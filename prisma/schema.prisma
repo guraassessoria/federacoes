@@ -155,3 +155,40 @@ model DeParaMapping {
   @@unique([companyId, contaFederacao])
   @@index([companyId])
 }
+
+model StandardStructure {
+  id        String        @id @default(cuid())
+  type      StructureType
+  version   Int           @default(1)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  lines     StandardStructureLine[]
+
+  @@index([type, isActive])
+}
+
+model StandardStructureLine {
+  id                 String   @id @default(cuid())
+  structureId         String
+  order               Int
+  code                String
+  description         String
+  group               String?
+  parentCode          String?
+  isTotal             Boolean  @default(false)
+
+  structure           StandardStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@index([structureId, order])
+  @@index([code])
+}
+
+enum StructureType {
+  BP
+  DRE
+  DFC
+  DMPL
+  DVA
+  DRA
+}

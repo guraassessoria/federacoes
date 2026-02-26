@@ -101,3 +101,37 @@ enum FileType {
   DE_PARA
   BALANCETE
 }
+
+model DeParaRow {
+  id                String   @id @default(cuid())
+  companyId          String
+  contaBalancete     String
+  descricaoBalancete String?
+  padraoBP           String?
+  padraoDRE          String?
+  padraoDFC          String?
+  padraoDMPL         String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([companyId, contaBalancete])
+  @@index([companyId])
+}
+
+model BalanceteRow {
+  id          String   @id @default(cuid())
+  companyId    String
+  periodo      String   // ex: "2025-12" ou "2025-12-31"
+  conta        String
+  descricao    String?
+  saldoInicial Decimal? @db.Decimal(18,2)
+  debito       Decimal? @db.Decimal(18,2)
+  credito      Decimal? @db.Decimal(18,2)
+  saldoFinal   Decimal? @db.Decimal(18,2)
+  natureza     String?  // "D"/"C" se você tiver
+
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, periodo])
+}

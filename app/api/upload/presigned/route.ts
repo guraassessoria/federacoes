@@ -1,74 +1,71 @@
+// app/api/upload/presigned/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { handleUpload } from "@vercel/blob/client";
+import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request): Promise<Response> {
+function sanitizeFolder(input: string) {
+  return input.replace(/[^a-zA-Z0-9/_-]/g, "") || "uploads";
+}
+
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    // Trava de governança (ajuste conforme sua política)
+    // Se quiser travar só ADMIN, mantém assim:
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ✅ Retorne o Response gerado pelo handleUpload (isso resolve o erro do build)
-    return await handleUpload({
-      request,
+    // Lê FormData (arquivo real)
+    const formData = await req.formData();
+    const file = formData.get("file");
 
-      // Aqui você pode impor regras antes de gerar o token
-      onBeforeGenerateToken: async (pathname) => {
-        // Opcional: restringir quem pode subir arquivo (ex: ADMIN/EDITOR)
-        const role = (session.user as any)?.role;
-        if (!["ADMIN", "EDITOR"].includes(role)) {
-          throw new Error("Sem permissão para upload");
-        }
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "file is required (FormData)" }, { status: 400 });
+    }
 
-        // Opcional: validar path/pastas permitidas
-        // Ex.: só permitir uploads/...
-        // if (!pathname.startsWith("uploads/")) throw new Error("Path inválido");
+    const folderRaw = String(formData.get("folder") || "uploads");
+    const companyId = String(formData.get("companyId") || "");
 
-        return {
-          access: "private",
-          // whitelist dos content-types aceitos
-          allowedContentTypes: [
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-excel",
-            "text/csv",
-            "application/pdf",
-          ],
-          // payload opcional (vai para onUploadCompleted)
-          tokenPayload: JSON.stringify({
-            userId: (session.user as any)?.id,
-            role,
-          }),
-        };
-      },
+    const safeFolder = sanitizeFolder(folderRaw);
+    const safeCompany = companyId ? sanitizeFolder(companyId) : "";
+    const keyPrefix = safeCompany ? `${safeFolder}/${safeCompany}` : safeFolder;
 
-      // Callback pós-upload (server-side)
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // Aqui você pode auditar/logar, ou até gravar no banco se quiser
-        // blob: { url, pathname, contentType, contentDisposition, ... }
-        // tokenPayload: string (o JSON acima)
-        console.log("Upload completed:", {
-          pathname: blob.pathname,
-          url: blob.url,
-          tokenPayload,
-        });
+    const key = `${keyPrefix}/${Date.now()}-${file.name}`;
 
-        return {
-          response: "ok",
-        };
-      },
+    // 🔐 Token do Blob Store (o seu é BLOB_READ_WRITE_TOKEN)
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return NextResponse.json(
+        { error: "Missing env var: BLOB_READ_WRITE_TOKEN" },
+        { status: 500 }
+      );
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+
+    const blob = await put(key, arrayBuffer, {
+      access: "private",
+      contentType: file.type || "application/octet-stream",
+      addRandomSuffix: false,
+      token, // 👈 usa o seu token customizado
+    });
+
+    return NextResponse.json({
+      url: blob.url,
+      pathname: blob.pathname,
+      key,
+      cloudStoragePath: blob.pathname, // padrão que você já usa no DB
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
     });
   } catch (err: any) {
-    console.error("Error in blob upload handler:", err);
-    return NextResponse.json(
-      { error: err?.message || "Failed to create upload token" },
-      { status: 500 }
-    );
+    console.error("Blob upload error:", err);
+    return NextResponse.json({ error: "Failed to upload" }, { status: 500 });
   }
 }

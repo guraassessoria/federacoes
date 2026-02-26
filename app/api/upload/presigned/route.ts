@@ -1,40 +1,41 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { generatePresignedUploadUrl } from "@/lib/s3";
+import { getServerSession } from "next-auth";
+import { handleUpload } from "@vercel/blob/client";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user || (session.user as any).role !== "ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { fileName, contentType, isPublic = false } = body;
-
-    if (!fileName || !contentType) {
-      return NextResponse.json(
-        { error: "fileName e contentType são obrigatórios" },
-        { status: 400 }
-      );
-    }
-
-    const { uploadUrl, cloudStoragePath } = await generatePresignedUploadUrl(
-      fileName,
-      contentType,
-      isPublic
-    );
-
-    return NextResponse.json({ uploadUrl, cloudStoragePath });
-  } catch (error) {
-    console.error("Error generating presigned URL:", error);
-    return NextResponse.json(
-      { error: "Erro ao gerar URL de upload" },
-      { status: 500 }
-    );
+    return await handleUpload({
+      request,
+      body,
+      onBeforeGenerateToken: async () => ({
+        allowedContentTypes: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+          "text/csv",
+        ],
+        tokenPayload: {
+          userId: (session.user as any).id,
+          role: (session.user as any).role,
+        },
+      }),
+      onUploadCompleted: async ({ blob }) => {
+        console.log("Upload completed:", blob.pathname);
+      },
+    });
+  } catch (err) {
+    console.error("Blob upload auth failed:", err);
+    return NextResponse.json({ error: "Upload authorization failed" }, { status: 500 });
   }
 }

@@ -60,13 +60,43 @@ function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
 }
 
 /**
+ * Tenta ler um arquivo JSON estático de múltiplos caminhos possíveis.
+ * Na Vercel, process.cwd() pode variar, então tentamos vários.
+ */
+function readJsonFileSafe(fileName: string): any[] | null {
+  const possiblePaths = [
+    path.join(process.cwd(), 'public', 'data', fileName),
+    path.join(process.cwd(), '.next', 'server', 'public', 'data', fileName),
+    path.resolve('public', 'data', fileName),
+    path.join('/var/task', 'public', 'data', fileName),
+  ];
+
+  for (const filePath of possiblePaths) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(content);
+        console.log(`[readJsonFileSafe] Leu ${fileName} de: ${filePath} (${parsed.length} itens)`);
+        return parsed;
+      }
+    } catch (e) {
+      // tenta próximo caminho
+    }
+  }
+
+  console.error(`[readJsonFileSafe] Não encontrou ${fileName} em nenhum caminho`);
+  return null;
+}
+
+/**
  * Carrega estrutura do banco de dados por tipo.
  * Retorna null se não houver estrutura salva no banco.
  */
 async function loadEstruturaFromDB(tipo: 'BP' | 'DRE' | 'DFC' | 'DMPL'): Promise<{ rows: ContaEstrutura[]; version: number } | null> {
   try {
+    // Tenta buscar usando StructureType (schema novo)
     const record = await prisma.standardStructure.findUnique({
-      where: { type: tipo },
+      where: { type: tipo as any },
     });
 
     if (!record || !record.data) return null;
@@ -81,76 +111,86 @@ async function loadEstruturaFromDB(tipo: 'BP' | 'DRE' | 'DFC' | 'DMPL'): Promise
       version: record.version,
     };
   } catch (error) {
-    console.error(`[loadEstruturaFromDB] Erro ao carregar ${tipo} do banco:`, error);
+    // Log mas NÃO propaga — permite fallback para JSON
+    console.warn(`[loadEstruturaFromDB] Falha ao carregar ${tipo} do banco (usando fallback JSON):`, 
+      error instanceof Error ? error.message : error
+    );
     return null;
   }
 }
 
 /**
  * Carrega a estrutura base do DRE
- * 1º tenta o banco de dados (StandardStructure)
- * 2º fallback para o arquivo JSON estático
+ * 1º tenta cache em memória
+ * 2º tenta o banco de dados (StandardStructure)
+ * 3º fallback para o arquivo JSON estático
  */
 export async function loadEstruturaDRE(): Promise<ContaEstrutura[]> {
-  // Tenta carregar do banco
-  const fromDB = await loadEstruturaFromDB('DRE');
-
-  if (fromDB) {
-    // Se a versão mudou ou cache está vazio, atualiza
-    if (!estruturaDRECache || estruturaDREVersion !== fromDB.version) {
-      estruturaDRECache = fromDB.rows;
-      estruturaDREVersion = fromDB.version;
-      console.log(`[loadEstruturaDRE] Carregado do banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+  // 1. Tenta carregar do banco
+  try {
+    const fromDB = await loadEstruturaFromDB('DRE');
+    if (fromDB && fromDB.rows.length > 0) {
+      if (!estruturaDRECache || estruturaDREVersion !== fromDB.version) {
+        estruturaDRECache = fromDB.rows;
+        estruturaDREVersion = fromDB.version;
+        console.log(`[loadEstruturaDRE] ✅ Banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+      }
+      return estruturaDRECache;
     }
+  } catch (e) {
+    console.warn('[loadEstruturaDRE] Erro ao tentar banco, usando fallback JSON');
+  }
+
+  // 2. Fallback: cache em memória (de leitura anterior do JSON)
+  if (estruturaDRECache && estruturaDRECache.length > 0) return estruturaDRECache;
+
+  // 3. Fallback: arquivo JSON estático
+  console.log('[loadEstruturaDRE] Banco vazio/indisponível, carregando JSON estático...');
+  const parsed = readJsonFileSafe('estrutura_dre.json');
+  if (parsed && parsed.length > 0) {
+    estruturaDRECache = parsed;
     return estruturaDRECache;
   }
 
-  // Fallback: arquivo JSON estático
-  if (estruturaDRECache) return estruturaDRECache;
-
-  console.log('[loadEstruturaDRE] Banco vazio, usando fallback JSON estático');
-  const filePath = path.join(process.cwd(), 'public', 'data', 'estrutura_dre.json');
-  try {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    estruturaDRECache = JSON.parse(fileContent);
-  } catch (e) {
-    console.error('[loadEstruturaDRE] Falha ao ler JSON estático:', e);
-    estruturaDRECache = [];
-  }
-  return estruturaDRECache!;
+  console.error('[loadEstruturaDRE] ❌ NENHUMA FONTE disponível para estrutura DRE!');
+  return [];
 }
 
 /**
  * Carrega a estrutura base do BP
- * 1º tenta o banco de dados (StandardStructure)
- * 2º fallback para o arquivo JSON estático
+ * 1º tenta cache em memória
+ * 2º tenta o banco de dados (StandardStructure)
+ * 3º fallback para o arquivo JSON estático
  */
 export async function loadEstruturaBP(): Promise<ContaEstrutura[]> {
-  // Tenta carregar do banco
-  const fromDB = await loadEstruturaFromDB('BP');
-
-  if (fromDB) {
-    if (!estruturaBPCache || estruturaBPVersion !== fromDB.version) {
-      estruturaBPCache = fromDB.rows;
-      estruturaBPVersion = fromDB.version;
-      console.log(`[loadEstruturaBP] Carregado do banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+  // 1. Tenta carregar do banco
+  try {
+    const fromDB = await loadEstruturaFromDB('BP');
+    if (fromDB && fromDB.rows.length > 0) {
+      if (!estruturaBPCache || estruturaBPVersion !== fromDB.version) {
+        estruturaBPCache = fromDB.rows;
+        estruturaBPVersion = fromDB.version;
+        console.log(`[loadEstruturaBP] ✅ Banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+      }
+      return estruturaBPCache;
     }
+  } catch (e) {
+    console.warn('[loadEstruturaBP] Erro ao tentar banco, usando fallback JSON');
+  }
+
+  // 2. Fallback: cache em memória
+  if (estruturaBPCache && estruturaBPCache.length > 0) return estruturaBPCache;
+
+  // 3. Fallback: arquivo JSON estático
+  console.log('[loadEstruturaBP] Banco vazio/indisponível, carregando JSON estático...');
+  const parsed = readJsonFileSafe('estrutura_bp.json');
+  if (parsed && parsed.length > 0) {
+    estruturaBPCache = parsed;
     return estruturaBPCache;
   }
 
-  // Fallback: arquivo JSON estático
-  if (estruturaBPCache) return estruturaBPCache;
-
-  console.log('[loadEstruturaBP] Banco vazio, usando fallback JSON estático');
-  const filePath = path.join(process.cwd(), 'public', 'data', 'estrutura_bp.json');
-  try {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    estruturaBPCache = JSON.parse(fileContent);
-  } catch (e) {
-    console.error('[loadEstruturaBP] Falha ao ler JSON estático:', e);
-    estruturaBPCache = [];
-  }
-  return estruturaBPCache!;
+  console.error('[loadEstruturaBP] ❌ NENHUMA FONTE disponível para estrutura BP!');
+  return [];
 }
 
 /**

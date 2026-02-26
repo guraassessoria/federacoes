@@ -143,7 +143,49 @@ export async function GET(request: NextRequest) {
         return parsed && parsed.month === month.padStart(2, "0");
       });
 
+      if (viewMode === "mensal") {
+      // Retorna dados do mês específico
+      const monthData = monthlyDataArray.find((m) => {
+        const parsed = parsePeriod(m.period);
+        return parsed && parsed.month === month.padStart(2, "0");
+      });
+
       if (monthData) {
+        // ═══ PROCESSAR estruturaDRE para o mês ═══
+        let estruturaDREMensal: ContaComValor[] | null = null;
+        try {
+          // Busca dados do balancete APENAS deste mês
+          const balanceteMes = await prisma.balanceteData.findMany({
+            where: { companyId, period: monthData.period },
+          });
+
+          if (balanceteMes.length > 0) {
+            // Carrega de-para
+            const deParaRows = await prisma.deParaMapping.findMany({
+              where: { companyId },
+              select: {
+                contaFederacao: true,
+                padraoBP: true,
+                padraoDRE: true,
+                padraoDFC: true,
+                padraoDMPL: true,
+              },
+            });
+            const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
+              contaFederacao: r.contaFederacao,
+              padraoBP: r.padraoBP,
+              padraoDRE: r.padraoDRE,
+              padraoDFC: r.padraoDFC,
+              padraoDMPL: r.padraoDMPL,
+            }));
+
+            const processado = await processarDadosFinanceiros(balanceteMes, deParaRecords);
+            estruturaDREMensal = processado.dre;
+          }
+        } catch (error) {
+          console.error(`Erro ao processar estrutura mensal ${month}/${year}:`, error);
+        }
+
         return NextResponse.json({
           success: true,
           source: "database",
@@ -155,6 +197,7 @@ export async function GET(request: NextRequest) {
             dre: monthData.dre,
             indices: monthData.indices,
             period: monthData.period,
+            estruturaDRE: estruturaDREMensal,
           },
         });
       } else {

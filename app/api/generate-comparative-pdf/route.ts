@@ -403,38 +403,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { year, federacoes: federacoesNomes } = body;
+   const body = await request.json();
+    const { year, companyIds, federacoes: federacoesNomes } = body;
 
-    // Buscar empresas
-    let companyNames: string[] = [];
+    // Buscar empresas - prioriza companyIds (IDs reais), fallback para nomes
+    let companies: { id: string; name: string }[] = [];
     
-    if (federacoesNomes && Array.isArray(federacoesNomes) && federacoesNomes.length > 0) {
-      companyNames = federacoesNomes;
+    if (companyIds && Array.isArray(companyIds) && companyIds.length > 0) {
+      // Novo formato: recebe IDs reais das empresas
+      companies = await prisma.company.findMany({
+        where: { id: { in: companyIds } },
+        select: { id: true, name: true },
+      });
+    } else if (federacoesNomes && Array.isArray(federacoesNomes) && federacoesNomes.length > 0) {
+      // Formato antigo (compatibilidade): recebe nomes
+      companies = await prisma.company.findMany({
+        where: { name: { in: federacoesNomes } },
+        select: { id: true, name: true },
+      });
     } else {
-      // Buscar empresas do usuário
+      // Fallback: todas as empresas do usuário
       const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: { companies: { include: { company: true } } }
+        include: { companies: { include: { company: { select: { id: true, name: true } } } } }
       });
       
       if (user?.companies) {
-        companyNames = user.companies.map(uc => uc.company.name);
+        companies = user.companies.map(uc => uc.company);
       }
     }
-
-    if (companyNames.length < 2) {
-      return NextResponse.json({ 
-        error: 'São necessárias pelo menos 2 federações para gerar o relatório comparativo' 
-      }, { status: 400 });
-    }
-
-    // Buscar empresas no banco
-    const companies = await prisma.company.findMany({
-      where: {
-        name: { in: companyNames }
-      }
-    });
 
     if (companies.length < 2) {
       return NextResponse.json({ 

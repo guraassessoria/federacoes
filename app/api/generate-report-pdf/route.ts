@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { processarDadosFinanceiros, ContaComValor, flattenHierarchy } from '@/lib/services/estruturaMapping';
+import { processarDadosFinanceiros, ContaComValor, flattenHierarchy, DeParaRecord } from '@/lib/services/estruturaMapping';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -484,7 +484,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Processar dados financeiros
-    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData);
+    const deParaRows = await prisma.deParaMapping.findMany({
+  where: { companyId },
+  select: { contaFederacao: true, padraoBP: true, padraoDRE: true, padraoDFC: true, padraoDMPL: true },
+});
+const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
+  contaFederacao: r.contaFederacao,
+  padraoBP: r.padraoBP,
+  padraoDRE: r.padraoDRE,
+  padraoDFC: r.padraoDFC,
+  padraoDMPL: r.padraoDMPL,
+}));
+    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
 
     // Gerar HTML
     const periodo = `20${yearFilter}`;

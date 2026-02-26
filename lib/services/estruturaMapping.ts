@@ -312,45 +312,48 @@ export async function mapBalanceteToDRE(
   }
 
   // ── Ordem de apresentação da DRE ──
-  // 1. Receita Bruta (expandível com detalhes)
+  // Regra: grupos de DADOS são expandíveis (mostram detalhes)
+  //        totalizadores CALCULADOS são apenas linhas de resultado (sem children)
+  
+  // 1. Receita Bruta (expandível → detalhes das receitas)
   resultado.push(nodeWithChildren('51', 'Receita Bruta')!);
   
-  // 2. (-) Deduções da Receita
+  // 2. (-) Deduções da Receita (expandível se houver)
   if (val('52') !== 0) resultado.push(nodeWithChildren('52')!);
   
-  // 3. Receita Líquida (= Receita Bruta - Deduções)
+  // 3. Receita Líquida = Receita Bruta - Deduções (SEM children)
   resultado.push(node('56', 'Receita Líquida')!);
   
-  // 4. (-) Custos (expandível)
+  // 4. (-) Custos (expandível → detalhes dos custos)
   resultado.push(nodeWithChildren('57', '(-) Custos dos Serviços')!);
   
-  // 5. Margem Bruta
+  // 5. Margem Bruta = Receita Líquida - Custos (SEM children)
   resultado.push(node('109', 'Margem Bruta')!);
   
-  // 6. (-) Despesas (expandível)
+  // 6. (-) Despesas (expandível → detalhes das despesas)
   resultado.push(nodeWithChildren('110', '(-) Despesas Gerais')!);
   
-  // 7. Resultado Operacional
+  // 7. Resultado Operacional = Margem - Despesas (SEM children)
   resultado.push(node('196', 'Resultado Operacional')!);
   
-  // 8. LAREF
+  // 8. LAREF = Resultado Operacional (SEM children)
   resultado.push(node('197', 'Lucro Antes do Resultado Financeiro')!);
   
-  // 9. (+/-) Resultado Financeiro (expandível, indentado)
+  // 9. (+/-) Resultado Financeiro (expandível, indentado nível 2)
   const resFin = nodeWithChildren('198', '(+/-) Resultado Financeiro');
   if (resFin) { resFin.nivelVisualizacao = 2; resultado.push(resFin); }
   
-  // 10. (+/-) Resultado Não Operacional (expandível, indentado)
+  // 10. (+/-) Outras Receitas/Despesas (expandível, indentado nível 2)
   const resNaoOper = nodeWithChildren('218', '(+/-) Outras Receitas/Despesas');
   if (resNaoOper) { resNaoOper.nivelVisualizacao = 2; resultado.push(resNaoOper); }
   
-  // 11. Lucro Antes dos Impostos
+  // 11. Lucro Antes dos Impostos (SEM children)
   resultado.push(node('227', 'Lucro Líquido Antes dos Impostos')!);
   
-  // 12. IR e CSLL
+  // 12. IR e CSLL (se houver)
   if (val('228') !== 0) resultado.push(node('228', 'LAIR e LACS')!);
   
-  // 13. Superávit/Déficit
+  // 13. Superávit/Déficit (SEM children)
   resultado.push(node('229', 'Superávit/Déficit do Exercício')!);
 
   return resultado.filter(Boolean);
@@ -453,4 +456,4 @@ export function flattenHierarchy(contas: ContaComValor[], resultado: ContaComVal
     if (c.children?.length) flattenHierarchy(c.children, resultado);
   }
   return resultado;
-}
+} 

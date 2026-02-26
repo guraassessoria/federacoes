@@ -2,69 +2,93 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { FileType } from "@prisma/client";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+/**
+ * GET /api/admin/standard-files?type=BP|DRE|DFC|DMPL
+ * Retorna a estrutura padrão salva no banco.
+ */
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    if (!session?.user || (session.user as any).role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type");
 
-    if (user?.role !== "ADMIN") {
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+    if (!type) {
+      return NextResponse.json({ error: "type is required" }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { type, name, cloudStoragePath } = body;
-
-    const file = await prisma.standardFile.upsert({
-      where: { type: type as FileType },
-      update: {
-        name,
-        cloudStoragePath,
-        version: { increment: 1 },
-      },
-      create: {
-        type: type as FileType,
-        name,
-        cloudStoragePath,
-      },
+    const record = await prisma.standardStructure.findUnique({
+      where: { type: type as any },
     });
 
-    return NextResponse.json({ file });
-  } catch (error) {
-    console.error("Error saving standard file:", error);
-    return NextResponse.json(
-      { error: "Erro ao salvar arquivo" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      type,
+      version: record?.version ?? 0,
+      data: record?.data ?? null,
+      updatedAt: record?.updatedAt ?? null,
+    });
+  } catch (err) {
+    console.error("GET standard-files error:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
-export async function GET() {
+/**
+ * POST /api/admin/standard-files
+ * Body: { type: "BP"|"DRE"|"DFC"|"DMPL", data: any }
+ * Salva a estrutura padrão no banco (sobrescreve e incrementa versão).
+ */
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    if (!session?.user || (session.user as any).role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const files = await prisma.standardFile.findMany();
+    const body = await req.json();
+    const { type, data } = body as { type?: string; data?: any };
 
-    return NextResponse.json({ files });
-  } catch (error) {
-    console.error("Error fetching standard files:", error);
-    return NextResponse.json(
-      { error: "Erro ao buscar arquivos" },
-      { status: 500 }
-    );
+    if (!type) {
+      return NextResponse.json({ error: "type is required" }, { status: 400 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: "data is required" }, { status: 400 });
+    }
+
+    const existing = await prisma.standardStructure.findUnique({
+      where: { type: type as any },
+    });
+
+    const saved = await prisma.standardStructure.upsert({
+      where: { type: type as any },
+      create: {
+        type: type as any,
+        data,
+        version: 1,
+      },
+      update: {
+        data,
+        version: (existing?.version ?? 0) + 1,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      type: saved.type,
+      version: saved.version,
+      updatedAt: saved.updatedAt,
+    });
+  } catch (err) {
+    console.error("POST standard-files error:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

@@ -46,14 +46,20 @@ model UserCompany {
 }
 
 model StandardFile {
-  id               String   @id @default(cuid())
-  type             FileType @unique
-  name             String
-  description      String?
-  cloudStoragePath String
-  version          Int      @default(1)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id          String   @id @default(cuid())
+  type        FileType @unique
+  name        String
+  description String?
+
+  // ✅ NOVO: conteúdo da estrutura salvo no banco
+  contentJson Json
+
+  // opcional: guardar o CSV “original” (bom para auditoria)
+  rawText     String?
+
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model CompanyFile {
@@ -191,4 +197,13 @@ enum StructureType {
   DMPL
   DVA
   DRA
+}
+model StandardStructure {
+  id        String   @id @default(cuid())
+  type      FileType @unique
+  // Estrutura normalizada em JSON, editável via upload de XLSX/CSV
+  data      Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -80,16 +80,8 @@ interface UserCompany {
   role: string;
 }
 
-// Todas as federações do sistema
-const todasFederacoes = [
-  { id: 'Federação Paulista de Futebol', nome: 'Federação Paulista de Futebol', sigla: 'FPF' },
-  { id: 'Federação Mineira de Futebol', nome: 'Federação Mineira de Futebol', sigla: 'FMF' },
-  { id: 'Federação Gaúcha de Futebol', nome: 'Federação Gaúcha de Futebol', sigla: 'FGF' },
-  { id: 'Federação Carioca de Futebol', nome: 'Federação Carioca de Futebol', sigla: 'FERJ' },
-  { id: 'Federação Bahiana de Futebol', nome: 'Federação Bahiana de Futebol', sigla: 'FBF' },
-  { id: 'Federação Paranaense de Futebol', nome: 'Federação Paranaense de Futebol', sigla: 'FPrF' },
-  { id: 'Federação de Futebol do Piauí', nome: 'Federação de Futebol do Piauí', sigla: 'FFP' },
-];
+// Todas as federações do sistema - agora derivadas das empresas do usuário
+// (removido lista estática - usa userCompanies diretamente)
 
 const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const MONTH_NAMES_FULL = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -207,16 +199,12 @@ export default function DemonstracoesPage() {
     }
   }, [viewMode]);
 
-  // ═══ Federações ═══
-  const federacoesDisponiveis = todasFederacoes.filter(fed =>
-    userCompanies.some(uc => {
-      const ucNameLower = uc.name.toLowerCase();
-      const fedIdLower = fed.id.toLowerCase();
-      const fedSiglaLower = fed.sigla.toLowerCase();
-      return ucNameLower === fedIdLower || ucNameLower.includes(fedIdLower) ||
-             fedIdLower.includes(ucNameLower) || ucNameLower.includes(fedSiglaLower);
-    })
-  );
+  // ═══ Empresas disponíveis para comparação (direto do cadastro do usuário) ═══
+  const federacoesDisponiveis = userCompanies.map(uc => ({
+    id: uc.id,
+    nome: uc.name,
+    sigla: uc.name.split(' ').map(w => w[0]).filter(c => c === c?.toUpperCase()).join('').substring(0, 4),
+  }));
 
   useEffect(() => {
     const fetchUserCompanies = async () => {
@@ -304,12 +292,16 @@ export default function DemonstracoesPage() {
 
   // ═══ PDF ═══
   const handleGeneratePdf = async () => {
+    if (!selectedCompanyId) {
+      alert('Selecione uma empresa no menu lateral');
+      return;
+    }
     setGeneratingPdf(true);
     try {
       const response = await fetch('/api/generate-report-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName: selectedCompanyName, year: selectedYear }),
+        body: JSON.stringify({ companyId: selectedCompanyId, companyName: selectedCompanyName, year: selectedYear }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -333,14 +325,14 @@ export default function DemonstracoesPage() {
   };
 
   const handleGenerateComparativePdf = async () => {
-    if (selectedFederacoes.length < 2) { alert('Selecione pelo menos 2 federações'); return; }
+    if (selectedFederacoes.length < 2) { alert('Selecione pelo menos 2 empresas'); return; }
     setShowFederacaoModal(false);
     setGeneratingComparative(true);
     try {
       const response = await fetch('/api/generate-comparative-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: selectedYear, federacoes: selectedFederacoes }),
+        body: JSON.stringify({ year: selectedYear, companyIds: selectedFederacoes }),
       });
       if (!response.ok) { const error = await response.json(); throw new Error(error.error || 'Erro'); }
       const blob = await response.blob();

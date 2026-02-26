@@ -143,13 +143,6 @@ export async function GET(request: NextRequest) {
         return parsed && parsed.month === month.padStart(2, "0");
       });
 
-      if (viewMode === "mensal") {
-      // Retorna dados do mês específico
-      const monthData = monthlyDataArray.find((m) => {
-        const parsed = parsePeriod(m.period);
-        return parsed && parsed.month === month.padStart(2, "0");
-      });
-
       if (monthData) {
         // ═══ PROCESSAR estruturaDRE para o mês ═══
         let estruturaDREMensal: ContaComValor[] | null = null;

@@ -1,460 +1,944 @@
-/**
- * Serviço de Mapeamento de Estrutura
- * 
- * BP: Hierarquia padrão (ATIVO/PASSIVO como raízes, soma bottom-up)
- * 
- * DRE: Apresentação sequencial de totalizadores (como no padrão contábil):
- *   Receita Bruta           → expandível → detalhes das receitas
- *   Receita Líquida         = Receita Bruta - Deduções
- *   (-) Custos              → expandível → detalhes dos custos
- *   Margem Bruta            = Receita Líquida - Custos
- *   (-) Despesas            → expandível → detalhes das despesas
- *   Resultado Operacional   = Margem Bruta - Despesas
- *   LAREF                   = Resultado Operacional
- *   (+/-) Resultado Financeiro → expandível
- *   (+/-) Resultado Não Oper   → expandível
- *   Lucro Antes dos Impostos = LAREF + Res Fin + Res Não Oper
- *   IR e CSLL
- *   Superávit/Déficit       = LAI - IR
- */
+'use client';
 
-import { BalanceteData } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
+import { formatCurrency } from '@/lib/data';
+import CustomBarChart from '@/components/charts/bar-chart';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
 
-// ─── Tipos ────────────────────────────────────────────────────
+// Interface para conta hierárquica (dados brutos do balancete)
+interface HierarchicalAccount {
+  codigo: string;
+  descricao: string;
+  valor: number;
+  nivel: number;
+  children?: HierarchicalAccount[];
+}
 
-export interface ContaEstrutura {
+// Interface para conta da estrutura base (de-para)
+interface ContaComValor {
   codigo: string;
   descricao: string;
   codigoSuperior: string | null;
   nivel: number;
   nivelVisualizacao: number;
-  ordem?: number;
-}
-
-export interface ContaComValor extends ContaEstrutura {
   valor: number;
   children?: ContaComValor[];
 }
 
-export interface DeParaRecord {
-  contaFederacao: string;
-  padraoBP: string | null;
-  padraoDRE: string | null;
-  padraoDFC: string | null;
-  padraoDMPL: string | null;
+// Interface para DRE hierárquica
+interface HierarchicalDRE {
+  receitas: HierarchicalAccount[];
+  custos: HierarchicalAccount[];
+  resultados: Record<string, number>;
+  total: number;
 }
 
-// ─── Cache ────────────────────────────────────────────────────
-
-let estruturaDRECache: ContaEstrutura[] | null = null;
-let estruturaBPCache: ContaEstrutura[] | null = null;
-
-// ─── Utilitários ──────────────────────────────────────────────
-
-function normalizeCodigo(cod: string): string {
-  if (!cod) return '';
-  return cod.replace(/^0+/, '') || '0';
+// Interface para BP hierárquico
+interface HierarchicalBP {
+  ativo: HierarchicalAccount[];
+  passivo: HierarchicalAccount[];
+  patrimonioLiquido: HierarchicalAccount[];
+  totalAtivo: number;
+  totalPassivo: number;
+  totalPL: number;
 }
 
-function readJsonFileSafe(fileName: string): any[] | null {
-  const paths = [
-    path.join(process.cwd(), 'public', 'data', fileName),
-    path.resolve('public', 'data', fileName),
-    path.join(process.cwd(), '.next', 'server', 'public', 'data', fileName),
-  ];
-  for (const p of paths) {
+// Interface para dados financeiros da API
+interface FinancialApiData {
+  bp?: {
+    ativoCirculante?: Record<string, number>;
+    ativoNaoCirculante?: Record<string, number>;
+    passivoCirculante?: Record<string, number>;
+    passivoNaoCirculante?: Record<string, number>;
+    patrimonioLiquido?: Record<string, number>;
+    totalAtivo?: number;
+    totalPassivo?: number;
+  };
+  dre?: {
+    receitas?: Record<string, number>;
+    custos?: Record<string, number>;
+    despesas?: Record<string, number>;
+    resultados?: Record<string, number>;
+    total?: number;
+  };
+  estruturaDRE?: ContaComValor[];
+  estruturaBP?: ContaComValor[];
+  resultadoDRE?: number;
+  totalPassivoPL?: number;
+  hierarchicalDRE?: HierarchicalDRE;
+  hierarchicalBP?: HierarchicalBP;
+}
+
+type TabType = 'bp' | 'dre' | 'dfc' | 'dmpl' | 'dva';
+
+interface UserCompany {
+  id: string;
+  name: string;
+  cnpj: string | null;
+  role: string;
+}
+
+// Todas as federações do sistema
+const todasFederacoes = [
+  { id: 'Federação Paulista de Futebol', nome: 'Federação Paulista de Futebol', sigla: 'FPF' },
+  { id: 'Federação Mineira de Futebol', nome: 'Federação Mineira de Futebol', sigla: 'FMF' },
+  { id: 'Federação Gaúcha de Futebol', nome: 'Federação Gaúcha de Futebol', sigla: 'FGF' },
+  { id: 'Federação Carioca de Futebol', nome: 'Federação Carioca de Futebol', sigla: 'FERJ' },
+  { id: 'Federação Bahiana de Futebol', nome: 'Federação Bahiana de Futebol', sigla: 'FBF' },
+  { id: 'Federação Paranaense de Futebol', nome: 'Federação Paranaense de Futebol', sigla: 'FPrF' },
+  { id: 'Federação de Futebol do Piauí', nome: 'Federação de Futebol do Piauí', sigla: 'FFP' },
+];
+
+const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTH_NAMES_FULL = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const bpGroups = [
+  { title: 'Ativo Circulante', keys: ['Total Disponibilidades', 'Total Contas a Receber', 'Total Estoques', 'Total Ativo Circulante'], total: 'Total Ativo Circulante' },
+  { title: 'Ativo Nao Circulante', keys: ['Total Imobilizado Liquido', 'Total Intangivel', 'Total Ativo Nao Circulante'], total: 'Total Ativo Nao Circulante' },
+  { title: 'Passivo Circulante', keys: ['Fornecedores', 'Emprestimos Bancarios CP', 'Total Passivo Circulante'], total: 'Total Passivo Circulante' },
+  { title: 'Passivo Nao Circulante', keys: ['Emprestimos Bancarios LP', 'Financiamentos LP', 'Total Passivo Nao Circulante'], total: 'Total Passivo Nao Circulante' },
+  { title: 'Patrimonio Liquido', keys: ['Capital Social', 'Reserva Legal', 'Superavits Acumulados', 'Total Patrimonio Liquido'], total: 'Total Patrimonio Liquido' }
+];
+
+const dreGroups = [
+  { title: 'Receitas Operacionais', keys: ['Receitas de Competicoes', 'Receitas de Repasses', 'Receitas de Convenios e Parcerias', 'Outras Receitas Operacionais', 'Total Receitas Operacionais'], total: 'Total Receitas Operacionais' },
+  { title: 'Custos', keys: ['Custos com Competicoes', 'Custos com Desenvolvimento do Futebol', 'Custos com Infraestrutura Esportiva', 'Total Custos'], total: 'Total Custos' },
+  { title: 'Despesas Operacionais', keys: ['Despesas com Pessoal', 'Despesas Administrativas', 'Despesas Comerciais e Marketing', 'Outras Despesas Operacionais', 'Total Despesas Operacionais'], total: 'Total Despesas Operacionais' },
+  { title: 'Resultados', keys: ['Resultado Operacional', 'Resultado Financeiro', 'Resultado Nao Operacional', 'Resultado Liquido'], total: 'Resultado Liquido' }
+];
+
+const dfcGroups = [
+  { title: 'Atividades Operacionais', keys: ['Resultado do Periodo', 'Ajustes de Depreciacoes', 'Ajustes de Provisoes', 'Variacao de Contas a Receber', 'Variacao de Estoques', 'Variacao de Fornecedores', 'Total Atividades Operacionais'], total: 'Total Atividades Operacionais' },
+  { title: 'Atividades de Investimento', keys: ['Aquisicao de Imobilizado', 'Venda de Ativos', 'Investimentos em Intangiveis', 'Total Atividades Investimento'], total: 'Total Atividades Investimento' },
+  { title: 'Atividades de Financiamento', keys: ['Captacao de Emprestimos', 'Pagamento de Emprestimos', 'Aumento de Capital', 'Distribuicao de Resultados', 'Total Atividades Financiamento'], total: 'Total Atividades Financiamento' },
+  { title: 'Variacao do Caixa', keys: ['Variacao Liquida do Caixa', 'Caixa Inicial', 'Caixa Final'], total: 'Caixa Final' }
+];
+
+const dmplGroups = [
+  { title: 'Capital Social', keys: ['Saldo Inicial Capital', 'Integralizacao de Capital', 'Ajustes de Capital', 'Saldo Final Capital'], total: 'Saldo Final Capital' },
+  { title: 'Reservas de Capital', keys: ['Saldo Inicial Reservas', 'Constituicao de Reservas', 'Utilizacao de Reservas', 'Saldo Final Reservas'], total: 'Saldo Final Reservas' },
+  { title: 'Reserva Legal', keys: ['Saldo Inicial Reserva Legal', 'Destinacao do Resultado', 'Saldo Final Reserva Legal'], total: 'Saldo Final Reserva Legal' },
+  { title: 'Resultados Acumulados', keys: ['Saldo Inicial Resultados', 'Resultado do Exercicio', 'Destinacao para Reservas', 'Ajustes de Exercicios Anteriores', 'Saldo Final Resultados'], total: 'Saldo Final Resultados' },
+  { title: 'Total Patrimonio Liquido', keys: ['Saldo Inicial PL', 'Mutacoes do Periodo', 'Saldo Final PL'], total: 'Saldo Final PL' }
+];
+
+const dvaGroups = [
+  { title: 'Receitas', keys: ['Receitas de Competicoes e Eventos', 'Receitas Comerciais e de Patrocinio', 'Receitas de Subvencoes e Convenios', 'Outras Receitas Operacionais', 'Total Receitas'], total: 'Total Receitas' },
+  { title: '(-) Insumos Adquiridos de Terceiros', keys: ['Custos de Competicoes e Eventos', 'Materiais e Servicos de Terceiros', 'Servicos Tecnicos Especializados', 'Outros Insumos', 'Total Insumos'], total: 'Total Insumos' },
+  { title: 'Valor Adicionado Bruto', keys: ['Valor Adicionado Bruto'], total: 'Valor Adicionado Bruto' },
+  { title: '(-) Depreciacao e Amortizacao', keys: ['Depreciacao de Imobilizado', 'Amortizacao de Intangiveis', 'Total Depreciacao'], total: 'Total Depreciacao' },
+  { title: 'Valor Adicionado Liquido', keys: ['Valor Adicionado Liquido'], total: 'Valor Adicionado Liquido' },
+  { title: 'Valor Adicionado Recebido em Transferencia', keys: ['Receitas Financeiras', 'Resultado de Equivalencia', 'Total Transferencias'], total: 'Total Transferencias' },
+  { title: 'Valor Adicionado Total a Distribuir', keys: ['Valor Adicionado Total'], total: 'Valor Adicionado Total' },
+  { title: 'Distribuicao - Pessoal', keys: ['Remuneracao Direta', 'Beneficios', 'FGTS', 'Total Pessoal'], total: 'Total Pessoal' },
+  { title: 'Distribuicao - Impostos', keys: ['Tributos Federais', 'Tributos Estaduais', 'Tributos Municipais', 'Total Impostos'], total: 'Total Impostos' },
+  { title: 'Distribuicao - Capitais de Terceiros', keys: ['Despesas Financeiras', 'Alugueis', 'Total Capitais Terceiros'], total: 'Total Capitais Terceiros' },
+  { title: 'Distribuicao - Capitais Proprios', keys: ['Superavit do Exercicio', 'Destinacao para Reservas', 'Total Capitais Proprios'], total: 'Total Capitais Proprios' }
+];
+
+// Dados fictícios para DFC, DMPL, DVA (mantidos)
+const dfcData: Record<string, Record<string, number>> = {
+  '2025': {
+    'Resultado do Periodo': 6100, 'Ajustes de Depreciacoes': 3400, 'Ajustes de Provisoes': 1600,
+    'Variacao de Contas a Receber': -3200, 'Variacao de Estoques': -500, 'Variacao de Fornecedores': 2400,
+    'Total Atividades Operacionais': 9800, 'Aquisicao de Imobilizado': -9000, 'Venda de Ativos': 1500,
+    'Investimentos em Intangiveis': -2200, 'Total Atividades Investimento': -9700,
+    'Captacao de Emprestimos': 6000, 'Pagamento de Emprestimos': -5800,
+    'Aumento de Capital': 4000, 'Distribuicao de Resultados': -3000,
+    'Total Atividades Financiamento': 1200, 'Variacao Liquida do Caixa': 1300,
+    'Caixa Inicial': 15000, 'Caixa Final': 16300
+  }
+};
+
+const dmplData: Record<string, Record<string, number>> = {
+  '2025': {
+    'Saldo Inicial Capital': 40500, 'Integralizacao de Capital': 4000, 'Ajustes de Capital': 0,
+    'Saldo Final Capital': 44500, 'Saldo Inicial Reservas': 3250, 'Constituicao de Reservas': 700,
+    'Utilizacao de Reservas': -100, 'Saldo Final Reservas': 3850, 'Saldo Inicial Reserva Legal': 2285,
+    'Destinacao do Resultado': 305, 'Saldo Final Reserva Legal': 2590, 'Saldo Inicial Resultados': 26415,
+    'Resultado do Exercicio': 6100, 'Destinacao para Reservas': -1005, 'Ajustes de Exercicios Anteriores': 0,
+    'Saldo Final Resultados': 31510, 'Saldo Inicial PL': 72450, 'Mutacoes do Periodo': 10000, 'Saldo Final PL': 82450
+  }
+};
+
+const dvaData: Record<string, Record<string, number>> = {
+  '2025': {
+    'Receitas de Competicoes e Eventos': 42000, 'Receitas Comerciais e de Patrocinio': 28000,
+    'Receitas de Subvencoes e Convenios': 15000, 'Outras Receitas Operacionais': 5000,
+    'Total Receitas': 90000, 'Custos de Competicoes e Eventos': -18000,
+    'Materiais e Servicos de Terceiros': -12000, 'Servicos Tecnicos Especializados': -6000,
+    'Outros Insumos': -4000, 'Total Insumos': -40000, 'Valor Adicionado Bruto': 50000,
+    'Depreciacao de Imobilizado': -2800, 'Amortizacao de Intangiveis': -600,
+    'Total Depreciacao': -3400, 'Valor Adicionado Liquido': 46600,
+    'Receitas Financeiras': 3500, 'Resultado de Equivalencia': 500, 'Total Transferencias': 4000,
+    'Valor Adicionado Total': 50600, 'Remuneracao Direta': 18000, 'Beneficios': 4500,
+    'FGTS': 1800, 'Total Pessoal': 24300, 'Tributos Federais': 8000, 'Tributos Estaduais': 2500,
+    'Tributos Municipais': 1500, 'Total Impostos': 12000, 'Despesas Financeiras': 4200,
+    'Alugueis': 2000, 'Total Capitais Terceiros': 6200, 'Superavit do Exercicio': 6100,
+    'Destinacao para Reservas': 2000, 'Total Capitais Proprios': 8100
+  }
+};
+
+export default function DemonstracoesPage() {
+  // ═══ CONTEXTO GLOBAL (menu lateral) ═══
+  const { viewMode, selectedYear, selectedMonth, selectedCompanyId, selectedCompanyName, dataVersion } = useDashboard();
+
+  const [activeTab, setActiveTab] = useState<TabType>('bp');
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingComparative, setGeneratingComparative] = useState(false);
+  const [showFederacaoModal, setShowFederacaoModal] = useState(false);
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
+  const [loadingFinancialData, setLoadingFinancialData] = useState(false);
+
+  // Dados anuais: { '2025': FinancialApiData }
+  const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
+  // Dados mensais: { '2025': { '01': FinancialApiData, '02': FinancialApiData, ... } }
+  const [monthlyData, setMonthlyData] = useState<Record<string, Record<string, FinancialApiData>>>({});
+
+  // ═══ Forçar DRE no modo mensal ═══
+  useEffect(() => {
+    if (viewMode === 'mensal') {
+      setActiveTab('dre');
+    }
+  }, [viewMode]);
+
+  // ═══ Federações ═══
+  const federacoesDisponiveis = todasFederacoes.filter(fed =>
+    userCompanies.some(uc => {
+      const ucNameLower = uc.name.toLowerCase();
+      const fedIdLower = fed.id.toLowerCase();
+      const fedSiglaLower = fed.sigla.toLowerCase();
+      return ucNameLower === fedIdLower || ucNameLower.includes(fedIdLower) ||
+             fedIdLower.includes(ucNameLower) || ucNameLower.includes(fedSiglaLower);
+    })
+  );
+
+  useEffect(() => {
+    const fetchUserCompanies = async () => {
+      try {
+        const response = await fetch('/api/user/companies');
+        if (response.ok) {
+          const data = await response.json();
+          setUserCompanies(data.companies || []);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar empresas:', error);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+    fetchUserCompanies();
+  }, []);
+
+  useEffect(() => {
+    if (federacoesDisponiveis.length > 0) {
+      setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
+    }
+  }, [userCompanies]);
+
+  // ═══ FETCH DADOS ANUAIS ═══
+  const fetchFinancialData = useCallback(async (companyId: string, year: string) => {
+    if (!companyId) return;
+    setLoadingFinancialData(true);
     try {
-      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
-    } catch (e) { /* next */ }
-  }
-  return null;
-}
-
-// ─── Carregamento ─────────────────────────────────────────────
-
-export async function loadEstruturaDRE(): Promise<ContaEstrutura[]> {
-  if (estruturaDRECache) return estruturaDRECache;
-  const parsed = readJsonFileSafe('estrutura_dre.json');
-  if (parsed?.length) { estruturaDRECache = parsed; return estruturaDRECache; }
-  return [];
-}
-
-export async function loadEstruturaBP(): Promise<ContaEstrutura[]> {
-  if (estruturaBPCache) return estruturaBPCache;
-  const parsed = readJsonFileSafe('estrutura_bp.json');
-  if (parsed?.length) { estruturaBPCache = parsed; return estruturaBPCache; }
-  return [];
-}
-
-export function setEstruturaCache(tipo: 'BP' | 'DRE', estrutura: ContaEstrutura[]) {
-  if (tipo === 'BP') estruturaBPCache = estrutura;
-  if (tipo === 'DRE') estruturaDRECache = estrutura;
-}
-
-export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE') {
-  if (!tipo || tipo === 'DRE') estruturaDRECache = null;
-  if (!tipo || tipo === 'BP') estruturaBPCache = null;
-}
-
-export function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
-  return rows.map((row: any) => ({
-    codigo: String(row.codigo || ''),
-    descricao: String(row.descricao || ''),
-    codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
-    nivel: Number(row.nivel) || 1,
-    nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
-  }));
-}
-
-// ─── Classificação e Filtro ───────────────────────────────────
-
-function getTipoDemonstracao(accountNumber: string): 'BP' | 'DRE' | null {
-  const c = accountNumber.charAt(0);
-  if (c === '1' || c === '2') return 'BP';
-  if (c === '3' || c === '4' || c === '5') return 'DRE';
-  return null;
-}
-
-function filtrarContasFolhas(data: BalanceteData[]): BalanceteData[] {
-  const codigos = new Set(data.map(c => c.accountNumber));
-  return data.filter(conta => {
-    for (const outro of codigos) {
-      if (outro !== conta.accountNumber && outro.startsWith(conta.accountNumber + '.')) return false;
-    }
-    return true;
-  });
-}
-
-function ajustarSinal(valor: number, accountNumber: string): number {
-  const c = accountNumber.charAt(0);
-  if (c === '2' || c === '3') return valor * -1;
-  return valor;
-}
-
-function buildDeParaLookup(records: DeParaRecord[], tipo: 'BP' | 'DRE'): Record<string, string> {
-  const lookup: Record<string, string> = {};
-  for (const rec of records) {
-    const cod = tipo === 'BP' ? rec.padraoBP : rec.padraoDRE;
-    if (cod) lookup[rec.contaFederacao.trim()] = normalizeCodigo(cod.trim());
-  }
-  return lookup;
-}
-
-// ─── Mapear Valores do Balancete ──────────────────────────────
-
-function mapearValores(
-  balanceteData: BalanceteData[],
-  tipo: 'BP' | 'DRE',
-  deParaRecords?: DeParaRecord[]
-): Record<string, number> {
-  let lookup: Record<string, string> = {};
-  if (deParaRecords?.length) lookup = buildDeParaLookup(deParaRecords, tipo);
-
-  const contasTipo = balanceteData.filter(c => getTipoDemonstracao(c.accountNumber) === tipo);
-  const folhas = filtrarContasFolhas(contasTipo);
-
-  const valores: Record<string, number> = {};
-  for (const conta of folhas) {
-    const codPadrao = lookup[conta.accountNumber];
-    if (codPadrao) {
-      const val = ajustarSinal(Number(conta.finalBalance) || 0, conta.accountNumber);
-      valores[codPadrao] = (valores[codPadrao] || 0) + val;
-    }
-  }
-  return valores;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// BP: Hierarquia padrão com soma bottom-up
-// ═══════════════════════════════════════════════════════════════
-
-export async function mapBalanceteToBP(
-  balanceteData: BalanceteData[],
-  deParaRecords?: DeParaRecord[]
-): Promise<ContaComValor[]> {
-  const estrutura = await loadEstruturaBP();
-  if (!estrutura?.length) return [];
-
-  const valores = mapearValores(balanceteData, 'BP', deParaRecords);
-
-  const contas: ContaComValor[] = estrutura.map(c => ({
-    ...c,
-    valor: valores[c.codigo] || 0,
-  }));
-
-  // Bottom-up sum
-  const mapa = new Map<string, ContaComValor>();
-  contas.forEach(c => mapa.set(c.codigo, c));
-  const ordenadas = [...contas].sort((a, b) => b.nivel - a.nivel);
-  for (const conta of ordenadas) {
-    if (conta.codigoSuperior && conta.valor !== 0) {
-      const pai = mapa.get(conta.codigoSuperior);
-      if (pai) pai.valor += conta.valor;
-    }
-  }
-
-  // Build tree
-  return buildTree(contas);
-}
-
-function buildTree(contas: ContaComValor[]): ContaComValor[] {
-  const mapa = new Map<string, ContaComValor>();
-  contas.forEach(c => mapa.set(c.codigo, { ...c, children: [] }));
-
-  const raizes: ContaComValor[] = [];
-  contas.forEach(c => {
-    const atual = mapa.get(c.codigo)!;
-    if (c.codigoSuperior) {
-      const pai = mapa.get(c.codigoSuperior);
-      if (pai) pai.children!.push(atual);
-      else raizes.push(atual);
-    } else {
-      raizes.push(atual);
-    }
-  });
-  return raizes;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DRE: Apresentação sequencial com fórmulas
-// ═══════════════════════════════════════════════════════════════
-
-export async function mapBalanceteToDRE(
-  balanceteData: BalanceteData[],
-  deParaRecords?: DeParaRecord[]
-): Promise<ContaComValor[]> {
-  const estrutura = await loadEstruturaDRE();
-  if (!estrutura?.length) return [];
-
-  const valores = mapearValores(balanceteData, 'DRE', deParaRecords);
-
-  // Criar mapa de contas com valores analíticos
-  const mapa = new Map<string, ContaComValor>();
-  estrutura.forEach((c, idx) => {
-    mapa.set(c.codigo, { ...c, ordem: idx, valor: valores[c.codigo] || 0, children: [] });
-  });
-
-  // ─── ETAPA 1: Soma bottom-up para grupos NÃO-totalizadores ───
-  // Grupos que somam filhos normalmente (ex: 51, 57, 110, etc.)
-  // Totalizadores com fórmula NÃO recebem soma dos filhos
-  const totalizadoresFormula = new Set(['56', '109', '196', '197', '198', '218', '227', '229']);
-
-  const ordenadas = [...estrutura].sort((a, b) => b.nivel - a.nivel);
-  for (const item of ordenadas) {
-    const conta = mapa.get(item.codigo)!;
-    if (conta.codigoSuperior && conta.valor !== 0) {
-      if (!totalizadoresFormula.has(conta.codigoSuperior)) {
-        const pai = mapa.get(conta.codigoSuperior);
-        if (pai) pai.valor += conta.valor;
+      const response = await fetch(`/api/financial-data?companyId=${companyId}&viewMode=anual&year=${year}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setFinancialData(prev => ({ ...prev, [year]: result.data }));
+        }
       }
+    } catch (error) {
+      console.error('Erro ao buscar dados financeiros:', error);
+    } finally {
+      setLoadingFinancialData(false);
     }
-  }
+  }, []);
 
-  // ─── ETAPA 2: Fórmulas específicas ───
-  const val = (cod: string) => mapa.get(cod)?.valor || 0;
-  const set = (cod: string, v: number) => { const c = mapa.get(cod); if (c) c.valor = v; };
-
-  set('56',  val('51') + val('52'));              // Receita Líquida = Bruta + Deduções
-  set('109', val('56') - val('57'));              // Margem Bruta = Rec Líq - Custos
-  set('196', val('109') - val('110'));            // Result Operacional = Margem - Despesas
-  set('197', val('196'));                          // LAREF = Result Operacional
-  set('198', val('199') - val('207'));            // Result Financeiro = Rec Fin - Desp Fin
-  set('218', val('219') - val('223'));            // Result Não Oper = Rec - Desp
-  set('227', val('197') + val('198') + val('218')); // LAI
-  set('229', val('227') - val('228'));            // Superávit/Déficit
-
-  // ─── ETAPA 3: Montar árvore interna (para detalhes expandíveis) ───
-  // Cada grupo que tem filhos recebe seus filhos como children
-  estrutura.forEach(c => {
-    if (c.codigoSuperior) {
-      const pai = mapa.get(c.codigoSuperior);
-      const filho = mapa.get(c.codigo);
-      if (pai && filho) pai.children!.push(filho);
-    }
-  });
-
-  // ─── ETAPA 4: Montar apresentação sequencial ───
-  // Retorna lista flat de seções na ordem de apresentação contábil
-  const resultado: ContaComValor[] = [];
-
-  // Helper: cria nó SEM children (totalizador = só exibe valor, não expandível)
-  const node = (cod: string, descOverride?: string): ContaComValor | null => {
-    const c = mapa.get(cod);
-    if (!c) return null;
-    return {
-      ...c,
-      descricao: descOverride || c.descricao,
-      nivelVisualizacao: 1,
-      children: [], // IMPORTANTE: limpar children para não duplicar
-    };
-  };
-
-  // Helper: cria nó com filhos re-nivelados para apresentação
-  const nodeWithChildren = (cod: string, descOverride?: string): ContaComValor | null => {
-    const c = mapa.get(cod);
-    if (!c) return null;
-    return {
-      ...c,
-      descricao: descOverride || c.descricao,
-      nivelVisualizacao: 1,
-      children: reNivelar(c.children || [], 1),
-    };
-  };
-
-  // Re-nivela children para apresentação (nível relativo ao pai)
-  function reNivelar(children: ContaComValor[], parentLevel: number): ContaComValor[] {
-    return children.map(child => ({
-      ...child,
-      nivelVisualizacao: parentLevel + 1,
-      children: child.children?.length ? reNivelar(child.children, parentLevel + 1) : [],
-    }));
-  }
-
-  // ── Ordem de apresentação da DRE ──
-  // Regra: grupos de DADOS são expandíveis (mostram detalhes)
-  //        totalizadores CALCULADOS são apenas linhas de resultado (sem children)
-  
-  // 1. Receita Bruta (expandível → detalhes das receitas)
-  resultado.push(nodeWithChildren('51', 'Receita Bruta')!);
-  
-  // 2. (-) Deduções da Receita (expandível se houver)
-  if (val('52') !== 0) resultado.push(nodeWithChildren('52')!);
-  
-  // 3. Receita Líquida = Receita Bruta - Deduções (SEM children)
-  resultado.push(node('56', 'Receita Líquida')!);
-  
-  // 4. (-) Custos (expandível → detalhes dos custos)
-  resultado.push(nodeWithChildren('57', '(-) Custos dos Serviços')!);
-  
-  // 5. Margem Bruta = Receita Líquida - Custos (SEM children)
-  resultado.push(node('109', 'Margem Bruta')!);
-  
-  // 6. (-) Despesas (expandível → detalhes das despesas)
-  resultado.push(nodeWithChildren('110', '(-) Despesas Gerais')!);
-  
-  // 7. Resultado Operacional = Margem - Despesas (SEM children)
-  resultado.push(node('196', 'Resultado Operacional')!);
-  
-  // 8. LAREF = Resultado Operacional (SEM children)
-  resultado.push(node('197', 'Lucro Antes do Resultado Financeiro')!);
-  
-  // 9. (+/-) Resultado Financeiro (expandível, indentado nível 2)
-  const resFin = nodeWithChildren('198', '(+/-) Resultado Financeiro');
-  if (resFin) { resFin.nivelVisualizacao = 2; resultado.push(resFin); }
-  
-  // 10. (+/-) Outras Receitas/Despesas (expandível, indentado nível 2)
-  const resNaoOper = nodeWithChildren('218', '(+/-) Outras Receitas/Despesas');
-  if (resNaoOper) { resNaoOper.nivelVisualizacao = 2; resultado.push(resNaoOper); }
-  
-  // 11. Lucro Antes dos Impostos (SEM children)
-  resultado.push(node('227', 'Lucro Líquido Antes dos Impostos')!);
-  
-  // 12. IR e CSLL (se houver)
-  if (val('228') !== 0) resultado.push(node('228', 'LAIR e LACS')!);
-  
-  // 13. Superávit/Déficit (SEM children)
-  resultado.push(node('229', 'Superávit/Déficit do Exercício')!);
-
-  return resultado.filter(Boolean);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Interface pública (mantém compatibilidade)
-// ═══════════════════════════════════════════════════════════════
-
-/** Mantém compatibilidade com chamadas existentes */
-export async function mapBalanceteToEstrutura(
-  balanceteData: BalanceteData[],
-  tipo: 'BP' | 'DRE',
-  deParaRecords?: DeParaRecord[]
-): Promise<ContaComValor[]> {
-  if (tipo === 'BP') return mapBalanceteToBP(balanceteData, deParaRecords);
-  return mapBalanceteToDRE(balanceteData, deParaRecords);
-}
-
-export async function processarDadosFinanceiros(
-  balanceteData: BalanceteData[],
-  deParaRecords?: DeParaRecord[]
-): Promise<{
-  dre: ContaComValor[];
-  bp: ContaComValor[];
-  resultadoDRE: number;
-  totalPassivoPL: number;
-}> {
-  const [dre, bp] = await Promise.all([
-    mapBalanceteToDRE(balanceteData, deParaRecords),
-    mapBalanceteToBP(balanceteData, deParaRecords),
-  ]);
-
-  // Resultado = valor do Superávit/Déficit (229)
-  const resultadoDRE = dre.find(c => c.codigo === '229')?.valor || 0;
-
-  // Inserir resultado no BP
-  inserirResultadoNoBP(bp, resultadoDRE);
-  
-  // Total Passivo + PL
-  const totalPassivoPL = buscarValor(bp, '76') || 0;
-
-  return { dre, bp, resultadoDRE, totalPassivoPL };
-}
-
-// ─── Auxiliares BP ────────────────────────────────────────────
-
-function buscarValor(contas: ContaComValor[], codigo: string): number {
-  for (const c of contas) {
-    if (c.codigo === codigo) return c.valor;
-    if (c.children?.length) {
-      const v = buscarValor(c.children, codigo);
-      if (v !== 0) return v;
-    }
-  }
-  return 0;
-}
-
-function inserirResultadoNoBP(bp: ContaComValor[], resultado: number): void {
-  if (resultado === 0) return;
-  
-  function buscar(contas: ContaComValor[]): boolean {
-    for (const c of contas) {
-      if (c.codigo === '141') {
-        c.valor += resultado;
-        return true;
+  // ═══ FETCH DADOS MENSAIS (para visão mensal) ═══
+  const fetchMonthlyDRE = useCallback(async (companyId: string, year: string, upToMonth: number) => {
+    if (!companyId) return;
+    setLoadingFinancialData(true);
+    try {
+      const promises = [];
+      for (let m = 1; m <= upToMonth; m++) {
+        const monthStr = String(m).padStart(2, '0');
+        promises.push(
+          fetch(`/api/financial-data?companyId=${companyId}&viewMode=mensal&year=${year}&month=${monthStr}`)
+            .then(r => r.json())
+            .then(result => ({ month: String(m).padStart(2, '0'), data: result.success ? result.data : null }))
+            .catch(() => ({ month: String(m).padStart(2, '0'), data: null }))
+        );
       }
-      if (c.children?.length && buscar(c.children)) return true;
+      const results = await Promise.all(promises);
+      const monthly: Record<string, FinancialApiData> = {};
+      results.forEach(r => { if (r.data) monthly[r.month] = r.data; });
+      setMonthlyData(prev => ({ ...prev, [year]: monthly }));
+    } catch (error) {
+      console.error('Erro ao buscar dados mensais:', error);
+    } finally {
+      setLoadingFinancialData(false);
     }
-    return false;
-  }
-  
-  if (buscar(bp)) {
-    // Recalcular ancestors: 141 → 125 → 76
-    const mapa = new Map<string, ContaComValor>();
-    function indexar(contas: ContaComValor[]) {
-      for (const c of contas) { mapa.set(c.codigo, c); if (c.children?.length) indexar(c.children); }
-    }
-    indexar(bp);
+  }, []);
+
+  // ═══ EFEITO PRINCIPAL: buscar dados quando empresa/ano/mês mudam ═══
+  useEffect(() => {
+    if (!selectedCompanyId) return;
     
-    const c141 = mapa.get('141');
-    if (c141?.codigoSuperior) {
-      const c125 = mapa.get(c141.codigoSuperior);
-      if (c125?.children) {
-        c125.valor = c125.children.reduce((s, x) => s + x.valor, 0);
-        if (c125.codigoSuperior) {
-          const c76 = mapa.get(c125.codigoSuperior);
-          if (c76?.children) c76.valor = c76.children.reduce((s, x) => s + x.valor, 0);
+    if (viewMode === 'mensal') {
+      const monthNum = parseInt(selectedMonth);
+      // Busca meses do ano atual e do ano anterior
+      fetchMonthlyDRE(selectedCompanyId, selectedYear, monthNum);
+      const anoAnterior = String(Number(selectedYear) - 1);
+      fetchMonthlyDRE(selectedCompanyId, anoAnterior, monthNum);
+    } else {
+      // Anual: busca o ano selecionado
+      fetchFinancialData(selectedCompanyId, selectedYear);
+    }
+  }, [selectedCompanyId, selectedYear, selectedMonth, viewMode, dataVersion, fetchFinancialData, fetchMonthlyDRE]);
+
+  // ═══ PDF ═══
+  const handleGeneratePdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      const response = await fetch('/api/generate-report-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyName: selectedCompanyName, year: selectedYear }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao gerar PDF');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_financeiro_${selectedCompanyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao gerar PDF');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleGenerateComparativePdf = async () => {
+    if (selectedFederacoes.length < 2) { alert('Selecione pelo menos 2 federações'); return; }
+    setShowFederacaoModal(false);
+    setGeneratingComparative(true);
+    try {
+      const response = await fetch('/api/generate-comparative-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: selectedYear, federacoes: selectedFederacoes }),
+      });
+      if (!response.ok) { const error = await response.json(); throw new Error(error.error || 'Erro'); }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `comparativo_federacoes_${selectedYear}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao gerar PDF comparativo:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao gerar PDF comparativo');
+    } finally {
+      setGeneratingComparative(false);
+    }
+  };
+
+  // ═══ Helpers ═══
+  const toggleFederacao = (id: string) => setSelectedFederacoes(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  const selectAllFederacoes = () => setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
+  const deselectAllFederacoes = () => setSelectedFederacoes([]);
+  const toggleGroup = (group: string) => setExpandedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
+
+  // ═══ Value getters (para fallback estático) ═══
+  const dreKeyMapping: Record<string, { group: 'receitas' | 'custos' | 'despesas' | 'resultados', apiKey?: string }> = {
+    'Receitas de Competicoes': { group: 'receitas', apiKey: 'Receitas de Competições' },
+    'Receitas de Repasses': { group: 'receitas', apiKey: 'Programa de Auxilios Financeiros' },
+    'Receitas de Convenios e Parcerias': { group: 'receitas', apiKey: 'Receitas de Convênios' },
+    'Outras Receitas Operacionais': { group: 'receitas', apiKey: 'Outras Receitas' },
+    'Total Receitas Operacionais': { group: 'resultados', apiKey: 'totalReceitas' },
+    'Custos com Competicoes': { group: 'custos', apiKey: 'Custos com Competições' },
+    'Custos com Desenvolvimento do Futebol': { group: 'custos', apiKey: 'Custos com Desenvolvimento' },
+    'Custos com Infraestrutura Esportiva': { group: 'custos', apiKey: 'Custos com Infraestrutura' },
+    'Total Custos': { group: 'resultados', apiKey: 'totalCustos' },
+    'Despesas com Pessoal': { group: 'despesas', apiKey: 'Despesas com Pessoal' },
+    'Despesas Administrativas': { group: 'despesas', apiKey: 'Despesas Administrativas' },
+    'Despesas Comerciais e Marketing': { group: 'despesas', apiKey: 'Despesas Comerciais' },
+    'Outras Despesas Operacionais': { group: 'despesas', apiKey: 'Outras Despesas' },
+    'Total Despesas Operacionais': { group: 'resultados', apiKey: 'totalDespesas' },
+    'Resultado Operacional': { group: 'resultados', apiKey: 'resultadoOperacional' },
+    'Resultado Financeiro': { group: 'resultados', apiKey: 'resultadoFinanceiro' },
+    'Resultado Nao Operacional': { group: 'resultados', apiKey: 'resultadoNaoOperacional' },
+    'Resultado Liquido': { group: 'resultados', apiKey: 'resultadoLiquido' },
+  };
+
+  const bpKeyMapping: Record<string, { group: 'ativoCirculante' | 'ativoNaoCirculante' | 'passivoCirculante' | 'passivoNaoCirculante' | 'patrimonioLiquido', apiKey?: string }> = {
+    'Total Disponibilidades': { group: 'ativoCirculante', apiKey: 'Disponibilidades' },
+    'Total Contas a Receber': { group: 'ativoCirculante', apiKey: 'Contas a Receber' },
+    'Total Estoques': { group: 'ativoCirculante', apiKey: 'Estoques' },
+    'Total Ativo Circulante': { group: 'ativoCirculante', apiKey: 'TOTAL_ATIVO_CIRCULANTE' },
+    'Total Imobilizado Liquido': { group: 'ativoNaoCirculante', apiKey: 'Imobilizado' },
+    'Total Intangivel': { group: 'ativoNaoCirculante', apiKey: 'Intangível' },
+    'Total Ativo Nao Circulante': { group: 'ativoNaoCirculante', apiKey: 'TOTAL_ATIVO_NAO_CIRCULANTE' },
+    'Fornecedores': { group: 'passivoCirculante', apiKey: 'Fornecedores' },
+    'Emprestimos Bancarios CP': { group: 'passivoCirculante', apiKey: 'Empréstimos CP' },
+    'Total Passivo Circulante': { group: 'passivoCirculante', apiKey: 'TOTAL_PASSIVO_CIRCULANTE' },
+    'Emprestimos Bancarios LP': { group: 'passivoNaoCirculante', apiKey: 'Empréstimos LP' },
+    'Financiamentos LP': { group: 'passivoNaoCirculante', apiKey: 'Financiamentos' },
+    'Total Passivo Nao Circulante': { group: 'passivoNaoCirculante', apiKey: 'TOTAL_PASSIVO_NAO_CIRCULANTE' },
+    'Capital Social': { group: 'patrimonioLiquido', apiKey: 'Capital Social' },
+    'Reserva Legal': { group: 'patrimonioLiquido', apiKey: 'Reservas' },
+    'Superavits Acumulados': { group: 'patrimonioLiquido', apiKey: 'Lucros Acumulados' },
+    'Total Patrimonio Liquido': { group: 'patrimonioLiquido', apiKey: 'TOTAL_PATRIMONIO_LIQUIDO' },
+  };
+
+  const getDreValue = (year: string, key: string) => {
+    const apiData = financialData[year];
+    if (apiData?.dre) {
+      const mapping = dreKeyMapping[key];
+      if (mapping) {
+        const group = apiData.dre[mapping.group];
+        if (group && mapping.apiKey) {
+          const value = group[mapping.apiKey];
+          if (value !== undefined) return value / 1000;
+          const normalizedApiKey = mapping.apiKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey);
+          if (foundKey) return group[foundKey] / 1000;
+        }
+      }
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const groupName of ['receitas', 'custos', 'despesas', 'resultados'] as const) {
+        const group = apiData.dre[groupName];
+        if (group) {
+          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey);
+          if (foundKey) return group[foundKey] / 1000;
         }
       }
     }
-  }
-}
+    return 0;
+  };
 
-// ─── Flatten ──────────────────────────────────────────────────
+  const getBpValue = (year: string, key: string) => {
+    const apiData = financialData[year];
+    if (apiData?.bp) {
+      const mapping = bpKeyMapping[key];
+      if (mapping) {
+        const group = apiData.bp[mapping.group];
+        if (group && mapping.apiKey) {
+          const value = group[mapping.apiKey];
+          if (value !== undefined) return value / 1000;
+          const normalizedApiKey = mapping.apiKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey);
+          if (foundKey) return group[foundKey] / 1000;
+        }
+      }
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const groupName of ['ativoCirculante', 'ativoNaoCirculante', 'passivoCirculante', 'passivoNaoCirculante', 'patrimonioLiquido'] as const) {
+        const group = apiData.bp[groupName];
+        if (group) {
+          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey);
+          if (foundKey) return group[foundKey] / 1000;
+        }
+      }
+    }
+    return 0;
+  };
 
-export function flattenHierarchy(contas: ContaComValor[], resultado: ContaComValor[] = []): ContaComValor[] {
-  for (const c of contas) {
-    resultado.push(c);
-    if (c.children?.length) flattenHierarchy(c.children, resultado);
-  }
-  return resultado;
+  const getDfcValue = (year: string, key: string) => dfcData[year]?.[key] ?? 0;
+  const getDmplValue = (year: string, key: string) => dmplData[year]?.[key] ?? 0;
+  const getDvaValue = (year: string, key: string) => dvaData[year]?.[key] ?? 0;
+
+  const getGroups = () => {
+    switch (activeTab) {
+      case 'bp': return bpGroups; case 'dre': return dreGroups; case 'dfc': return dfcGroups;
+      case 'dmpl': return dmplGroups; case 'dva': return dvaGroups; default: return bpGroups;
+    }
+  };
+
+  const getValue = (year: string, key: string) => {
+    switch (activeTab) {
+      case 'bp': return getBpValue(year, key); case 'dre': return getDreValue(year, key);
+      case 'dfc': return getDfcValue(year, key); case 'dmpl': return getDmplValue(year, key);
+      case 'dva': return getDvaValue(year, key); default: return 0;
+    }
+  };
+
+  const groups = getGroups();
+  const chartData = groups.map(g => ({ name: g.title.substring(0, 15), [selectedYear]: Math.abs(getValue(selectedYear, g.total)) }));
+
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case 'bp': return 'Balanço Patrimonial'; case 'dre': return 'DRE - Demonstração do Resultado';
+      case 'dfc': return 'DFC - Demonstração do Fluxo de Caixa'; case 'dmpl': return 'DMPL - Demonstração das Mutações do PL';
+      case 'dva': return 'DVA - Demonstração do Valor Adicionado'; default: return '';
+    }
+  };
+
+  const getTabColor = () => {
+    switch (activeTab) {
+      case 'bp': return 'bg-blue-600'; case 'dre': return 'bg-indigo-600'; case 'dfc': return 'bg-emerald-600';
+      case 'dmpl': return 'bg-purple-600'; case 'dva': return 'bg-amber-600'; default: return 'bg-blue-600';
+    }
+  };
+
+  // ═══ RENDERIZAÇÃO: Estrutura base (anual) ═══
+  const renderEstruturaRows = (accounts: ContaComValor[], level: number = 0): JSX.Element[] => {
+    const rows: JSX.Element[] = [];
+    accounts.forEach((account) => {
+      const isExpandable = account.children && account.children.length > 0;
+      const isExpanded = expandedGroups.includes(account.codigo);
+      const indent = account.nivelVisualizacao * 16;
+      const nivelVis = account.nivelVisualizacao;
+      const bgClass = nivelVis === 1 ? 'bg-slate-200' : nivelVis === 2 ? 'bg-slate-100' : nivelVis === 3 ? 'bg-slate-50' : '';
+      const fontWeight = nivelVis <= 2 ? 'font-semibold' : nivelVis === 3 ? 'font-medium' : 'font-normal';
+      const textColor = nivelVis === 1 ? 'text-slate-900' : nivelVis === 2 ? 'text-slate-800' : nivelVis === 3 ? 'text-slate-700' : 'text-slate-600';
+      const fontSize = nivelVis <= 2 ? 'text-sm' : 'text-xs';
+
+      const hasValueRecursive = (acc: ContaComValor): boolean => {
+        if (acc.valor !== 0) return true;
+        return (acc.children || []).some(child => hasValueRecursive(child));
+      };
+      if (!hasValueRecursive(account)) return;
+
+      rows.push(
+        <tr key={account.codigo}
+          className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100 transition-colors`}
+          onClick={() => isExpandable && toggleGroup(account.codigo)}
+        >
+          <td className={`px-4 py-2 ${fontWeight} ${textColor} ${fontSize}`} style={{ paddingLeft: `${16 + indent}px` }}>
+            <div className="flex items-center gap-2">
+              {isExpandable && (
+                <span className="flex-shrink-0">
+                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </span>
+              )}
+              <span>{account.descricao}</span>
+            </div>
+          </td>
+          <td className={`text-right px-4 py-2 ${fontWeight} ${textColor} ${fontSize}`}>
+            {formatCurrency(account.valor / 1000)}
+          </td>
+        </tr>
+      );
+      if (isExpandable && isExpanded && account.children) {
+        rows.push(...renderEstruturaRows(account.children, level + 1));
+      }
+    });
+    return rows;
+  };
+
+  // ═══ RENDERIZAÇÃO: DRE Mensal (colunas por mês) ═══
+  const renderMensalDRE = () => {
+    const monthNum = parseInt(selectedMonth);
+    const anoAtual = selectedYear;
+    const anoAnterior = String(Number(selectedYear) - 1);
+    const dadosAtual = monthlyData[anoAtual] || {};
+    const dadosAnterior = monthlyData[anoAnterior] || {};
+
+    // Pega estrutura do último mês disponível
+    let estrutura: ContaComValor[] = [];
+    for (let m = monthNum; m >= 1; m--) {
+      const ms = String(m).padStart(2, '0');
+      if (dadosAtual[ms]?.estruturaDRE?.length) {
+        estrutura = dadosAtual[ms].estruturaDRE!;
+        break;
+      }
+    }
+
+    if (!estrutura.length) {
+      return (
+        <tr>
+          <td colSpan={monthNum + 4} className="text-center py-12 text-slate-400">
+            {loadingFinancialData ? (
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Carregando dados mensais...
+              </div>
+            ) : 'Sem dados mensais disponíveis para o período selecionado'}
+          </td>
+        </tr>
+      );
+    }
+
+    // Helper: valor de um código para um mês/ano
+    const getVal = (dados: Record<string, FinancialApiData>, month: string, codigo: string): number => {
+      const mesData = dados[month];
+      if (!mesData?.estruturaDRE) return 0;
+      const findInTree = (contas: ContaComValor[]): number => {
+        for (const c of contas) {
+          if (c.codigo === codigo) return c.valor;
+          if (c.children?.length) { const v = findInTree(c.children); if (v !== 0) return v; }
+        }
+        return 0;
+      };
+      return findInTree(mesData.estruturaDRE);
+    };
+
+    const rows: JSX.Element[] = [];
+
+    const renderRow = (conta: ContaComValor) => {
+      const isExpandable = conta.children && conta.children.length > 0;
+      const isExpanded = expandedGroups.includes(conta.codigo);
+      const nivelVis = conta.nivelVisualizacao;
+      const bgClass = nivelVis === 1 ? 'bg-slate-200' : nivelVis === 2 ? 'bg-slate-100' : nivelVis === 3 ? 'bg-slate-50' : '';
+      const fontWeight = nivelVis <= 2 ? 'font-semibold' : nivelVis === 3 ? 'font-medium' : 'font-normal';
+      const textColor = nivelVis === 1 ? 'text-slate-900' : nivelVis === 2 ? 'text-slate-800' : nivelVis === 3 ? 'text-slate-700' : 'text-slate-600';
+      const fontSize = nivelVis <= 2 ? 'text-xs' : 'text-[11px]';
+
+      // Valores mensais
+      let totalAtual = 0;
+      let totalAnterior = 0;
+      const cells: JSX.Element[] = [];
+
+      for (let m = 1; m <= monthNum; m++) {
+        const ms = String(m).padStart(2, '0');
+        const val = getVal(dadosAtual, ms, conta.codigo);
+        totalAtual += val;
+        cells.push(
+          <td key={`m${m}`} className={`text-right px-2 py-1.5 ${fontWeight} ${textColor} ${fontSize} whitespace-nowrap`}>
+            {val !== 0 ? formatCurrency(val / 1000) : '-'}
+          </td>
+        );
+      }
+
+      for (let m = 1; m <= monthNum; m++) {
+        const ms = String(m).padStart(2, '0');
+        totalAnterior += getVal(dadosAnterior, ms, conta.codigo);
+      }
+
+      const variacao = totalAnterior !== 0 ? ((totalAtual / totalAnterior) - 1) * 100 : 0;
+      const varColor = variacao > 0 ? 'text-green-700' : variacao < 0 ? 'text-red-600' : 'text-slate-400';
+
+      // Só exibe se tem algum valor
+      if (totalAtual === 0 && totalAnterior === 0) return;
+
+      rows.push(
+        <tr key={conta.codigo}
+          className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100`}
+          onClick={() => isExpandable && toggleGroup(conta.codigo)}
+        >
+          <td className={`px-3 py-1.5 ${fontWeight} ${textColor} ${fontSize} sticky left-0 ${bgClass || 'bg-white'} min-w-[220px] z-10`}>
+            <div className="flex items-center gap-1" style={{ paddingLeft: `${(nivelVis - 1) * 12}px` }}>
+              {isExpandable && (
+                <span className="flex-shrink-0">
+                  {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </span>
+              )}
+              <span className="truncate">{conta.descricao}</span>
+            </div>
+          </td>
+          {cells}
+          <td className={`text-right px-2 py-1.5 font-bold ${textColor} ${fontSize} bg-blue-50 border-l border-blue-200`}>
+            {formatCurrency(totalAtual / 1000)}
+          </td>
+          <td className={`text-right px-2 py-1.5 ${fontWeight} text-slate-500 ${fontSize} bg-slate-50 border-l border-slate-200`}>
+            {totalAnterior !== 0 ? formatCurrency(totalAnterior / 1000) : '-'}
+          </td>
+          <td className={`text-right px-2 py-1.5 font-semibold ${varColor} ${fontSize} border-l border-slate-200`}>
+            {totalAnterior !== 0 ? `${variacao > 0 ? '+' : ''}${variacao.toFixed(1)}%` : '-'}
+          </td>
+        </tr>
+      );
+
+      if (isExpandable && isExpanded && conta.children) {
+        conta.children.forEach(child => renderRow(child));
+      }
+    };
+
+    estrutura.forEach(conta => renderRow(conta));
+    return rows;
+  };
+
+  // ═══ Helpers de dados ═══
+  const getTotalPassivoPL = (): number => {
+    const data = financialData[selectedYear];
+    if (data?.totalPassivoPL) return data.totalPassivoPL;
+    if (data?.estruturaBP) {
+      const buscarValor = (contas: ContaComValor[], codigo: string): number => {
+        for (const c of contas) {
+          if (c.codigo === codigo) return c.valor;
+          if (c.children) { const v = buscarValor(c.children, codigo); if (v !== 0) return v; }
+        }
+        return 0;
+      };
+      return buscarValor(data.estruturaBP, '76');
+    }
+    return 0;
+  };
+
+  const renderHierarchicalRows = (accounts: HierarchicalAccount[], level: number = 0): JSX.Element[] => {
+    const rows: JSX.Element[] = [];
+    accounts.forEach((account) => {
+      const isExpandable = account.children && account.children.length > 0;
+      const isExpanded = expandedGroups.includes(account.codigo);
+      const indent = level * 20;
+      const bgClass = level === 0 ? 'bg-slate-100' : level === 1 ? 'bg-slate-50' : '';
+      const fontWeight = level <= 1 ? 'font-semibold' : 'font-normal';
+      const textColor = level === 0 ? 'text-slate-900' : level === 1 ? 'text-slate-800' : 'text-slate-600';
+      if (account.valor === 0 && (!account.children || account.children.length === 0)) return;
+      rows.push(
+        <tr key={account.codigo} className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100`}
+          onClick={() => isExpandable && toggleGroup(account.codigo)}>
+          <td className={`px-4 py-2 ${fontWeight} ${textColor}`} style={{ paddingLeft: `${16 + indent}px` }}>
+            <div className="flex items-center gap-2">
+              {isExpandable && (isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+              <span className="text-xs text-slate-400 mr-2">{account.codigo}</span>
+              {account.descricao}
+            </div>
+          </td>
+          <td className={`text-right px-4 py-2 ${fontWeight} ${textColor}`}>{formatCurrency(account.valor / 1000)}</td>
+        </tr>
+      );
+      if (isExpandable && isExpanded && account.children) {
+        rows.push(...renderHierarchicalRows(account.children, level + 1));
+      }
+    });
+    return rows;
+  };
+
+  const hasEstruturaData = (tab: TabType): boolean => {
+    const data = financialData[selectedYear];
+    if (!data) return false;
+    if (tab === 'dre' && data.estruturaDRE && data.estruturaDRE.length > 0) return true;
+    if (tab === 'bp' && data.estruturaBP && data.estruturaBP.length > 0) return true;
+    return false;
+  };
+
+  const hasHierarchicalData = (tab: TabType): boolean => {
+    const data = financialData[selectedYear];
+    if (!data) return false;
+    if (tab === 'dre' && data.hierarchicalDRE) return true;
+    if (tab === 'bp' && data.hierarchicalBP) return true;
+    return false;
+  };
+
+  const getEstruturaData = (): ContaComValor[] => {
+    const data = financialData[selectedYear];
+    if (!data) return [];
+    if (activeTab === 'dre' && data.estruturaDRE) return data.estruturaDRE;
+    if (activeTab === 'bp' && data.estruturaBP) return data.estruturaBP;
+    return [];
+  };
+
+  const getHierarchicalData = (): HierarchicalAccount[] => {
+    const data = financialData[selectedYear];
+    if (!data) return [];
+    if (activeTab === 'dre' && data.hierarchicalDRE) return [...data.hierarchicalDRE.receitas, ...data.hierarchicalDRE.custos];
+    if (activeTab === 'bp' && data.hierarchicalBP) return [...data.hierarchicalBP.ativo, ...data.hierarchicalBP.passivo, ...data.hierarchicalBP.patrimonioLiquido];
+    return [];
+  };
+
+  const isMensal = viewMode === 'mensal';
+  const monthNum = parseInt(selectedMonth);
+
+  // ═══ RENDER ═══
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl">
+        <div className="flex items-center gap-3 mb-2">
+          <FileSpreadsheet className="w-8 h-8" />
+          <h1 className="text-3xl font-bold">Demonstrações Financeiras</h1>
+        </div>
+        <p className="text-blue-100">
+          {isMensal
+            ? `DRE Mensal — ${MONTH_NAMES_FULL[1]} a ${MONTH_NAMES_FULL[monthNum]} de ${selectedYear}`
+            : `BP, DRE, DFC, DMPL e DVA — Exercício ${selectedYear}`
+          }
+        </p>
+      </motion.div>
+
+      {/* Tabs + Botões PDF */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {isMensal ? (
+          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm">
+            <FileSpreadsheet className="w-4 h-4" />
+            DRE Mensal — {selectedYear}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {(['bp', 'dre', 'dfc', 'dmpl', 'dva'] as TabType[]).map(tab => {
+              const colors: Record<TabType, string> = { bp: 'bg-blue-600', dre: 'bg-indigo-600', dfc: 'bg-emerald-600', dmpl: 'bg-purple-600', dva: 'bg-amber-600' };
+              const labels: Record<TabType, string> = { bp: 'BP', dre: 'DRE', dfc: 'DFC', dmpl: 'DMPL', dva: 'DVA' };
+              return (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === tab ? `${colors[tab]} text-white shadow-lg` : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                  {labels[tab]}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button onClick={handleGeneratePdf} disabled={generatingPdf}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-70">
+            {generatingPdf ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</> : <><Download className="w-4 h-4" />PDF Individual</>}
+          </button>
+          {!loadingCompanies && federacoesDisponiveis.length >= 2 && (
+            <button onClick={() => setShowFederacaoModal(true)} disabled={generatingComparative}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold shadow-lg hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-70">
+              {generatingComparative ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</> : <><FileBarChart className="w-4 h-4" />PDF Comparativo</>}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabela Principal */}
+      <motion.div key={activeTab + selectedYear + viewMode} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className={`${isMensal ? 'bg-indigo-600' : getTabColor()} px-4 py-3`}>
+          <h2 className="font-semibold text-white">
+            {isMensal
+              ? `DRE - Demonstração do Resultado — ${MONTH_NAMES_FULL[1]} a ${MONTH_NAMES_FULL[monthNum]} de ${selectedYear}`
+              : `${getTabTitle()} - Exercício ${selectedYear}`
+            }
+          </h2>
+        </div>
+
+        <div className={isMensal ? 'overflow-x-auto' : ''}>
+          <table className={`w-full text-sm ${isMensal ? 'min-w-[800px]' : ''}`}>
+            <thead>
+              <tr className="bg-slate-100">
+                <th className={`text-left px-4 py-3 font-semibold text-slate-700 ${isMensal ? 'sticky left-0 bg-slate-100 z-10 min-w-[220px]' : 'w-2/3'}`}>
+                  Conta
+                </th>
+                {isMensal ? (
+                  <>
+                    {Array.from({ length: monthNum }, (_, i) => (
+                      <th key={i} className="text-right px-2 py-3 font-semibold text-slate-600 text-xs whitespace-nowrap">
+                        {MONTH_NAMES_SHORT[i + 1]}
+                      </th>
+                    ))}
+                    <th className="text-right px-2 py-3 font-bold text-blue-700 text-xs bg-blue-50 border-l border-blue-200 whitespace-nowrap">
+                      Total {selectedYear}
+                    </th>
+                    <th className="text-right px-2 py-3 font-semibold text-slate-500 text-xs bg-slate-50 border-l border-slate-200 whitespace-nowrap">
+                      Total {Number(selectedYear) - 1}
+                    </th>
+                    <th className="text-right px-2 py-3 font-semibold text-slate-600 text-xs border-l border-slate-200 whitespace-nowrap">
+                      Var %
+                    </th>
+                  </>
+                ) : (
+                  <th className="text-right px-4 py-3 font-semibold text-slate-700 w-1/3">Valor (R$ mil)</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {isMensal ? (
+                // ═══ VISÃO MENSAL: DRE com colunas por mês ═══
+                renderMensalDRE()
+              ) : hasEstruturaData(activeTab) ? (
+                // ═══ VISÃO ANUAL: Estrutura base (de-para) ═══
+                <>
+                  {renderEstruturaRows(getEstruturaData())}
+                  {activeTab === 'bp' && (
+                    <tr className="bg-blue-100 border-t-2 border-blue-300">
+                      <td className="px-4 py-3 font-bold text-blue-900 text-sm">TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO</td>
+                      <td className="text-right px-4 py-3 font-bold text-blue-900 text-sm">{formatCurrency(getTotalPassivoPL() / 1000)}</td>
+                    </tr>
+                  )}
+                </>
+              ) : hasHierarchicalData(activeTab) ? (
+                renderHierarchicalRows(getHierarchicalData())
+              ) : (
+                groups.map((group) => (
+                  <React.Fragment key={group.title}>
+                    <tr className="bg-slate-50 cursor-pointer hover:bg-slate-100" onClick={() => toggleGroup(group.title)}>
+                      <td className="px-4 py-3 font-semibold text-slate-800 flex items-center gap-2">
+                        {expandedGroups.includes(group.title) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        {group.title}
+                      </td>
+                      <td className="text-right px-4 py-3 font-semibold text-slate-800">{formatCurrency(getValue(selectedYear, group.total))}</td>
+                    </tr>
+                    {expandedGroups.includes(group.title) && group.keys.filter(k => k !== group.total).map((key) => (
+                      <tr key={key} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-2 pl-10 text-slate-600">{key}</td>
+                        <td className="text-right px-4 py-2 text-slate-700">{formatCurrency(getValue(selectedYear, key))}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+
+      {/* Gráfico (apenas no modo anual) */}
+      {!isMensal && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-lg font-bold text-slate-800 mb-4">Composição por Grupo - {getTabTitle()} ({selectedYear})</h2>
+          <CustomBarChart
+            data={chartData}
+            bars={[{ dataKey: selectedYear, color: activeTab === 'bp' ? '#3B82F6' : activeTab === 'dre' ? '#6366F1' : activeTab === 'dfc' ? '#10B981' : activeTab === 'dmpl' ? '#8B5CF6' : '#F59E0B', name: selectedYear }]}
+          />
+        </motion.div>
+      )}
+
+      {/* Modal de Federações */}
+      {showFederacaoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Selecionar Federações para Comparação</h3>
+              <button onClick={() => setShowFederacaoModal(false)} className="text-white/80 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600 mb-4">Selecione as federações que deseja incluir no relatório comparativo (mínimo 2):</p>
+              <div className="flex gap-2 mb-4">
+                <button onClick={selectAllFederacoes} className="text-sm px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200">Selecionar Todas</button>
+                <button onClick={deselectAllFederacoes} className="text-sm px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Limpar Seleção</button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {federacoesDisponiveis.map((fed) => (
+                  <label key={fed.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedFederacoes.includes(fed.id) ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center ${selectedFederacoes.includes(fed.id) ? 'bg-violet-600' : 'bg-slate-200'}`}>
+                      {selectedFederacoes.includes(fed.id) && <Check className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <input type="checkbox" checked={selectedFederacoes.includes(fed.id)} onChange={() => toggleFederacao(fed.id)} className="sr-only" />
+                    <div className="flex-1">
+                      <span className="font-medium text-slate-800">{fed.nome}</span>
+                      <span className="ml-2 text-sm text-slate-500">({fed.sigla})</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <span className="text-sm text-slate-500">{selectedFederacoes.length} de {federacoesDisponiveis.length} selecionadas</span>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowFederacaoModal(false)} className="px-4 py-2 text-slate-600 hover:text-slate-800">Cancelar</button>
+                  <button onClick={handleGenerateComparativePdf} disabled={selectedFederacoes.length < 2}
+                    className="px-6 py-2 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold hover:from-violet-700 hover:to-violet-800 disabled:opacity-50">
+                    Gerar PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
 }

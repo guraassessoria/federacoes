@@ -279,14 +279,15 @@ export async function mapBalanceteToDRE(
   // Retorna lista flat de seções na ordem de apresentação contábil
   const resultado: ContaComValor[] = [];
 
-  // Helper: cria nó de apresentação
+  // Helper: cria nó SEM children (totalizador = só exibe valor, não expandível)
   const node = (cod: string, descOverride?: string): ContaComValor | null => {
     const c = mapa.get(cod);
     if (!c) return null;
     return {
       ...c,
       descricao: descOverride || c.descricao,
-      nivelVisualizacao: 1, // Totalizadores são nível 1 na apresentação
+      nivelVisualizacao: 1,
+      children: [], // IMPORTANTE: limpar children para não duplicar
     };
   };
 
@@ -456,4 +457,4 @@ export function flattenHierarchy(contas: ContaComValor[], resultado: ContaComVal
     if (c.children?.length) flattenHierarchy(c.children, resultado);
   }
   return resultado;
-} 
+}

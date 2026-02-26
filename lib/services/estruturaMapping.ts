@@ -311,15 +311,41 @@ export async function processarDadosFinanceiros(
 
 // ─── Resultado da DRE ─────────────────────────────────────────
 
+/**
+ * Calcula o resultado do exercício a partir da DRE.
+ * Tenta buscar o nó de resultado na hierarquia; se não encontrar,
+ * calcula somando todas as raízes da DRE (receitas - custos - despesas).
+ */
 function calcularResultadoDRE(dre: ContaComValor[]): number {
-  function buscar(contas: ContaComValor[], codigo: string): number {
+  function buscar(contas: ContaComValor[], codigo: string): number | null {
     for (const c of contas) {
       if (c.codigo === codigo) return c.valor;
-      if (c.children?.length) { const v = buscar(c.children, codigo); if (v !== 0) return v; }
+      if (c.children?.length) {
+        const v = buscar(c.children, codigo);
+        if (v !== null) return v;
+      }
     }
-    return 0;
+    return null;
   }
-  return buscar(dre, '225') || buscar(dre, '210');
+
+  // Tenta encontrar o nó de resultado na estrutura DRE
+  // 229 = Superávit/Déficit do Exercício (nível 1 - raiz)
+  // 210 = Resultado do Exercício (alternativo)
+  // 196 = Resultado Operacional (alternativo)
+  const codigos = ['229', '210', '196'];
+  for (const cod of codigos) {
+    const val = buscar(dre, cod);
+    if (val !== null && val !== 0) return val;
+  }
+
+  // Fallback: soma todas as raízes da DRE
+  // (receitas são positivas, custos/despesas negativos pelo ajuste de sinal)
+  let total = 0;
+  for (const raiz of dre) {
+    total += raiz.valor;
+  }
+  console.log(`[calcularResultadoDRE] Calculado por soma das raízes: ${total}`);
+  return total;
 }
 
 function inserirResultadoNoBP(bp: ContaComValor[], resultadoDRE: number): void {

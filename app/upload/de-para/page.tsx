@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { upload } from "@vercel/blob/client";
 import {
   Upload,
   FileSpreadsheet,
@@ -77,11 +78,13 @@ export default function UploadDeParaPage() {
         "application/vnd.ms-excel",
         "text/csv",
       ];
+
       if (!validTypes.includes(file.type) && !file.name.endsWith(".xlsx") && !file.name.endsWith(".csv")) {
         setStatusMessage("Formato inválido. Envie um arquivo Excel (.xlsx) ou CSV.");
         setUploadStatus("error");
         return;
       }
+
       setSelectedFile(file);
       setUploadStatus("idle");
       setStatusMessage("");
@@ -95,39 +98,19 @@ export default function UploadDeParaPage() {
     setUploadStatus("idle");
 
     try {
-      // 1. Get presigned URL
-      const presignedRes = await fetch("/api/upload/presigned", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: selectedFile.name,
-          contentType: selectedFile.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          isPublic: false,
-        }),
+      // 1) Upload no Vercel Blob (sem S3/AWS)
+      const blob = await upload(selectedFile.name, selectedFile, {
+        access: "private",
+        handleUploadUrl: "/api/upload/presigned",
       });
 
-      const { uploadUrl, cloudStoragePath } = await presignedRes.json();
-
-      // 2. Upload to S3
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": selectedFile.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-        body: selectedFile,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Erro ao fazer upload do arquivo");
-      }
-
-      // 3. Save file reference in database
+      // 2) Salvar referência no banco (API já existente)
       const saveRes = await fetch("/api/files/de-para", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId,
-          cloudStoragePath,
+          cloudStoragePath: blob.url,
           fileName: selectedFile.name,
         }),
       });
@@ -145,11 +128,9 @@ export default function UploadDeParaPage() {
         setUploadStatus("success");
         setStatusMessage("Arquivo enviado com sucesso!");
       }
-      
+
       setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
       fetchExistingFile(companyId);
     } catch (error) {
       console.error("Upload error:", error);
@@ -165,7 +146,7 @@ export default function UploadDeParaPage() {
     const example1 = "1.1.01;Caixa e Equivalentes;0001 - Caixa e Equivalentes de Caixa;;;";
     const example2 = "4.1.01;Receitas de Competições;;0001 - Receitas de Competições;;";
     const example3 = "3.1.01;Custos com Competições;;0050 - Custos com Competições;;";
-    
+
     const content = `${headers}\n${example1}\n${example2}\n${example3}`;
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -181,10 +162,7 @@ export default function UploadDeParaPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-all"
-          >
+          <button onClick={() => router.back()} className="p-2 hover:bg-gray-200 rounded-lg transition-all">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
@@ -271,9 +249,7 @@ export default function UploadDeParaPage() {
           <div
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${
-              selectedFile
-                ? "border-green-500 bg-green-50"
-                : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+              selectedFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
             }`}
           >
             <input
@@ -287,20 +263,14 @@ export default function UploadDeParaPage() {
               <>
                 <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <p className="text-lg font-medium text-gray-800">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {(selectedFile.size / 1024).toFixed(2)} KB
-                </p>
+                <p className="text-sm text-gray-500 mt-1">{(selectedFile.size / 1024).toFixed(2)} KB</p>
                 <p className="text-sm text-green-600 mt-2">Clique para trocar o arquivo</p>
               </>
             ) : (
               <>
                 <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-600">
-                  Clique ou arraste o arquivo aqui
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Formatos aceitos: Excel (.xlsx) ou CSV
-                </p>
+                <p className="text-lg font-medium text-gray-600">Clique ou arraste o arquivo aqui</p>
+                <p className="text-sm text-gray-400 mt-1">Formatos aceitos: Excel (.xlsx) ou CSV</p>
               </>
             )}
           </div>

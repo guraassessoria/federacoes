@@ -623,7 +623,44 @@ export default function DemonstracoesPage() {
       }
 
       const variacao = totalAnterior !== 0 ? ((totalAtual / totalAnterior) - 1) * 100 : 0;
-      const varColor = variacao > 0 ? 'text-green-700' : variacao < 0 ? 'text-red-600' : 'text-slate-400';
+      
+      // Lógica de cor da variação conforme natureza da conta:
+      // Receita/Margem positiva: aumento=bom(verde), redução=ruim(vermelho)
+      // Custo/Despesa: aumento=ruim(vermelho), redução=bom(verde)
+      // Resultado: depende do sinal (superávit: aumento=bom; déficit: aumento=ruim)
+      const getVarColor = (): string => {
+        if (variacao === 0) return 'text-slate-400';
+        
+        // Códigos de custos e despesas (aumento = ruim)
+        const isCustoOuDespesa = ['57', '110', '52', '207', '223', '228'].includes(conta.codigo);
+        // Códigos de receita e margens (aumento = bom)
+        const isReceitaOuMargem = ['51', '56', '109', '199', '219'].includes(conta.codigo);
+        // Códigos de resultado (depende do sinal do valor atual)
+        const isResultado = ['196', '197', '198', '218', '227', '229'].includes(conta.codigo);
+        
+        if (isCustoOuDespesa) {
+          // Custo/despesa: diminuiu=verde, aumentou=vermelho
+          return variacao < 0 ? 'text-green-700' : 'text-red-600';
+        }
+        
+        if (isResultado) {
+          // Se resultado atual é positivo (superávit): aumento=verde
+          // Se resultado atual é negativo (déficit): aumento=vermelho
+          if (totalAtual >= 0) {
+            return variacao > 0 ? 'text-green-700' : 'text-red-600';
+          } else {
+            // Déficit: se ficou menos negativo (variação positiva mas valor negativo), 
+            // na verdade piorou (ficou mais déficit)
+            // Melhorou = diminuiu em módulo = totalAtual mais próximo de zero
+            const melhorou = Math.abs(totalAtual) < Math.abs(totalAnterior);
+            return melhorou ? 'text-green-700' : 'text-red-600';
+          }
+        }
+        
+        // Receita e demais: aumento=verde, redução=vermelho (padrão)
+        return variacao > 0 ? 'text-green-700' : 'text-red-600';
+      };
+      const varColor = getVarColor();
 
       // Só exibe se tem algum valor
       if (totalAtual === 0 && totalAnterior === 0) return;

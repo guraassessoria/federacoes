@@ -9,520 +9,527 @@
   {
     "codigo": "2",
     "descricao": "Ativo Circulante",
-    "codigoSuperior": "1.0",
+    "codigoSuperior": "1",
     "nivel": 2,
     "nivelVisualizacao": 2
   },
   {
     "codigo": "3",
     "descricao": "Disponibilidades",
-    "codigoSuperior": "2.0",
+    "codigoSuperior": "2",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "4",
     "descricao": "Caixa",
-    "codigoSuperior": "3.0",
+    "codigoSuperior": "3",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "5",
     "descricao": "Bancos Conta Movimento",
-    "codigoSuperior": "3.0",
+    "codigoSuperior": "3",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "6",
     "descricao": "Aplicações Financeiras de Liquidez Imediata",
-    "codigoSuperior": "3.0",
+    "codigoSuperior": "3",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "7",
     "descricao": "Contas a Receber",
-    "codigoSuperior": "2.0",
+    "codigoSuperior": "2",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "8",
     "descricao": "Patrocinadores a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "9",
     "descricao": "Direitos de Transmissão a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "10",
     "descricao": "Repasses CBF a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "11",
     "descricao": "Repasses FIFA a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "12",
     "descricao": "Repasses CONMEBOL a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "13",
     "descricao": "Bilheteria a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "14",
     "descricao": "Licenciamento a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "15",
     "descricao": "Outras Contas a Receber",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "16",
     "descricao": "(-) Provisão para Créditos de Liquidação Duvidosa",
-    "codigoSuperior": "7.0",
+    "codigoSuperior": "7",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "17",
     "descricao": "Estoques",
-    "codigoSuperior": "2.0",
+    "codigoSuperior": "2",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "18",
     "descricao": "Materiais Esportivos",
-    "codigoSuperior": "17.0",
+    "codigoSuperior": "17",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "19",
     "descricao": "Uniformes e Vestuário",
-    "codigoSuperior": "17.0",
+    "codigoSuperior": "17",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "20",
     "descricao": "Troféus e Medalhas",
-    "codigoSuperior": "17.0",
+    "codigoSuperior": "17",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "21",
     "descricao": "Materiais de Escritório",
-    "codigoSuperior": "17.0",
+    "codigoSuperior": "17",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "22",
     "descricao": "Outros Materiais",
-    "codigoSuperior": "17.0",
+    "codigoSuperior": "17",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "23",
     "descricao": "Despesas Antecipadas",
-    "codigoSuperior": "2.0",
+    "codigoSuperior": "2",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "24",
     "descricao": "Seguros a Vencer",
-    "codigoSuperior": "23.0",
+    "codigoSuperior": "23",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "25",
     "descricao": "Aluguéis Pagos Antecipadamente",
-    "codigoSuperior": "23.0",
+    "codigoSuperior": "23",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "26",
     "descricao": "Assinaturas e Licenças a Vencer",
-    "codigoSuperior": "23.0",
+    "codigoSuperior": "23",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "27",
     "descricao": "Outros Ativos Circulantes",
-    "codigoSuperior": "2.0",
+    "codigoSuperior": "2",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "28",
     "descricao": "Adiantamentos a Fornecedores",
-    "codigoSuperior": "27.0",
+    "codigoSuperior": "27",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "29",
     "descricao": "Adiantamentos a Funcionários",
-    "codigoSuperior": "27.0",
+    "codigoSuperior": "27",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "30",
     "descricao": "Adiantamentos para Viagens",
-    "codigoSuperior": "27.0",
+    "codigoSuperior": "27",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "31",
     "descricao": "Impostos a Recuperar",
-    "codigoSuperior": "27.0",
+    "codigoSuperior": "27",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "32",
     "descricao": "Outros Créditos",
-    "codigoSuperior": "27.0",
+    "codigoSuperior": "27",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "33",
     "descricao": "Ativo Não Circulante",
-    "codigoSuperior": "1.0",
+    "codigoSuperior": "1",
     "nivel": 2,
     "nivelVisualizacao": 2
   },
   {
     "codigo": "34",
     "descricao": "Realizável a Longo Prazo",
-    "codigoSuperior": "33.0",
+    "codigoSuperior": "33",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "35",
     "descricao": "Contas a Receber de Longo Prazo",
-    "codigoSuperior": "34.0",
+    "codigoSuperior": "34",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "36",
     "descricao": "Depósitos Judiciais",
-    "codigoSuperior": "34.0",
+    "codigoSuperior": "34",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "37",
     "descricao": "Empréstimos a Clubes Filiados",
-    "codigoSuperior": "34.0",
+    "codigoSuperior": "34",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "38",
     "descricao": "Outros Créditos de Longo Prazo",
-    "codigoSuperior": "34.0",
+    "codigoSuperior": "34",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "39",
     "descricao": "Investimentos",
-    "codigoSuperior": "33.0",
+    "codigoSuperior": "33",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "40",
     "descricao": "Participações em Outras Entidades",
-    "codigoSuperior": "39.0",
+    "codigoSuperior": "39",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "41",
     "descricao": "Participações Societárias",
-    "codigoSuperior": "39.0",
+    "codigoSuperior": "39",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "42",
     "descricao": "Obras de Arte",
-    "codigoSuperior": "39.0",
+    "codigoSuperior": "39",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "43",
     "descricao": "Imobilizado",
-    "codigoSuperior": "33.0",
+    "codigoSuperior": "33",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "44",
     "descricao": "Terrenos",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "45",
     "descricao": "Edificações",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "46",
     "descricao": "Sede Administrativa",
-    "codigoSuperior": "45.0",
+    "codigoSuperior": "45",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "47",
     "descricao": "Centros de Treinamento",
-    "codigoSuperior": "45.0",
+    "codigoSuperior": "45",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "48",
     "descricao": "(-) Depreciação Acumulada de Edificações",
-    "codigoSuperior": "45.0",
+    "codigoSuperior": "45",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "49",
     "descricao": "Instalações Esportivas",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "50",
     "descricao": "Campos de Futebol",
-    "codigoSuperior": "49.0",
+    "codigoSuperior": "49",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "51",
     "descricao": "Arquibancadas e Tribunas",
-    "codigoSuperior": "49.0",
+    "codigoSuperior": "49",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "52",
     "descricao": "Vestiários",
-    "codigoSuperior": "49.0",
+    "codigoSuperior": "49",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "53",
     "descricao": "Sistema de Iluminação",
-    "codigoSuperior": "49.0",
+    "codigoSuperior": "49",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "54",
     "descricao": "(-) Depreciação Acumulada de Instalações Esportivas",
-    "codigoSuperior": "49.0",
+    "codigoSuperior": "49",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "55",
     "descricao": "Equipamentos",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "56",
     "descricao": "Equipamentos de Informática",
-    "codigoSuperior": "55.0",
+    "codigoSuperior": "55",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "57",
     "descricao": "Equipamentos de Comunicação",
-    "codigoSuperior": "55.0",
+    "codigoSuperior": "55",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "58",
     "descricao": "Equipamentos Esportivos",
-    "codigoSuperior": "55.0",
+    "codigoSuperior": "55",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
+  },
+  {
+    "codigo": "143",
+    "descricao": "Maquinas e Equipamentos",
+    "codigoSuperior": "55",
+    "nivel": 5,
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "59",
     "descricao": "(-) Depreciação Acumulada de Equipamentos",
-    "codigoSuperior": "55.0",
+    "codigoSuperior": "55",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "60",
     "descricao": "Veículos",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "61",
     "descricao": "Veículos de Passeio",
-    "codigoSuperior": "60.0",
+    "codigoSuperior": "60",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "62",
     "descricao": "Ônibus e Vans",
-    "codigoSuperior": "60.0",
+    "codigoSuperior": "60",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "63",
     "descricao": "(-) Depreciação Acumulada de Veículos",
-    "codigoSuperior": "60.0",
+    "codigoSuperior": "60",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "64",
     "descricao": "Móveis e Utensílios",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "65",
     "descricao": "Móveis de Escritório",
-    "codigoSuperior": "64.0",
+    "codigoSuperior": "64",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "66",
     "descricao": "Utensílios e Ferramentas",
-    "codigoSuperior": "64.0",
+    "codigoSuperior": "64",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "67",
     "descricao": "(-) Depreciação Acumulada de Móveis e Utensílios",
-    "codigoSuperior": "64.0",
+    "codigoSuperior": "64",
     "nivel": 5,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 5
   },
   {
     "codigo": "68",
     "descricao": "Imobilizado em Andamento",
-    "codigoSuperior": "43.0",
+    "codigoSuperior": "43",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "69",
     "descricao": "Intangível",
-    "codigoSuperior": "33.0",
+    "codigoSuperior": "33",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "70",
     "descricao": "Marcas e Patentes",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "71",
     "descricao": "Softwares",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "72",
     "descricao": "Direitos de Imagem",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "73",
     "descricao": "Direitos Federativos",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "74",
     "descricao": "Outros Direitos",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "75",
     "descricao": "(-) Amortização Acumulada",
-    "codigoSuperior": "69.0",
+    "codigoSuperior": "69",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "76",
@@ -534,463 +541,463 @@
   {
     "codigo": "77",
     "descricao": "Passivo Circulante",
-    "codigoSuperior": "76.0",
+    "codigoSuperior": "76",
     "nivel": 2,
     "nivelVisualizacao": 2
   },
   {
     "codigo": "78",
     "descricao": "Fornecedores",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "79",
     "descricao": "Fornecedores Nacionais",
-    "codigoSuperior": "78.0",
+    "codigoSuperior": "78",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "80",
     "descricao": "Fornecedores Internacionais",
-    "codigoSuperior": "78.0",
+    "codigoSuperior": "78",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "81",
     "descricao": "Obrigações Trabalhistas e Previdenciárias",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "82",
     "descricao": "Salários a Pagar",
-    "codigoSuperior": "81.0",
+    "codigoSuperior": "81",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "83",
     "descricao": "INSS a Recolher",
-    "codigoSuperior": "81.0",
+    "codigoSuperior": "81",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "84",
     "descricao": "FGTS a Recolher",
-    "codigoSuperior": "81.0",
+    "codigoSuperior": "81",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "85",
     "descricao": "Contribuições Sindicais a Recolher",
-    "codigoSuperior": "81.0",
+    "codigoSuperior": "81",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "86",
     "descricao": "Obrigações Tributárias",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "87",
     "descricao": "PIS a Recolher",
-    "codigoSuperior": "86.0",
+    "codigoSuperior": "86",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "88",
     "descricao": "COFINS a Recolher",
-    "codigoSuperior": "86.0",
+    "codigoSuperior": "86",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "89",
     "descricao": "IRRF a Recolher",
-    "codigoSuperior": "86.0",
+    "codigoSuperior": "86",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "90",
     "descricao": "ISS a Recolher",
-    "codigoSuperior": "86.0",
+    "codigoSuperior": "86",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "91",
     "descricao": "Outros Tributos a Recolher",
-    "codigoSuperior": "86.0",
+    "codigoSuperior": "86",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "92",
     "descricao": "Empréstimos e Financiamentos de Curto Prazo",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "93",
     "descricao": "Empréstimos Bancários CP",
-    "codigoSuperior": "92.0",
+    "codigoSuperior": "92",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "94",
     "descricao": "Financiamentos CP",
-    "codigoSuperior": "92.0",
+    "codigoSuperior": "92",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "95",
     "descricao": "Juros a Pagar",
-    "codigoSuperior": "92.0",
+    "codigoSuperior": "92",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "96",
     "descricao": "Contas a Pagar",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "97",
     "descricao": "Comissões Técnicas a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "98",
     "descricao": "Arbitragem a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "99",
     "descricao": "Premiações a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "100",
     "descricao": "Direitos de Imagem a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "101",
     "descricao": "Aluguel a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "102",
     "descricao": "Energia Elétrica a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "103",
     "descricao": "Telefone e Internet a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "104",
     "descricao": "Outras Contas a Pagar",
-    "codigoSuperior": "96.0",
+    "codigoSuperior": "96",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "105",
     "descricao": "Provisões de Curto Prazo",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "106",
     "descricao": "Provisão para Férias",
-    "codigoSuperior": "105.0",
+    "codigoSuperior": "105",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "107",
     "descricao": "Provisão para 13º Salário",
-    "codigoSuperior": "105.0",
+    "codigoSuperior": "105",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "108",
     "descricao": "Provisão para Contingências CP",
-    "codigoSuperior": "105.0",
+    "codigoSuperior": "105",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "109",
     "descricao": "Outras Obrigações Circulantes",
-    "codigoSuperior": "77.0",
+    "codigoSuperior": "77",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "110",
     "descricao": "Adiantamentos de Clientes",
-    "codigoSuperior": "109.0",
+    "codigoSuperior": "109",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "111",
     "descricao": "Dividendos a Pagar",
-    "codigoSuperior": "109.0",
+    "codigoSuperior": "109",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "112",
     "descricao": "Outras Obrigações",
-    "codigoSuperior": "109.0",
+    "codigoSuperior": "109",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "113",
     "descricao": "Passivo Não Circulante",
-    "codigoSuperior": "76.0",
+    "codigoSuperior": "76",
     "nivel": 2,
     "nivelVisualizacao": 2
   },
   {
     "codigo": "114",
     "descricao": "Empréstimos e Financiamentos de Longo Prazo",
-    "codigoSuperior": "113.0",
+    "codigoSuperior": "113",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "115",
     "descricao": "Empréstimos Bancários LP",
-    "codigoSuperior": "114.0",
+    "codigoSuperior": "114",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "116",
     "descricao": "Financiamentos LP",
-    "codigoSuperior": "114.0",
+    "codigoSuperior": "114",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "117",
     "descricao": "Debêntures",
-    "codigoSuperior": "114.0",
+    "codigoSuperior": "114",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "118",
     "descricao": "Provisões de Longo Prazo",
-    "codigoSuperior": "113.0",
+    "codigoSuperior": "113",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "119",
     "descricao": "Provisão para Contingências Trabalhistas",
-    "codigoSuperior": "118.0",
+    "codigoSuperior": "118",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "120",
     "descricao": "Provisão para Contingências Cíveis",
-    "codigoSuperior": "118.0",
+    "codigoSuperior": "118",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "121",
     "descricao": "Provisão para Contingências Fiscais",
-    "codigoSuperior": "118.0",
+    "codigoSuperior": "118",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "122",
     "descricao": "Outras Obrigações Não Circulantes",
-    "codigoSuperior": "113.0",
+    "codigoSuperior": "113",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "123",
     "descricao": "Receitas Diferidas",
-    "codigoSuperior": "122.0",
+    "codigoSuperior": "122",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "124",
     "descricao": "Outros Passivos de Longo Prazo",
-    "codigoSuperior": "122.0",
+    "codigoSuperior": "122",
     "nivel": 4,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "125",
     "descricao": "PATRIMÔNIO LÍQUIDO",
-    "codigoSuperior": null,
-    "nivel": 1,
-    "nivelVisualizacao": 1
-  },
-  {
-    "codigo": "126",
-    "descricao": "Capital Social / Patrimônio Social",
-    "codigoSuperior": "125.0",
+    "codigoSuperior": "76",
     "nivel": 2,
     "nivelVisualizacao": 2
   },
   {
-    "codigo": "127",
-    "descricao": "Capital Subscrito",
-    "codigoSuperior": "126.0",
+    "codigo": "126",
+    "descricao": "Patrimônio Social",
+    "codigoSuperior": "125",
     "nivel": 3,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "127",
+    "descricao": "Patrimônio Social",
+    "codigoSuperior": "126",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "128",
-    "descricao": "(-) Capital a Integralizar",
-    "codigoSuperior": "126.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "descricao": "(-) Patrimônio a Integralizar",
+    "codigoSuperior": "126",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "129",
     "descricao": "Reservas de Capital",
-    "codigoSuperior": "125.0",
-    "nivel": 2,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "125",
+    "nivel": 3,
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "130",
     "descricao": "Doações e Subvenções para Investimento",
-    "codigoSuperior": "129.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "129",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "131",
     "descricao": "Incentivos Fiscais",
-    "codigoSuperior": "129.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "129",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "132",
     "descricao": "Outras Reservas de Capital",
-    "codigoSuperior": "129.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "129",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "133",
     "descricao": "Reservas de Lucros / Superávits",
-    "codigoSuperior": "125.0",
-    "nivel": 2,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "125",
+    "nivel": 3,
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "134",
     "descricao": "Reserva Legal",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "135",
     "descricao": "Reserva Estatutária",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "136",
     "descricao": "Reserva para Contingências",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "137",
     "descricao": "Reserva de Investimentos",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "138",
     "descricao": "Reserva para Desenvolvimento do Futebol",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "139",
     "descricao": "Outras Reservas de Lucros",
-    "codigoSuperior": "133.0",
-    "nivel": 3,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "133",
+    "nivel": 4,
+    "nivelVisualizacao": 4
   },
   {
     "codigo": "140",
     "descricao": "Ajustes de Avaliação Patrimonial",
-    "codigoSuperior": "125.0",
-    "nivel": 2,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "125",
+    "nivel": 3,
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "141",
     "descricao": "Superávits/Déficits Acumulados",
-    "codigoSuperior": "125.0",
-    "nivel": 2,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "125",
+    "nivel": 3,
+    "nivelVisualizacao": 3
   },
   {
     "codigo": "142",
     "descricao": "Outros Resultados Abrangentes",
-    "codigoSuperior": "125.0",
-    "nivel": 2,
-    "nivelVisualizacao": 2
+    "codigoSuperior": "125",
+    "nivel": 3,
+    "nivelVisualizacao": 3
   }
 ]

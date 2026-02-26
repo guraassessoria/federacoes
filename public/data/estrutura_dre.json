@@ -1670,21 +1670,21 @@
     "descricao": "Outras Despesas Não Operacionais",
     "codigoSuperior": "223",
     "nivel": 3,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 3  
   },
   {
     "codigo": "227",
     "descricao": "Lucro Antes dos Impostos",
     "codigoSuperior": "229",
     "nivel": 2,
-    "nivelVisualizacao": 2
+    "nivelVisualizacao": 1
   },
   {
     "codigo": "228",
     "descricao": "Imposto de Renda e Contribuição Social",
     "codigoSuperior": "229",
     "nivel": 3,
-    "nivelVisualizacao": 3
+    "nivelVisualizacao": 2
   },
   {
     "codigo": "229",

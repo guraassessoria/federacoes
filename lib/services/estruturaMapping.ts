@@ -2,12 +2,12 @@
  * Serviço de Mapeamento de Estrutura
  * Adapta dados do balancete à estrutura base padronizada usando o mapeamento "de-para"
  * 
- * ATUALIZADO: Agora carrega estruturas do banco de dados (StandardStructure)
- * com fallback para os arquivos JSON estáticos em public/data/
+ * ATUALIZADO: Carrega estruturas dos JSONs estáticos (garantido funcionar).
+ * A integração com o banco (StandardStructure) é feita pela API que chama
+ * este serviço, passando a estrutura como parâmetro quando disponível.
  */
 
 import { BalanceteData } from '@prisma/client';
-import { prisma } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -37,38 +37,20 @@ export interface DeParaMapping {
   DMPL: Record<string, MapeamentoDePara>;
 }
 
-// Cache para estruturas carregadas (com versão para invalidação)
+// Cache para estruturas carregadas
 let estruturaDRECache: ContaEstrutura[] | null = null;
-let estruturaDREVersion: number = -1;
 let estruturaBPCache: ContaEstrutura[] | null = null;
-let estruturaBPVersion: number = -1;
 let deParaMappingCache: DeParaMapping | null = null;
 
 /**
- * Converte as rows do banco (formato JSON) para o formato ContaEstrutura[]
- * O banco armazena: { ordem, codigo, descricao, codigoSuperior, nivel, isTotal, grupo }
- * Precisamos de: { codigo, descricao, codigoSuperior, nivel, nivelVisualizacao }
- */
-function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
-  return rows.map((row: any) => ({
-    codigo: String(row.codigo || ''),
-    descricao: String(row.descricao || ''),
-    codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
-    nivel: Number(row.nivel) || 1,
-    nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
-  }));
-}
-
-/**
  * Tenta ler um arquivo JSON estático de múltiplos caminhos possíveis.
- * Na Vercel, process.cwd() pode variar, então tentamos vários.
+ * Na Vercel, process.cwd() pode variar.
  */
 function readJsonFileSafe(fileName: string): any[] | null {
   const possiblePaths = [
     path.join(process.cwd(), 'public', 'data', fileName),
-    path.join(process.cwd(), '.next', 'server', 'public', 'data', fileName),
     path.resolve('public', 'data', fileName),
-    path.join('/var/task', 'public', 'data', fileName),
+    path.join(process.cwd(), '.next', 'server', 'public', 'data', fileName),
   ];
 
   for (const filePath of possiblePaths) {
@@ -76,7 +58,6 @@ function readJsonFileSafe(fileName: string): any[] | null {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
         const parsed = JSON.parse(content);
-        console.log(`[readJsonFileSafe] Leu ${fileName} de: ${filePath} (${parsed.length} itens)`);
         return parsed;
       }
     } catch (e) {
@@ -89,123 +70,66 @@ function readJsonFileSafe(fileName: string): any[] | null {
 }
 
 /**
- * Carrega estrutura do banco de dados por tipo.
- * Retorna null se não houver estrutura salva no banco.
+ * Converte as rows do banco (formato JSON) para o formato ContaEstrutura[]
+ * Usado quando a API passa estruturas carregadas do banco de dados.
  */
-async function loadEstruturaFromDB(tipo: 'BP' | 'DRE' | 'DFC' | 'DMPL'): Promise<{ rows: ContaEstrutura[]; version: number } | null> {
-  try {
-    // Tenta buscar usando StructureType (schema novo)
-    const record = await prisma.standardStructure.findUnique({
-      where: { type: tipo as any },
-    });
-
-    if (!record || !record.data) return null;
-
-    const data = record.data as any;
-    const rows = data?.rows;
-
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-
-    return {
-      rows: dbRowsToContaEstrutura(rows),
-      version: record.version,
-    };
-  } catch (error) {
-    // Log mas NÃO propaga — permite fallback para JSON
-    console.warn(`[loadEstruturaFromDB] Falha ao carregar ${tipo} do banco (usando fallback JSON):`, 
-      error instanceof Error ? error.message : error
-    );
-    return null;
-  }
+export function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
+  return rows.map((row: any) => ({
+    codigo: String(row.codigo || ''),
+    descricao: String(row.descricao || ''),
+    codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
+    nivel: Number(row.nivel) || 1,
+    nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
+  }));
 }
 
 /**
- * Carrega a estrutura base do DRE
- * 1º tenta cache em memória
- * 2º tenta o banco de dados (StandardStructure)
- * 3º fallback para o arquivo JSON estático
+ * Carrega a estrutura base do DRE (JSON estático)
  */
 export async function loadEstruturaDRE(): Promise<ContaEstrutura[]> {
-  // 1. Tenta carregar do banco
-  try {
-    const fromDB = await loadEstruturaFromDB('DRE');
-    if (fromDB && fromDB.rows.length > 0) {
-      if (!estruturaDRECache || estruturaDREVersion !== fromDB.version) {
-        estruturaDRECache = fromDB.rows;
-        estruturaDREVersion = fromDB.version;
-        console.log(`[loadEstruturaDRE] ✅ Banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
-      }
-      return estruturaDRECache;
-    }
-  } catch (e) {
-    console.warn('[loadEstruturaDRE] Erro ao tentar banco, usando fallback JSON');
-  }
-
-  // 2. Fallback: cache em memória (de leitura anterior do JSON)
-  if (estruturaDRECache && estruturaDRECache.length > 0) return estruturaDRECache;
-
-  // 3. Fallback: arquivo JSON estático
-  console.log('[loadEstruturaDRE] Banco vazio/indisponível, carregando JSON estático...');
+  if (estruturaDRECache) return estruturaDRECache;
+  
   const parsed = readJsonFileSafe('estrutura_dre.json');
   if (parsed && parsed.length > 0) {
     estruturaDRECache = parsed;
     return estruturaDRECache;
   }
 
-  console.error('[loadEstruturaDRE] ❌ NENHUMA FONTE disponível para estrutura DRE!');
+  console.error('[loadEstruturaDRE] Falha ao carregar JSON estático');
   return [];
 }
 
 /**
- * Carrega a estrutura base do BP
- * 1º tenta cache em memória
- * 2º tenta o banco de dados (StandardStructure)
- * 3º fallback para o arquivo JSON estático
+ * Carrega a estrutura base do BP (JSON estático)
  */
 export async function loadEstruturaBP(): Promise<ContaEstrutura[]> {
-  // 1. Tenta carregar do banco
-  try {
-    const fromDB = await loadEstruturaFromDB('BP');
-    if (fromDB && fromDB.rows.length > 0) {
-      if (!estruturaBPCache || estruturaBPVersion !== fromDB.version) {
-        estruturaBPCache = fromDB.rows;
-        estruturaBPVersion = fromDB.version;
-        console.log(`[loadEstruturaBP] ✅ Banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
-      }
-      return estruturaBPCache;
-    }
-  } catch (e) {
-    console.warn('[loadEstruturaBP] Erro ao tentar banco, usando fallback JSON');
-  }
-
-  // 2. Fallback: cache em memória
-  if (estruturaBPCache && estruturaBPCache.length > 0) return estruturaBPCache;
-
-  // 3. Fallback: arquivo JSON estático
-  console.log('[loadEstruturaBP] Banco vazio/indisponível, carregando JSON estático...');
+  if (estruturaBPCache) return estruturaBPCache;
+  
   const parsed = readJsonFileSafe('estrutura_bp.json');
   if (parsed && parsed.length > 0) {
     estruturaBPCache = parsed;
     return estruturaBPCache;
   }
 
-  console.error('[loadEstruturaBP] ❌ NENHUMA FONTE disponível para estrutura BP!');
+  console.error('[loadEstruturaBP] Falha ao carregar JSON estático');
   return [];
 }
 
 /**
- * Invalida os caches de estrutura (chamar após upload de nova versão)
+ * Permite sobrescrever o cache com estruturas carregadas do banco.
+ * Chamado pela API financial-data quando há estrutura no banco.
  */
-export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE' | 'DFC' | 'DMPL') {
-  if (!tipo || tipo === 'DRE') {
-    estruturaDRECache = null;
-    estruturaDREVersion = -1;
-  }
-  if (!tipo || tipo === 'BP') {
-    estruturaBPCache = null;
-    estruturaBPVersion = -1;
-  }
-  console.log(`[invalidateEstruturaCache] Cache invalidado para: ${tipo || 'todos'}`);
+export function setEstruturaCache(tipo: 'BP' | 'DRE', estrutura: ContaEstrutura[]) {
+  if (tipo === 'BP') estruturaBPCache = estrutura;
+  if (tipo === 'DRE') estruturaDRECache = estrutura;
+}
+
+/**
+ * Invalida os caches de estrutura
+ */
+export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE') {
+  if (!tipo || tipo === 'DRE') estruturaDRECache = null;
+  if (!tipo || tipo === 'BP') estruturaBPCache = null;
 }
 
 /**

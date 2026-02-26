@@ -194,15 +194,22 @@ export async function GET(request: NextRequest) {
           },
         });
       } else {
-        // Retorna demonstração para o mês sem dados
+        // Há balancetes no ano mas não para este mês específico
+        // Retorna dados vazios (não fictícios) para que o frontend mostre "-"
         return NextResponse.json({
           success: true,
-          source: "demonstration",
-          message: `Sem dados para ${month}/${year}`,
+          source: "database",
           viewMode: "mensal",
           year,
           month,
-          data: generateDemoData("mensal", year, month),
+          message: `Sem balancete para ${month}/${year}`,
+          data: {
+            bp: null,
+            dre: null,
+            indices: null,
+            period: null,
+            estruturaDRE: null,
+          },
         });
       }
     } else {

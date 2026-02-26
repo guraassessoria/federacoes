@@ -22,6 +22,7 @@ import {
   mapBalanceteToEstrutura,
   processarDadosFinanceiros,
   ContaComValor,
+  DeParaRecord 
 } from "@/lib/services/estruturaMapping";
 
 export const dynamic = "force-dynamic";
@@ -188,9 +189,28 @@ export async function GET(request: NextRequest) {
         let totalPassivoPL: number = 0;
         
         if (allBalanceteData.length > 0) {
-          try {
-            // Usa processarDadosFinanceiros para integrar DRE no BP
-            const processado = await processarDadosFinanceiros(allBalanceteData);
+  try {
+    // Carrega o de-para do banco para a empresa
+    const deParaRows = await prisma.deParaMapping.findMany({
+      where: { companyId },
+      select: {
+        contaFederacao: true,
+        padraoBP: true,
+        padraoDRE: true,
+        padraoDFC: true,
+        padraoDMPL: true,
+      },
+    });
+    const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
+      contaFederacao: r.contaFederacao,
+      padraoBP: r.padraoBP,
+      padraoDRE: r.padraoDRE,
+      padraoDFC: r.padraoDFC,
+      padraoDMPL: r.padraoDMPL,
+    }));
+    console.log(`[financial-data] De-para: ${deParaRecords.length} registros`);
+    
+    const processado = await processarDadosFinanceiros(allBalanceteData, deParaRecords);
             estruturaDRE = processado.dre;
             estruturaBP = processado.bp;
             resultadoDRE = processado.resultadoDRE;

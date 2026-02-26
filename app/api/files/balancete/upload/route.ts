@@ -8,40 +8,29 @@ import { Prisma } from "@prisma/client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Row = {
-  "Período"?: any;
-  "Periodo"?: any;
-  "Número da Conta"?: any;
-  "Numero da Conta"?: any;
-  "Conta"?: any;
-  "Descrição da Conta"?: any;
-  "Descricao da Conta"?: any;
-  "Saldo Anterior"?: any;
-  "Débito"?: any;
-  "Debito"?: any;
-  "Crédito"?: any;
-  "Credito"?: any;
-  "Saldo Final"?: any;
-  "Natureza da Conta"?: any;
-  "Natureza"?: any;
-};
-
-function s(v: any) {
-  if (v === null || v === undefined) return "";
-  return String(v).trim();
+function normalizeHeader(str: string) {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
 
-function toDecimal(v: any) {
-  // aceita "1.234,56" ou "1234.56" ou number
-  if (v === null || v === undefined || v === "") return new Prisma.Decimal(0);
-  if (typeof v === "number") return new Prisma.Decimal(v.toFixed(2));
-  const raw = String(v).trim();
-  const cleaned = raw
+function toDecimal(value: any) {
+  if (!value) return new Prisma.Decimal(0);
+
+  if (typeof value === "number") {
+    return new Prisma.Decimal(value.toFixed(2));
+  }
+
+  const cleaned = String(value)
     .replace(/\s/g, "")
-    .replace(/\./g, "")       // remove milhar pt-BR
-    .replace(/,/g, ".");      // vírgula -> ponto
+    .replace(/\./g, "")
+    .replace(/,/g, ".");
+
   const n = Number(cleaned);
-  if (Number.isNaN(n)) return new Prisma.Decimal(0);
+  if (isNaN(n)) return new Prisma.Decimal(0);
+
   return new Prisma.Decimal(n.toFixed(2));
 }
 
@@ -54,81 +43,120 @@ export async function POST(req: Request) {
 
     const form = await req.formData();
     const companyId = String(form.get("companyId") || "");
-    const period = String(form.get("period") || ""); // ex: "JAN/25"
+    const period = String(form.get("period") || "");
     const file = form.get("file") as File | null;
 
-    if (!companyId) return NextResponse.json({ error: "companyId é obrigatório" }, { status: 400 });
-    if (!period) return NextResponse.json({ error: "period é obrigatório (ex: JAN/25)" }, { status: 400 });
-    if (!file) return NextResponse.json({ error: "Arquivo é obrigatório" }, { status: 400 });
+    if (!companyId) return NextResponse.json({ error: "companyId obrigatório" }, { status: 400 });
+    if (!period) return NextResponse.json({ error: "period obrigatório" }, { status: 400 });
+    if (!file) return NextResponse.json({ error: "Arquivo obrigatório" }, { status: 400 });
 
-    // Permissão
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        companyId,
-        role: { in: ["ADMIN", "EDITOR"] },
-      },
-    });
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!userCompany && user?.role !== "ADMIN") {
-      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
-    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    const buf = Buffer.from(await file.arrayBuffer());
-    const wb = XLSX.read(buf, { type: "buffer" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<Row>(ws, { defval: "" });
+    const rawRows = XLSX.utils.sheet_to_json<any>(worksheet, { defval: "" });
 
-    if (!rows.length) {
+    if (!rawRows.length) {
       return NextResponse.json({ error: "Arquivo vazio" }, { status: 400 });
     }
 
-    const mapped = rows
-      .map((r) => {
-        const accountNumber = s(r["Número da Conta"] ?? r["Numero da Conta"] ?? r["Conta"]);
-        const accountDescription = s(r["Descrição da Conta"] ?? r["Descricao da Conta"]);
-        const previousBalance = toDecimal(r["Saldo Anterior"]);
-        const debit = toDecimal(r["Débito"] ?? r["Debito"]);
-        const credit = toDecimal(r["Crédito"] ?? r["Credito"]);
-        const finalBalance = toDecimal(r["Saldo Final"]);
-        const accountNature = s(r["Natureza da Conta"] ?? r["Natureza"]).toUpperCase();
+    const rows = rawRows.map((row) => {
+      const normalized: Record<string, any> = {};
 
-        return {
-          companyId,
-          period,
-          accountNumber,
-          accountDescription: accountDescription || "",
-          previousBalance,
-          debit,
-          credit,
-          finalBalance,
-          accountNature: accountNature === "C" || accountNature === "D" ? accountNature : "D",
-        };
-      })
-      .filter((r) => r.accountNumber);
+      Object.keys(row).forEach((key) => {
+        normalized[normalizeHeader(key)] = row[key];
+      });
 
-    if (!mapped.length) {
-      return NextResponse.json({ error: "Nenhuma linha válida (Número da Conta vazio)." }, { status: 400 });
+      const accountNumber =
+        normalized["numero da conta"] ||
+        normalized["numero"] ||
+        normalized["conta"] ||
+        normalized["codigo"] ||
+        normalized["cod"] ||
+        normalized["classificacao"];
+
+      const accountDescription =
+        normalized["descricao da conta"] ||
+        normalized["descricao"] ||
+        normalized["nome da conta"] ||
+        normalized["conta descricao"];
+
+      const previousBalance =
+        normalized["saldo anterior"] ||
+        normalized["saldo inicial"];
+
+      const debit =
+        normalized["debito"] ||
+        normalized["deb"] ||
+        normalized["mov debito"];
+
+      const credit =
+        normalized["credito"] ||
+        normalized["cred"] ||
+        normalized["mov credito"];
+
+      const finalBalance =
+        normalized["saldo final"] ||
+        normalized["saldo"];
+
+      const accountNature =
+        normalized["natureza"] ||
+        normalized["natureza da conta"] ||
+        "D";
+
+      return {
+        accountNumber: String(accountNumber || "").trim(),
+        accountDescription: String(accountDescription || "").trim(),
+        previousBalance: toDecimal(previousBalance),
+        debit: toDecimal(debit),
+        credit: toDecimal(credit),
+        finalBalance: toDecimal(finalBalance),
+        accountNature: String(accountNature || "D").toUpperCase(),
+      };
+    });
+
+    const validRows = rows.filter((r) => r.accountNumber);
+
+    if (!validRows.length) {
+      return NextResponse.json(
+        { error: "Nenhuma linha válida (Número da Conta vazio)." },
+        { status: 400 }
+      );
     }
 
-    // Estratégia: substituir o período inteiro (governança e rastreabilidade)
     const result = await prisma.$transaction(async (tx) => {
       const deleted = await tx.balanceteData.deleteMany({
         where: { companyId, period },
       });
+
       const created = await tx.balanceteData.createMany({
-        data: mapped,
+        data: validRows.map((r) => ({
+          companyId,
+          period,
+          accountNumber: r.accountNumber,
+          accountDescription: r.accountDescription,
+          previousBalance: r.previousBalance,
+          debit: r.debit,
+          credit: r.credit,
+          finalBalance: r.finalBalance,
+          accountNature: r.accountNature === "C" ? "C" : "D",
+        })),
       });
+
       return { deleted: deleted.count, inserted: created.count };
     });
 
     return NextResponse.json({
       ok: true,
-      message: `Balancete ${period} salvo no banco com sucesso.`,
+      message: `Balancete ${period} salvo com sucesso.`,
       ...result,
     });
+
   } catch (err: any) {
-    console.error("BALANCETE upload error:", err);
-    return NextResponse.json({ error: "Erro ao processar balancete" }, { status: 500 });
+    console.error("BALANCETE ERROR:", err);
+    return NextResponse.json(
+      { error: "Erro ao processar balancete." },
+      { status: 500 }
+    );
   }
 }

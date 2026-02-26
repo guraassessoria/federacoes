@@ -311,6 +311,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * Gera dados de demonstração quando não há dados reais no banco
+ * Inclui estruturaDRE para visão mensal funcionar corretamente
  */
 function generateDemoData(
   viewMode: string,
@@ -322,6 +323,10 @@ function generateDemoData(
   indices: FinancialIndices;
   period?: string;
   months?: Array<{ period: string; indices: FinancialIndices }>;
+  estruturaDRE?: ContaComValor[];
+  estruturaBP?: ContaComValor[];
+  resultadoDRE?: number;
+  totalPassivoPL?: number;
 } {
   // Fatores de variação por ano para simular crescimento
   const yearFactors: Record<string, number> = {
@@ -332,117 +337,265 @@ function generateDemoData(
   };
   const factor = yearFactors[year] || 1.0;
 
-  // Dados base (valores em milhares)
-  const baseReceitas = 45000 * factor;
-  const baseCustos = 25000 * factor;
-  const baseDespesas = 12000 * factor;
+  // ═══ DADOS BASE (valores em reais, não milhares) ═══
+  // BP - valores anuais (posição patrimonial)
+  const disponibilidades = 3000000 * factor;
+  const aplicacoesFinanceiras = 5000000 * factor;
+  const contasReceber = 4500000 * factor;
+  const estoques = 1500000 * factor;
+  const outrosAC = 1000000 * factor;
+  const totalAtivoCirculante = disponibilidades + aplicacoesFinanceiras + contasReceber + estoques + outrosAC;
   
-  const baseAtivoCirculante = 15000 * factor;
-  const baseAtivoNaoCirculante = 35000 * factor;
-  const basePassivoCirculante = 10000 * factor;
-  const basePassivoNaoCirculante = 15000 * factor;
-  const basePL = 25000 * factor;
+  const realizavelLP = 5000000 * factor;
+  const investimentos = 8000000 * factor;
+  const imobilizado = 20000000 * factor;
+  const intangivel = 2000000 * factor;
+  const totalAtivoNaoCirculante = realizavelLP + investimentos + imobilizado + intangivel;
+  
+  const ativoTotal = totalAtivoCirculante + totalAtivoNaoCirculante;
+  
+  const fornecedores = 3000000 * factor;
+  const obrigTrabalhistas = 2500000 * factor;
+  const obrigFiscais = 2000000 * factor;
+  const emprestimosCP = 2500000 * factor;
+  const totalPassivoCirculante = fornecedores + obrigTrabalhistas + obrigFiscais + emprestimosCP;
+  
+  const emprestimosLP = 12000000 * factor;
+  const provisoes = 3000000 * factor;
+  const totalPassivoNaoCirculante = emprestimosLP + provisoes;
+  
+  const capitalSocial = 15000000 * factor;
+  const reservas = 5000000 * factor;
+  const lucrosAcumulados = 5000000 * factor;
+  const totalPL = capitalSocial + reservas + lucrosAcumulados;
+  
+  const totalPassivos = totalPassivoCirculante + totalPassivoNaoCirculante;
+  
+  // DRE - valores anuais
+  const receitaBruta = 45000000 * factor;
+  const deducoes = 0; // Federações geralmente não têm deduções
+  const receitaLiquida = receitaBruta - deducoes;
+  const custos = 25000000 * factor;
+  const margemBruta = receitaLiquida - custos;
+  const despesasGerais = 10000000 * factor;
+  const resultadoOperacional = margemBruta - despesasGerais;
+  const resultadoFinanceiro = -2000000 * factor; // Negativo = despesa > receita
+  const outrasRecDesp = 0;
+  const lucroAntesIR = resultadoOperacional + resultadoFinanceiro + outrasRecDesp;
+  const resultadoLiquido = lucroAntesIR; // Federações não pagam IR
 
+  // Fator mensal para DRE (proporção)
   const monthFactor = viewMode === "mensal" ? 1 / 12 : 1;
+  // Fator de sazonalidade por mês (simula variação)
+  const monthIndex = parseInt(month) - 1;
+  const sazonalidade = [0.7, 0.75, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.1, 0.95];
+  const mFactor = viewMode === "mensal" ? (sazonalidade[monthIndex] || 1.0) / 12 : 1;
 
+  // ═══ BP processado (formato antigo - compatibilidade) ═══
   const bp: ProcessedBP = {
     ativoCirculante: {
-      "Disponibilidades": 3000 * factor,
-      "Aplicações Financeiras": 5000 * factor,
-      "Contas a Receber": 4500 * factor,
-      "Estoques": 1500 * factor,
-      "Outros Ativos Circulantes": 1000 * factor,
-      "TOTAL_ATIVO_CIRCULANTE": baseAtivoCirculante,
+      "Disponibilidades": disponibilidades,
+      "Aplicações Financeiras": aplicacoesFinanceiras,
+      "Contas a Receber": contasReceber,
+      "Estoques": estoques,
+      "Outros Ativos Circulantes": outrosAC,
+      "TOTAL_ATIVO_CIRCULANTE": totalAtivoCirculante,
     },
     ativoNaoCirculante: {
-      "Realizável a Longo Prazo": 5000 * factor,
-      "Investimentos": 8000 * factor,
-      "Imobilizado": 20000 * factor,
-      "Intangível": 2000 * factor,
-      "TOTAL_ATIVO_NAO_CIRCULANTE": baseAtivoNaoCirculante,
+      "Realizável a Longo Prazo": realizavelLP,
+      "Investimentos": investimentos,
+      "Imobilizado": imobilizado,
+      "Intangível": intangivel,
+      "TOTAL_ATIVO_NAO_CIRCULANTE": totalAtivoNaoCirculante,
     },
     passivoCirculante: {
-      "Fornecedores": 3000 * factor,
-      "Obrigações Trabalhistas": 2500 * factor,
-      "Obrigações Fiscais": 2000 * factor,
-      "Empréstimos CP": 2500 * factor,
-      "TOTAL_PASSIVO_CIRCULANTE": basePassivoCirculante,
+      "Fornecedores": fornecedores,
+      "Obrigações Trabalhistas": obrigTrabalhistas,
+      "Obrigações Fiscais": obrigFiscais,
+      "Empréstimos CP": emprestimosCP,
+      "TOTAL_PASSIVO_CIRCULANTE": totalPassivoCirculante,
     },
     passivoNaoCirculante: {
-      "Empréstimos LP": 12000 * factor,
-      "Provisões": 3000 * factor,
-      "TOTAL_PASSIVO_NAO_CIRCULANTE": basePassivoNaoCirculante,
+      "Empréstimos LP": emprestimosLP,
+      "Provisões": provisoes,
+      "TOTAL_PASSIVO_NAO_CIRCULANTE": totalPassivoNaoCirculante,
     },
     patrimonioLiquido: {
-      "Capital Social": 15000 * factor,
-      "Reservas": 5000 * factor,
-      "Lucros Acumulados": 5000 * factor,
-      "TOTAL_PATRIMONIO_LIQUIDO": basePL,
+      "Capital Social": capitalSocial,
+      "Reservas": reservas,
+      "Lucros Acumulados": lucrosAcumulados,
+      "TOTAL_PATRIMONIO_LIQUIDO": totalPL,
     },
-    totalAtivo: baseAtivoCirculante + baseAtivoNaoCirculante,
-    totalPassivo: basePassivoCirculante + basePassivoNaoCirculante + basePL,
+    totalAtivo: ativoTotal,
+    totalPassivo: totalPassivos + totalPL,
   };
 
+  // ═══ DRE processado (formato antigo - compatibilidade) ═══
   const dre: ProcessedDRE = {
     receitas: {
-      "Receitas de Competições": 18000 * factor * monthFactor,
-      "Patrocínios": 12000 * factor * monthFactor,
-      "Direitos de Transmissão": 10000 * factor * monthFactor,
-      "Outras Receitas": 5000 * factor * monthFactor,
+      "Receitas de Competições": 18000000 * factor * mFactor,
+      "Patrocínios": 12000000 * factor * mFactor,
+      "Direitos de Transmissão": 10000000 * factor * mFactor,
+      "Outras Receitas": 5000000 * factor * mFactor,
     },
     custos: {
-      "Arbitragem": 8000 * factor * monthFactor,
-      "Premiações": 7000 * factor * monthFactor,
-      "Infraestrutura": 5000 * factor * monthFactor,
-      "Outros Custos": 5000 * factor * monthFactor,
+      "Arbitragem": 8000000 * factor * mFactor,
+      "Premiações": 7000000 * factor * mFactor,
+      "Infraestrutura": 5000000 * factor * mFactor,
+      "Outros Custos": 5000000 * factor * mFactor,
     },
     despesas: {
-      "Despesas Administrativas": 6000 * factor * monthFactor,
-      "Despesas com Pessoal": 4000 * factor * monthFactor,
-      "Despesas Financeiras": 2000 * factor * monthFactor,
+      "Despesas Administrativas": 5000000 * factor * mFactor,
+      "Despesas com Pessoal": 3000000 * factor * mFactor,
+      "Despesas Financeiras": 2000000 * factor * mFactor,
     },
     resultados: {
-      totalReceitas: baseReceitas * monthFactor,
-      totalCustos: baseCustos * monthFactor,
-      resultadoBruto: (baseReceitas - baseCustos) * monthFactor,
-      totalDespesas: baseDespesas * monthFactor,
-      resultadoOperacional: (baseReceitas - baseCustos - baseDespesas) * monthFactor,
-      resultadoLiquido: (baseReceitas - baseCustos - baseDespesas) * monthFactor,
+      totalReceitas: receitaBruta * mFactor,
+      totalCustos: custos * mFactor,
+      resultadoBruto: margemBruta * mFactor,
+      totalDespesas: despesasGerais * mFactor,
+      resultadoOperacional: resultadoOperacional * mFactor,
+      resultadoLiquido: resultadoLiquido * mFactor,
     },
-    total: (baseReceitas - baseCustos - baseDespesas) * monthFactor,
+    total: resultadoLiquido * mFactor,
   };
+
+  // ═══ ÍNDICES FINANCEIROS (fórmulas corretas) ═══
+  
+  // LIQUIDEZ
+  // Corrente = Ativo Circulante / Passivo Circulante
+  const liqCorrente = totalPassivoCirculante !== 0 ? totalAtivoCirculante / totalPassivoCirculante : 0;
+  // Seca = (Ativo Circulante - Estoques) / Passivo Circulante
+  const liqSeca = totalPassivoCirculante !== 0 ? (totalAtivoCirculante - estoques) / totalPassivoCirculante : 0;
+  // Imediata = Disponibilidades / Passivo Circulante
+  const liqImediata = totalPassivoCirculante !== 0 ? disponibilidades / totalPassivoCirculante : 0;
+  // Geral = (Ativo Circulante + Realizável LP) / (Passivo Circulante + Passivo Não Circulante)
+  const liqGeral = totalPassivos !== 0 ? (totalAtivoCirculante + realizavelLP) / totalPassivos : 0;
+
+  // RENTABILIDADE (usa valores anuais da DRE)
+  const receitaBase = receitaBruta; // Base: receita bruta anual
+  // Margem Bruta = (Receita Líquida - Custos) / Receita Líquida × 100
+  const mgBruta = receitaLiquida !== 0 ? ((receitaLiquida - custos) / receitaLiquida) * 100 : 0;
+  // Margem Operacional = Resultado Operacional / Receita Líquida × 100
+  const mgOperacional = receitaLiquida !== 0 ? (resultadoOperacional / receitaLiquida) * 100 : 0;
+  // Margem Líquida = Resultado Líquido / Receita Líquida × 100
+  const mgLiquida = receitaLiquida !== 0 ? (resultadoLiquido / receitaLiquida) * 100 : 0;
+  // Margem EBITDA ≈ (Resultado Operacional + Depreciação) / Receita Líquida × 100
+  // Sem depreciação separada, usamos Resultado Operacional como proxy do EBITDA
+  const depreciacao = 2000000 * factor; // Estimativa
+  const ebitda = resultadoOperacional + depreciacao;
+  const mgEbitda = receitaLiquida !== 0 ? (ebitda / receitaLiquida) * 100 : 0;
+  // ROA = Resultado Líquido / Ativo Total × 100
+  const roaCalc = ativoTotal !== 0 ? (resultadoLiquido / ativoTotal) * 100 : 0;
+  // ROE = Resultado Líquido / Patrimônio Líquido × 100
+  const roeCalc = totalPL !== 0 ? (resultadoLiquido / totalPL) * 100 : 0;
+
+  // ENDIVIDAMENTO
+  // Endividamento Geral = (PC + PNC) / Ativo Total × 100
+  const endGeral = ativoTotal !== 0 ? (totalPassivos / ativoTotal) * 100 : 0;
+  // Composição do Endividamento = PC / (PC + PNC) × 100
+  const compEnd = totalPassivos !== 0 ? (totalPassivoCirculante / totalPassivos) * 100 : 0;
+  // Grau de Alavancagem (Participação Capital Terceiros / PL) = (PC + PNC) / PL
+  const grauAlav = totalPL !== 0 ? totalPassivos / totalPL : 0;
+  // Imobilização do PL = Imobilizado / PL × 100
+  const imobPL = totalPL !== 0 ? (imobilizado / totalPL) * 100 : 0;
+
+  // ATIVIDADE
+  // Giro do Ativo = Receita Líquida / Ativo Total
+  const giroAtivo = ativoTotal !== 0 ? receitaLiquida / ativoTotal : 0;
+  // Prazo Médio de Recebimento = (Contas a Receber / Receita Líquida) × 360
+  const pmr = receitaLiquida !== 0 ? Math.round((contasReceber / receitaLiquida) * 360) : 0;
+  // Prazo Médio de Pagamento = (Fornecedores / Custos) × 360
+  const pmp = custos !== 0 ? Math.round((fornecedores / custos) * 360) : 0;
 
   const indices: FinancialIndices = {
     liquidez: {
-      corrente: Number((baseAtivoCirculante / basePassivoCirculante).toFixed(2)),
-      seca: Number(((baseAtivoCirculante - 1500 * factor) / basePassivoCirculante).toFixed(2)),
-      imediata: Number((3000 * factor / basePassivoCirculante).toFixed(2)),
-      geral: Number((baseAtivoCirculante / (basePassivoCirculante + basePassivoNaoCirculante)).toFixed(2)),
+      corrente: Number(liqCorrente.toFixed(2)),
+      seca: Number(liqSeca.toFixed(2)),
+      imediata: Number(liqImediata.toFixed(2)),
+      geral: Number(liqGeral.toFixed(2)),
     },
     rentabilidade: {
-      margemBruta: Number((((baseReceitas - baseCustos) / baseReceitas) * 100).toFixed(2)),
-      margemOperacional: Number((((baseReceitas - baseCustos - baseDespesas) / baseReceitas) * 100).toFixed(2)),
-      margemLiquida: Number((((baseReceitas - baseCustos - baseDespesas) / baseReceitas) * 100).toFixed(2)),
-      margemEbitda: Number((((baseReceitas - baseCustos - baseDespesas * 0.8) / baseReceitas) * 100).toFixed(2)),
-      roa: Number((((baseReceitas - baseCustos - baseDespesas) / (baseAtivoCirculante + baseAtivoNaoCirculante)) * 100).toFixed(2)),
-      roe: Number((((baseReceitas - baseCustos - baseDespesas) / basePL) * 100).toFixed(2)),
+      margemBruta: Number(mgBruta.toFixed(2)),
+      margemOperacional: Number(mgOperacional.toFixed(2)),
+      margemLiquida: Number(mgLiquida.toFixed(2)),
+      margemEbitda: Number(mgEbitda.toFixed(2)),
+      roa: Number(roaCalc.toFixed(2)),
+      roe: Number(roeCalc.toFixed(2)),
     },
     endividamento: {
-      endividamentoGeral: Number((((basePassivoCirculante + basePassivoNaoCirculante) / (baseAtivoCirculante + baseAtivoNaoCirculante)) * 100).toFixed(2)),
-      composicaoEndividamento: Number(((basePassivoCirculante / (basePassivoCirculante + basePassivoNaoCirculante)) * 100).toFixed(2)),
-      grauAlavancagem: Number(((basePassivoCirculante + basePassivoNaoCirculante) / basePL).toFixed(2)),
-      imobilizacaoPL: Number(((20000 * factor / basePL) * 100).toFixed(2)),
+      endividamentoGeral: Number(endGeral.toFixed(2)),
+      composicaoEndividamento: Number(compEnd.toFixed(2)),
+      grauAlavancagem: Number(grauAlav.toFixed(2)),
+      imobilizacaoPL: Number(imobPL.toFixed(2)),
     },
     atividade: {
-      giroAtivo: Number((baseReceitas / (baseAtivoCirculante + baseAtivoNaoCirculante)).toFixed(2)),
-      prazoMedioRecebimento: Math.round((4500 * factor * 360) / baseReceitas),
-      prazoMedioPagamento: Math.round((3000 * factor * 360) / baseCustos),
+      giroAtivo: Number(giroAtivo.toFixed(2)),
+      prazoMedioRecebimento: pmr,
+      prazoMedioPagamento: pmp,
     },
   };
 
+  // ═══ ESTRUTURA DRE FICTÍCIA (formato sequencial) ═══
+  // Segue a mesma estrutura que o mapBalanceteToDRE gera
+  const gerarEstruturaDRE = (fatorMes: number): ContaComValor[] => {
+    const v = (val: number) => Math.round(val * fatorMes);
+    
+    const conta = (codigo: string, descricao: string, valor: number, nivelVis: number, children?: ContaComValor[]): ContaComValor => ({
+      codigo,
+      descricao,
+      codigoSuperior: null,
+      nivel: 1,
+      nivelVisualizacao: nivelVis,
+      valor: v(valor),
+      children: children || [],
+    });
+
+    return [
+      // Receita Bruta (expandível)
+      conta('51', 'Receita Bruta', receitaBruta, 1, [
+        conta('51.1', 'Receitas de Competições', 18000000 * factor, 2),
+        conta('51.2', 'Patrocínios e Publicidade', 12000000 * factor, 2),
+        conta('51.3', 'Direitos de Transmissão', 10000000 * factor, 2),
+        conta('51.4', 'Outras Receitas Operacionais', 5000000 * factor, 2),
+      ]),
+      // Receita Líquida (calculada, sem children)
+      conta('56', 'Receita Líquida', receitaLiquida, 1),
+      // Custos (expandível)
+      conta('57', '(-) Custos dos Serviços', custos, 1, [
+        conta('57.1', 'Custos com Arbitragem', 8000000 * factor, 2),
+        conta('57.2', 'Premiações', 7000000 * factor, 2),
+        conta('57.3', 'Infraestrutura Esportiva', 5000000 * factor, 2),
+        conta('57.4', 'Outros Custos', 5000000 * factor, 2),
+      ]),
+      // Margem Bruta (calculada)
+      conta('109', 'Margem Bruta', margemBruta, 1),
+      // Despesas (expandível)
+      conta('110', '(-) Despesas Gerais', despesasGerais, 1, [
+        conta('110.1', 'Despesas Administrativas', 5000000 * factor, 2),
+        conta('110.2', 'Despesas com Pessoal', 3000000 * factor, 2),
+        conta('110.3', 'Despesas Comerciais e Marketing', 2000000 * factor, 2),
+      ]),
+      // Resultado Operacional (calculado)
+      conta('196', 'Resultado Operacional', resultadoOperacional, 1),
+      // Lucro Antes do Resultado Financeiro (calculado)
+      conta('197', 'Lucro Antes do Resultado Financeiro', resultadoOperacional, 1),
+      // Resultado Financeiro (expandível, indentado)
+      { ...conta('198', '(+/-) Resultado Financeiro', resultadoFinanceiro, 2, [
+        conta('198.1', 'Receitas Financeiras', 500000 * factor, 3),
+        conta('198.2', '(-) Despesas Financeiras', -2500000 * factor, 3),
+      ]) },
+      // Lucro Líquido Antes dos Impostos
+      conta('227', 'Lucro Líquido Antes dos Impostos', lucroAntesIR, 1),
+      // Superávit/Déficit
+      conta('229', 'Superávit/Déficit do Exercício', resultadoLiquido, 1),
+    ];
+  };
+
+  const estruturaDRE = gerarEstruturaDRE(mFactor);
+
   if (viewMode === "mensal") {
     const months = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
-    const monthIndex = parseInt(month) - 1;
     const monthName = months[monthIndex] || "DEZ";
     const yearShort = year.slice(-2);
     
@@ -451,30 +604,34 @@ function generateDemoData(
       dre,
       indices,
       period: `${monthName}/${yearShort}`,
+      estruturaDRE,
+      resultadoDRE: resultadoLiquido * mFactor,
+      totalPassivoPL: totalPassivos + totalPL,
     };
   }
 
-  // Gera dados mensais para visão anual
+  // ═══ Visão anual ═══
   const months = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
   const yearShort = year.slice(-2);
   const monthlyIndices = months.map((m, i) => {
-    const monthFactor = 0.9 + (i * 0.02); // Simula crescimento ao longo do ano
+    // Pequena variação mensal para simular realismo
+    const monthVariation = 0.9 + (i * 0.02);
     return {
       period: `${m}/${yearShort}`,
       indices: {
         liquidez: {
-          corrente: Number((indices.liquidez.corrente * monthFactor).toFixed(2)),
-          seca: Number((indices.liquidez.seca * monthFactor).toFixed(2)),
-          imediata: Number((indices.liquidez.imediata * monthFactor).toFixed(2)),
-          geral: Number((indices.liquidez.geral * monthFactor).toFixed(2)),
+          corrente: Number((liqCorrente * monthVariation).toFixed(2)),
+          seca: Number((liqSeca * monthVariation).toFixed(2)),
+          imediata: Number((liqImediata * monthVariation).toFixed(2)),
+          geral: Number((liqGeral * monthVariation).toFixed(2)),
         },
         rentabilidade: {
-          margemBruta: Number((indices.rentabilidade.margemBruta * monthFactor).toFixed(2)),
-          margemOperacional: Number((indices.rentabilidade.margemOperacional * monthFactor).toFixed(2)),
-          margemLiquida: Number((indices.rentabilidade.margemLiquida * monthFactor).toFixed(2)),
-          margemEbitda: Number((indices.rentabilidade.margemEbitda * monthFactor).toFixed(2)),
-          roa: Number((indices.rentabilidade.roa * monthFactor).toFixed(2)),
-          roe: Number((indices.rentabilidade.roe * monthFactor).toFixed(2)),
+          margemBruta: Number(mgBruta.toFixed(2)),
+          margemOperacional: Number(mgOperacional.toFixed(2)),
+          margemLiquida: Number(mgLiquida.toFixed(2)),
+          margemEbitda: Number(mgEbitda.toFixed(2)),
+          roa: Number(roaCalc.toFixed(2)),
+          roe: Number(roeCalc.toFixed(2)),
         },
         endividamento: indices.endividamento,
         atividade: indices.atividade,
@@ -487,5 +644,8 @@ function generateDemoData(
     dre,
     indices,
     months: monthlyIndices,
+    estruturaDRE: gerarEstruturaDRE(1), // Anual: fator 1
+    resultadoDRE: resultadoLiquido,
+    totalPassivoPL: totalPassivos + totalPL,
   };
 }

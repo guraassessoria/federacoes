@@ -1,0 +1,104 @@
+{
+  "2023": {
+    "Liquidez": {
+      "Liquidez Corrente": 3.2,
+      "Liquidez Seca": 3.12,
+      "Liquidez Imediata": 1.77
+    },
+    "Rentabilidade": {
+      "Margem Bruta (%)": 52.78,
+      "Margem Operacional (%)": 6.94,
+      "Margem Líquida (%)": 8.33,
+      "ROA (%)": 5.49,
+      "ROE (%)": 7.84,
+      "EBITDA": 3100.0,
+      "Margem EBITDA (%)": 8.61
+    },
+    "Endividamento": {
+      "Endividamento Geral (%)": 29.95,
+      "Composição do Endividamento (%)": 44.95,
+      "Grau de Alavancagem": 0.43,
+      "Participação de Capital de Terceiros (%)": 29.95,
+      "Imobilização do PL (%)": 81.31
+    },
+    "Atividade": {
+      "Giro do Ativo": 0.66,
+      "Giro do Ativo Circulante": 1.53,
+      "Prazo Médio de Recebimento (dias)": 91.0
+    },
+    "Outros": {
+      "Capital de Giro": 16150,
+      "Capital de Giro / Ativo (%)": 29.58,
+      "Cobertura de Juros": 6.25,
+      "Solvência Geral": 3.34
+    }
+  },
+  "2024": {
+    "Liquidez": {
+      "Liquidez Corrente": 3.5,
+      "Liquidez Seca": 3.42,
+      "Liquidez Imediata": 2.01
+    },
+    "Rentabilidade": {
+      "Margem Bruta (%)": 52.78,
+      "Margem Operacional (%)": 6.94,
+      "Margem Líquida (%)": 8.33,
+      "ROA (%)": 5.88,
+      "ROE (%)": 8.25,
+      "EBITDA": 3348.0,
+      "Margem EBITDA (%)": 8.61
+    },
+    "Endividamento": {
+      "Endividamento Geral (%)": 28.75,
+      "Composição do Endividamento (%)": 46.34,
+      "Grau de Alavancagem": 0.4,
+      "Participação de Capital de Terceiros (%)": 28.75,
+      "Imobilização do PL (%)": 74.88
+    },
+    "Atividade": {
+      "Giro do Ativo": 0.71,
+      "Giro do Ativo Circulante": 1.51,
+      "Prazo Médio de Recebimento (dias)": 89.0
+    },
+    "Outros": {
+      "Capital de Giro": 18362.0,
+      "Capital de Giro / Ativo (%)": 33.32,
+      "Cobertura de Juros": 6.25,
+      "Solvência Geral": 3.48
+    }
+  },
+  "2025": {
+    "Liquidez": {
+      "Liquidez Corrente": 3.81,
+      "Liquidez Seca": 3.72,
+      "Liquidez Imediata": 2.26
+    },
+    "Rentabilidade": {
+      "Margem Bruta (%)": 52.78,
+      "Margem Operacional (%)": 6.94,
+      "Margem Líquida (%)": 8.33,
+      "ROA (%)": 6.21,
+      "ROE (%)": 8.58,
+      "EBITDA": 3565.0,
+      "Margem EBITDA (%)": 8.61
+    },
+    "Endividamento": {
+      "Endividamento Geral (%)": 27.67,
+      "Composição do Endividamento (%)": 47.64,
+      "Grau de Alavancagem": 0.38,
+      "Participação de Capital de Terceiros (%)": 27.67,
+      "Imobilização do PL (%)": 68.91
+    },
+    "Atividade": {
+      "Giro do Ativo": 0.74,
+      "Giro do Ativo Circulante": 1.49,
+      "Prazo Médio de Recebimento (dias)": 87.0
+    },
+    "Outros": {
+      "Capital de Giro": 20547.6,
+      "Capital de Giro / Ativo (%)": 36.97,
+      "Cobertura de Juros": 6.25,
+      "Solvência Geral": 3.61
+    }
+  }
+}

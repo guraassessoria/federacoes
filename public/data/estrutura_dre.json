@@ -1,0 +1,1577 @@
+[
+  {
+    "codigo": "1",
+    "descricao": "RECEITAS",
+    "codigoSuperior": null,
+    "nivel": 1,
+    "nivelVisualizacao": 1
+  },
+  {
+    "codigo": "2",
+    "descricao": "Receitas de Competições",
+    "codigoSuperior": "1.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "3",
+    "descricao": "Patrocínios de Competições",
+    "codigoSuperior": "2.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "4",
+    "descricao": "Patrocínio Master",
+    "codigoSuperior": "3.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "5",
+    "descricao": "Patrocínio Oficial",
+    "codigoSuperior": "3.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "6",
+    "descricao": "Patrocínio Regional",
+    "codigoSuperior": "3.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "7",
+    "descricao": "Direitos de Transmissão",
+    "codigoSuperior": "2.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "8",
+    "descricao": "TV Aberta",
+    "codigoSuperior": "7.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "9",
+    "descricao": "TV Fechada",
+    "codigoSuperior": "7.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "10",
+    "descricao": "Streaming/Digital",
+    "codigoSuperior": "7.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "11",
+    "descricao": "Rádio",
+    "codigoSuperior": "7.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "12",
+    "descricao": "Bilheteria",
+    "codigoSuperior": "2.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "13",
+    "descricao": "Vendas de Ingressos",
+    "codigoSuperior": "12.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "14",
+    "descricao": "Camarotes e Áreas VIP",
+    "codigoSuperior": "12.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "15",
+    "descricao": "Pacotes e Combos",
+    "codigoSuperior": "12.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "16",
+    "descricao": "Licenciamento e Merchandising",
+    "codigoSuperior": "2.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "17",
+    "descricao": "Produtos Oficiais",
+    "codigoSuperior": "16.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "18",
+    "descricao": "Royalties",
+    "codigoSuperior": "16.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "19",
+    "descricao": "Loja Oficial",
+    "codigoSuperior": "16.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "20",
+    "descricao": "Receitas de Repasses",
+    "codigoSuperior": "1.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "21",
+    "descricao": "Repasses CBF",
+    "codigoSuperior": "20.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "22",
+    "descricao": "Cota Federação",
+    "codigoSuperior": "21.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "23",
+    "descricao": "Incentivo ao Futebol de Base",
+    "codigoSuperior": "21.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "24",
+    "descricao": "Programas de Desenvolvimento",
+    "codigoSuperior": "21.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "25",
+    "descricao": "Repasses FIFA",
+    "codigoSuperior": "20.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "26",
+    "descricao": "Forward Programme",
+    "codigoSuperior": "25.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "27",
+    "descricao": "Development Programmes",
+    "codigoSuperior": "25.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "28",
+    "descricao": "Solidariedade",
+    "codigoSuperior": "25.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "29",
+    "descricao": "Repasses CONMEBOL",
+    "codigoSuperior": "20.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "30",
+    "descricao": "Cota de Participação",
+    "codigoSuperior": "29.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "31",
+    "descricao": "Programas de Desenvolvimento",
+    "codigoSuperior": "29.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "32",
+    "descricao": "Receitas de Convênios e Parcerias",
+    "codigoSuperior": "1.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "33",
+    "descricao": "Convênios Governamentais",
+    "codigoSuperior": "32.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "34",
+    "descricao": "Lei de Incentivo ao Esporte",
+    "codigoSuperior": "33.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "35",
+    "descricao": "Programas Municipais",
+    "codigoSuperior": "33.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "36",
+    "descricao": "Programas Estaduais",
+    "codigoSuperior": "33.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "37",
+    "descricao": "Parcerias Privadas",
+    "codigoSuperior": "32.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "38",
+    "descricao": "Parcerias Esportivas",
+    "codigoSuperior": "37.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "39",
+    "descricao": "Parcerias Comerciais",
+    "codigoSuperior": "37.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "40",
+    "descricao": "Outras Receitas Operacionais",
+    "codigoSuperior": "1.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "41",
+    "descricao": "Taxas de Inscrição e Filiação",
+    "codigoSuperior": "40.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "42",
+    "descricao": "Taxa de Inscrição de Clubes",
+    "codigoSuperior": "41.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "43",
+    "descricao": "Taxa de Filiação Anual",
+    "codigoSuperior": "41.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "44",
+    "descricao": "Taxa de Registro de Atletas",
+    "codigoSuperior": "41.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "45",
+    "descricao": "Multas e Penalidades",
+    "codigoSuperior": "40.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "46",
+    "descricao": "Multas Disciplinares",
+    "codigoSuperior": "45.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "47",
+    "descricao": "Multas Contratuais",
+    "codigoSuperior": "45.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "48",
+    "descricao": "Cursos e Treinamentos",
+    "codigoSuperior": "40.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "49",
+    "descricao": "Cursos de Arbitragem",
+    "codigoSuperior": "48.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "50",
+    "descricao": "Cursos de Treinadores",
+    "codigoSuperior": "48.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "51",
+    "descricao": "Workshops e Seminários",
+    "codigoSuperior": "48.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "52",
+    "descricao": "CUSTOS",
+    "codigoSuperior": null,
+    "nivel": 1,
+    "nivelVisualizacao": 1
+  },
+  {
+    "codigo": "53",
+    "descricao": "Custos com Competições",
+    "codigoSuperior": "52.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "54",
+    "descricao": "Organização de Jogos",
+    "codigoSuperior": "53.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "55",
+    "descricao": "Aluguel de Estádios",
+    "codigoSuperior": "54.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "56",
+    "descricao": "Segurança e Vigilância",
+    "codigoSuperior": "54.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "57",
+    "descricao": "Limpeza e Conservação",
+    "codigoSuperior": "54.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "58",
+    "descricao": "Infraestrutura Temporária",
+    "codigoSuperior": "54.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "59",
+    "descricao": "Iluminação e Energia",
+    "codigoSuperior": "54.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "60",
+    "descricao": "Arbitragem",
+    "codigoSuperior": "53.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "61",
+    "descricao": "Honorários de Árbitros",
+    "codigoSuperior": "60.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "62",
+    "descricao": "Assistentes de Arbitragem",
+    "codigoSuperior": "60.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "63",
+    "descricao": "VAR - Árbitro de Vídeo",
+    "codigoSuperior": "60.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "64",
+    "descricao": "Transporte e Hospedagem de Árbitros",
+    "codigoSuperior": "60.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "65",
+    "descricao": "Premiações",
+    "codigoSuperior": "53.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "66",
+    "descricao": "Prêmios em Dinheiro",
+    "codigoSuperior": "65.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "67",
+    "descricao": "Troféus e Medalhas",
+    "codigoSuperior": "65.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "68",
+    "descricao": "Incentivos de Desempenho",
+    "codigoSuperior": "65.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "69",
+    "descricao": "Material Esportivo",
+    "codigoSuperior": "53.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "70",
+    "descricao": "Bolas Oficiais",
+    "codigoSuperior": "69.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "71",
+    "descricao": "Equipamentos de Campo",
+    "codigoSuperior": "69.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "72",
+    "descricao": "Material de Marcação",
+    "codigoSuperior": "69.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "73",
+    "descricao": "Transmissão e Mídia",
+    "codigoSuperior": "53.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "74",
+    "descricao": "Infraestrutura de Transmissão",
+    "codigoSuperior": "73.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "75",
+    "descricao": "Equipe de Produção",
+    "codigoSuperior": "73.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "76",
+    "descricao": "Tecnologia VAR",
+    "codigoSuperior": "73.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "77",
+    "descricao": "Custos com Desenvolvimento do Futebol",
+    "codigoSuperior": "52.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "78",
+    "descricao": "Futebol de Base",
+    "codigoSuperior": "77.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "79",
+    "descricao": "Competições de Base",
+    "codigoSuperior": "78.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "80",
+    "descricao": "Categorias de Base",
+    "codigoSuperior": "78.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "81",
+    "descricao": "Material para Categorias de Base",
+    "codigoSuperior": "78.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "82",
+    "descricao": "Formação e Capacitação",
+    "codigoSuperior": "77.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "83",
+    "descricao": "Formação de Árbitros",
+    "codigoSuperior": "82.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "84",
+    "descricao": "Formação de Treinadores",
+    "codigoSuperior": "82.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "85",
+    "descricao": "Formação de Gestores",
+    "codigoSuperior": "82.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "86",
+    "descricao": "Material Didático",
+    "codigoSuperior": "82.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "87",
+    "descricao": "Projetos Sociais",
+    "codigoSuperior": "77.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "88",
+    "descricao": "Futebol Comunitário",
+    "codigoSuperior": "87.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "89",
+    "descricao": "Inclusão Social",
+    "codigoSuperior": "87.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "90",
+    "descricao": "Futebol Feminino",
+    "codigoSuperior": "87.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "91",
+    "descricao": "Material para Projetos",
+    "codigoSuperior": "87.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "92",
+    "descricao": "Pesquisa e Inovação",
+    "codigoSuperior": "77.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "93",
+    "descricao": "Análise de Performance",
+    "codigoSuperior": "92.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "94",
+    "descricao": "Tecnologia Esportiva",
+    "codigoSuperior": "92.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "95",
+    "descricao": "Estudos e Pesquisas",
+    "codigoSuperior": "92.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "96",
+    "descricao": "Custos com Infraestrutura Esportiva",
+    "codigoSuperior": "52.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "97",
+    "descricao": "Centros de Treinamento",
+    "codigoSuperior": "96.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "98",
+    "descricao": "Manutenção de Campos",
+    "codigoSuperior": "97.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "99",
+    "descricao": "Equipamentos Esportivos",
+    "codigoSuperior": "97.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "100",
+    "descricao": "Vestiários e Instalações",
+    "codigoSuperior": "97.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "101",
+    "descricao": "Infraestrutura de Competições",
+    "codigoSuperior": "96.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "102",
+    "descricao": "Melhorias em Estádios",
+    "codigoSuperior": "101.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "103",
+    "descricao": "Equipamentos de Segurança",
+    "codigoSuperior": "101.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "104",
+    "descricao": "DESPESAS",
+    "codigoSuperior": null,
+    "nivel": 1,
+    "nivelVisualizacao": 1
+  },
+  {
+    "codigo": "105",
+    "descricao": "Despesas com Pessoal",
+    "codigoSuperior": "104.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "106",
+    "descricao": "Salários e Ordenados",
+    "codigoSuperior": "105.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "107",
+    "descricao": "Salários Administrativos",
+    "codigoSuperior": "106.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "108",
+    "descricao": "Horas Extras",
+    "codigoSuperior": "106.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "109",
+    "descricao": "13º Salário",
+    "codigoSuperior": "106.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "110",
+    "descricao": "Férias",
+    "codigoSuperior": "106.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "111",
+    "descricao": "Encargos Sociais",
+    "codigoSuperior": "105.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "112",
+    "descricao": "INSS",
+    "codigoSuperior": "111.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "113",
+    "descricao": "FGTS",
+    "codigoSuperior": "111.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "114",
+    "descricao": "PIS",
+    "codigoSuperior": "111.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "115",
+    "descricao": "Benefícios",
+    "codigoSuperior": "105.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "116",
+    "descricao": "Vale Transporte",
+    "codigoSuperior": "115.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "117",
+    "descricao": "Vale Refeição",
+    "codigoSuperior": "115.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "118",
+    "descricao": "Vale Alimentação",
+    "codigoSuperior": "115.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "119",
+    "descricao": "Plano de Saúde",
+    "codigoSuperior": "115.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "120",
+    "descricao": "Seguro de Vida",
+    "codigoSuperior": "115.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "121",
+    "descricao": "Treinamento e Desenvolvimento",
+    "codigoSuperior": "105.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "122",
+    "descricao": "Cursos e Capacitações",
+    "codigoSuperior": "121.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "123",
+    "descricao": "Congressos e Eventos",
+    "codigoSuperior": "121.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "124",
+    "descricao": "Rescisões",
+    "codigoSuperior": "105.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "125",
+    "descricao": "Despesas Administrativas",
+    "codigoSuperior": "104.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "126",
+    "descricao": "Instalações",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "127",
+    "descricao": "Aluguel Sede Administrativa",
+    "codigoSuperior": "126.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "128",
+    "descricao": "Condomínio",
+    "codigoSuperior": "126.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "129",
+    "descricao": "IPTU",
+    "codigoSuperior": "126.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "130",
+    "descricao": "Manutenção Predial",
+    "codigoSuperior": "126.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "131",
+    "descricao": "Utilidades",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "132",
+    "descricao": "Energia Elétrica",
+    "codigoSuperior": "131.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "133",
+    "descricao": "Água e Esgoto",
+    "codigoSuperior": "131.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "134",
+    "descricao": "Telefone",
+    "codigoSuperior": "131.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "135",
+    "descricao": "Internet",
+    "codigoSuperior": "131.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "136",
+    "descricao": "Material de Escritório",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "137",
+    "descricao": "Material de Expediente",
+    "codigoSuperior": "136.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "138",
+    "descricao": "Impressos e Formulários",
+    "codigoSuperior": "136.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "139",
+    "descricao": "Serviços de Terceiros",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "140",
+    "descricao": "Contabilidade",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "141",
+    "descricao": "Assessoria Jurídica",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "142",
+    "descricao": "Auditoria",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "143",
+    "descricao": "Consultoria",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "144",
+    "descricao": "Informática e TI",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "145",
+    "descricao": "Limpeza",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "146",
+    "descricao": "Segurança",
+    "codigoSuperior": "139.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "147",
+    "descricao": "Tecnologia da Informação",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "148",
+    "descricao": "Software e Licenças",
+    "codigoSuperior": "147.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "149",
+    "descricao": "Manutenção de Sistemas",
+    "codigoSuperior": "147.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "150",
+    "descricao": "Equipamentos de Informática",
+    "codigoSuperior": "147.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "151",
+    "descricao": "Cloud Computing",
+    "codigoSuperior": "147.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "152",
+    "descricao": "Depreciação e Amortização",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "153",
+    "descricao": "Depreciação de Bens",
+    "codigoSuperior": "152.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "154",
+    "descricao": "Amortização de Intangíveis",
+    "codigoSuperior": "152.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "155",
+    "descricao": "Seguros",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "156",
+    "descricao": "Seguro Patrimonial",
+    "codigoSuperior": "155.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "157",
+    "descricao": "Seguro de Responsabilidade Civil",
+    "codigoSuperior": "155.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "158",
+    "descricao": "Viagens Administrativas",
+    "codigoSuperior": "125.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "159",
+    "descricao": "Passagens",
+    "codigoSuperior": "158.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "160",
+    "descricao": "Hospedagem",
+    "codigoSuperior": "158.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "161",
+    "descricao": "Alimentação",
+    "codigoSuperior": "158.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "162",
+    "descricao": "Locomoção",
+    "codigoSuperior": "158.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "163",
+    "descricao": "Despesas Comerciais e Marketing",
+    "codigoSuperior": "104.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "164",
+    "descricao": "Marketing e Publicidade",
+    "codigoSuperior": "163.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "165",
+    "descricao": "Campanhas Publicitárias",
+    "codigoSuperior": "164.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "166",
+    "descricao": "Mídias Sociais",
+    "codigoSuperior": "164.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "167",
+    "descricao": "Produção de Conteúdo",
+    "codigoSuperior": "164.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "168",
+    "descricao": "Assessoria de Imprensa",
+    "codigoSuperior": "164.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "169",
+    "descricao": "Eventos Institucionais",
+    "codigoSuperior": "163.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "170",
+    "descricao": "Congressos Técnicos",
+    "codigoSuperior": "169.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "171",
+    "descricao": "Assembleias",
+    "codigoSuperior": "169.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "172",
+    "descricao": "Eventos de Relacionamento",
+    "codigoSuperior": "169.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "173",
+    "descricao": "Materiais Promocionais",
+    "codigoSuperior": "163.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "174",
+    "descricao": "Brindes",
+    "codigoSuperior": "173.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "175",
+    "descricao": "Material Gráfico",
+    "codigoSuperior": "173.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "176",
+    "descricao": "Relacionamento com Stakeholders",
+    "codigoSuperior": "163.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "177",
+    "descricao": "Relacionamento com Clubes",
+    "codigoSuperior": "176.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "178",
+    "descricao": "Relacionamento com Patrocinadores",
+    "codigoSuperior": "176.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "179",
+    "descricao": "Outras Despesas Operacionais",
+    "codigoSuperior": "104.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "180",
+    "descricao": "Tributos e Taxas",
+    "codigoSuperior": "179.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "181",
+    "descricao": "Taxas Municipais",
+    "codigoSuperior": "180.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "182",
+    "descricao": "Taxas Estaduais",
+    "codigoSuperior": "180.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "183",
+    "descricao": "Contribuições Sindicais",
+    "codigoSuperior": "180.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "184",
+    "descricao": "Provisões",
+    "codigoSuperior": "179.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "185",
+    "descricao": "Provisão para Contingências",
+    "codigoSuperior": "184.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "186",
+    "descricao": "Provisão para Devedores Duvidosos",
+    "codigoSuperior": "184.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "187",
+    "descricao": "Perdas Diversas",
+    "codigoSuperior": "179.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "188",
+    "descricao": "Perdas com Créditos Incobráveis",
+    "codigoSuperior": "187.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "189",
+    "descricao": "Baixa de Bens",
+    "codigoSuperior": "187.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "190",
+    "descricao": "RESULTADO FINANCEIRO",
+    "codigoSuperior": null,
+    "nivel": 1,
+    "nivelVisualizacao": 1
+  },
+  {
+    "codigo": "191",
+    "descricao": "Receitas Financeiras",
+    "codigoSuperior": "190.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "192",
+    "descricao": "Rendimentos de Aplicações Financeiras",
+    "codigoSuperior": "191.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "193",
+    "descricao": "Rendimentos CDB",
+    "codigoSuperior": "192.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "194",
+    "descricao": "Rendimentos Poupança",
+    "codigoSuperior": "192.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "195",
+    "descricao": "Rendimentos Fundos de Investimento",
+    "codigoSuperior": "192.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "196",
+    "descricao": "Juros Recebidos",
+    "codigoSuperior": "191.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "197",
+    "descricao": "Descontos Obtidos",
+    "codigoSuperior": "191.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "198",
+    "descricao": "Variações Cambiais Ativas",
+    "codigoSuperior": "191.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "199",
+    "descricao": "Despesas Financeiras",
+    "codigoSuperior": "190.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "200",
+    "descricao": "Juros e Encargos",
+    "codigoSuperior": "199.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "201",
+    "descricao": "Juros sobre Empréstimos",
+    "codigoSuperior": "200.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "202",
+    "descricao": "Juros sobre Financiamentos",
+    "codigoSuperior": "200.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "203",
+    "descricao": "Juros de Mora",
+    "codigoSuperior": "200.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "204",
+    "descricao": "Tarifas Bancárias",
+    "codigoSuperior": "199.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "205",
+    "descricao": "Tarifas de Manutenção",
+    "codigoSuperior": "204.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "206",
+    "descricao": "Tarifas de Transação",
+    "codigoSuperior": "204.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "207",
+    "descricao": "IOF",
+    "codigoSuperior": "204.0",
+    "nivel": 4,
+    "nivelVisualizacao": 3
+  },
+  {
+    "codigo": "208",
+    "descricao": "Descontos Concedidos",
+    "codigoSuperior": "199.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "209",
+    "descricao": "Variações Cambiais Passivas",
+    "codigoSuperior": "199.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "210",
+    "descricao": "RESULTADO",
+    "codigoSuperior": null,
+    "nivel": 1,
+    "nivelVisualizacao": 1
+  },
+  {
+    "codigo": "211",
+    "descricao": "Resultado Operacional",
+    "codigoSuperior": "210.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "212",
+    "descricao": "Receitas Operacionais",
+    "codigoSuperior": "211.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "213",
+    "descricao": "(-) Custos Operacionais",
+    "codigoSuperior": "211.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "214",
+    "descricao": "(-) Despesas Operacionais",
+    "codigoSuperior": "211.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "215",
+    "descricao": "(=) Lucro/Prejuízo Operacional",
+    "codigoSuperior": "211.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "216",
+    "descricao": "Resultado Não Operacional",
+    "codigoSuperior": "210.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "217",
+    "descricao": "Receitas Não Operacionais",
+    "codigoSuperior": "216.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "218",
+    "descricao": "Doações Recebidas",
+    "codigoSuperior": "217.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "219",
+    "descricao": "Alienação de Bens",
+    "codigoSuperior": "217.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "220",
+    "descricao": "Reversão de Provisões",
+    "codigoSuperior": "217.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "221",
+    "descricao": "(-) Despesas Não Operacionais",
+    "codigoSuperior": "216.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "222",
+    "descricao": "Multas e Penalidades",
+    "codigoSuperior": "221.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "223",
+    "descricao": "Doações Efetuadas",
+    "codigoSuperior": "221.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "224",
+    "descricao": "Despesas Eventuais",
+    "codigoSuperior": "221.0",
+    "nivel": 3,
+    "nivelVisualizacao": 2
+  },
+  {
+    "codigo": "225",
+    "descricao": "Resultado Líquido do Exercício",
+    "codigoSuperior": "210.0",
+    "nivel": 2,
+    "nivelVisualizacao": 2
+  }
+]

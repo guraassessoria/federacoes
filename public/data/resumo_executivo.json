@@ -1,0 +1,155 @@
+{
+  "metadata": {
+    "nome_entidade": "Federação Estadual de Futebol - Exemplo",
+    "periodo": "2023-2025",
+    "data_geracao": "2026-02-23 19:14:56",
+    "moeda": "BRL (R$ mil)"
+  },
+  "kpis_principais": {
+    "2023": {
+      "receita_total": 36000.0,
+      "resultado_liquido": 3000.0,
+      "ebitda": 3100.0,
+      "ativo_total": 54600,
+      "patrimonio_liquido": 38250,
+      "capital_giro": 16150,
+      "margem_liquida": 8.33,
+      "roe": 7.84,
+      "liquidez_corrente": 3.2,
+      "endividamento_geral": 29.95
+    },
+    "2024": {
+      "receita_total": 38880.0,
+      "resultado_liquido": 3240.0,
+      "ebitda": 3348.0,
+      "ativo_total": 55102.0,
+      "patrimonio_liquido": 39262.0,
+      "capital_giro": 18362.0,
+      "margem_liquida": 8.33,
+      "roe": 8.25,
+      "liquidez_corrente": 3.5,
+      "endividamento_geral": 28.75
+    },
+    "2025": {
+      "receita_total": 41400.0,
+      "resultado_liquido": 3450.0,
+      "ebitda": 3565.0,
+      "ativo_total": 55572.1,
+      "patrimonio_liquido": 40197.6,
+      "capital_giro": 20547.6,
+      "margem_liquida": 8.33,
+      "roe": 8.58,
+      "liquidez_corrente": 3.81,
+      "endividamento_geral": 27.67
+    }
+  },
+  "evolucao_trienal": {
+    "receita_total": {
+      "var_2023_2024": 8.0,
+      "var_2024_2025": 6.48,
+      "var_acumulada_2023_2025": 15.0
+    },
+    "resultado_liquido": {
+      "var_2023_2024": 8.0,
+      "var_2024_2025": 6.48,
+      "var_acumulada_2023_2025": 15.0
+    },
+    "ativo_total": {
+      "var_2023_2024": 0.92,
+      "var_2024_2025": 0.85,
+      "var_acumulada_2023_2025": 1.78
+    },
+    "patrimonio_liquido": {
+      "var_2023_2024": 2.65,
+      "var_2024_2025": 2.38,
+      "var_acumulada_2023_2025": 5.09
+    }
+  },
+  "destaques": {
+    "crescimento_receita": {
+      "descricao": "Crescimento consistente da receita",
+      "valor": "15.0% em 3 anos",
+      "status": "positivo"
+    },
+    "lucratividade": {
+      "descricao": "Margem líquida estável",
+      "valor": "8.33% em 2025",
+      "status": "positivo"
+    },
+    "liquidez": {
+      "descricao": "Excelente liquidez corrente",
+      "valor": "3.81x em 2025",
+      "status": "positivo"
+    },
+    "endividamento": {
+      "descricao": "Endividamento baixo e decrescente",
+      "valor": "27.67% em 2025",
+      "status": "positivo"
+    },
+    "rentabilidade": {
+      "descricao": "ROE crescente",
+      "valor": "8.58% em 2025",
+      "status": "positivo"
+    }
+  },
+  "alertas": [
+    {
+      "tipo": "atencao",
+      "categoria": "Liquidez",
+      "descricao": "Liquidez corrente muito elevada pode indicar ociosidade de recursos",
+      "valor": 3.81,
+      "recomendacao": "Considerar investir recursos excedentes em projetos de desenvolvimento"
+    },
+    {
+      "tipo": "oportunidade",
+      "categoria": "Capital de Giro",
+      "descricao": "Capital de giro robusto oferece oportunidade para investimentos",
+      "valor": 20547.6,
+      "recomendacao": "Avaliar projetos estratégicos de infraestrutura ou desenvolvimento do futebol"
+    }
+  ],
+  "composicao_receita_2025": {
+    "Competições": {
+      "valor": 14375.0,
+      "percentual": 34.72
+    },
+    "Repasses": {
+      "valor": 20700.0,
+      "percentual": 50.0
+    },
+    "Convênios e Parcerias": {
+      "valor": 4025.0,
+      "percentual": 9.72
+    },
+    "Outras Receitas": {
+      "valor": 2300.0,
+      "percentual": 5.56
+    }
+  },
+  "distribuicao_custos_despesas_2025": {
+    "Competições": {
+      "valor": 11500.0,
+      "percentual": 29.85
+    },
+    "Desenvolvimento do Futebol": {
+      "valor": 5175.0,
+      "percentual": 13.43
+    },
+    "Infraestrutura": {
+      "valor": 2875.0,
+      "percentual": 7.46
+    },
+    "Pessoal": {
+      "valor": 9200.0,
+      "percentual": 23.88
+    },
+    "Administrativas": {
+      "valor": 6325.0,
+      "percentual": 16.42
+    },
+    "Marketing": {
+      "valor": 2300.0,
+      "percentual": 5.97
+    }
+  }
+}

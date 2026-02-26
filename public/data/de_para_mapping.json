@@ -1,0 +1,68 @@
+{
+  "BP": {
+    "1.1.01.001": {
+      "codigoPadrao": "3",
+      "descricaoPadrao": "0003 - Disponibilidades"
+    },
+    "1.1.01.002": {
+      "codigoPadrao": "3",
+      "descricaoPadrao": "0003 - Disponibilidades"
+    },
+    "1.1.01.003": {
+      "codigoPadrao": "3",
+      "descricaoPadrao": "0003 - Disponibilidades"
+    },
+    "1.1.02.001": {
+      "codigoPadrao": "4",
+      "descricaoPadrao": "0004 - Aplicações Financeiras"
+    },
+    "1.1.03.001": {
+      "codigoPadrao": "8",
+      "descricaoPadrao": "0008 - Contas a Receber"
+    },
+    "1.1.03.002": {
+      "codigoPadrao": "9",
+      "descricaoPadrao": "0009 - Direitos de Transmissão a Receber"
+    },
+    "1.2.01.001": {
+      "codigoPadrao": "45",
+      "descricaoPadrao": "0045 - Imobilizado"
+    },
+    "1.2.01.002": {
+      "codigoPadrao": "45",
+      "descricaoPadrao": "0045 - Imobilizado"
+    },
+    "2.1.01.001": {
+      "codigoPadrao": "80",
+      "descricaoPadrao": "0080 - Fornecedores"
+    },
+    "2.1.02.001": {
+      "codigoPadrao": "85",
+      "descricaoPadrao": "0085 - Obrigações Trabalhistas"
+    }
+  },
+  "DRE": {
+    "3.1.01.001": {
+      "codigoPadrao": "2",
+      "descricaoPadrao": "0002 - Receitas de Competições"
+    },
+    "3.1.01.002": {
+      "codigoPadrao": "3",
+      "descricaoPadrao": "0003 - Patrocínios"
+    },
+    "3.1.02.001": {
+      "codigoPadrao": "8",
+      "descricaoPadrao": "0008 - Direitos de Transmissão"
+    },
+    "4.1.01.001": {
+      "codigoPadrao": "54",
+      "descricaoPadrao": "0054 - Arbitragem"
+    },
+    "4.1.02.001": {
+      "codigoPadrao": "57",
+      "descricaoPadrao": "0057 - Premiações"
+    }
+  },
+  "DFC": {},
+  "DMPL": {}
+}

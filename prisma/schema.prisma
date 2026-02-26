@@ -30,6 +30,7 @@ model Company {
   balancetes BalanceteData[]
   files      CompanyFile[]
   users      UserCompany[]
+  deParaMappings DeParaMapping[]
 }
 
 model UserCompany {
@@ -83,6 +84,7 @@ model BalanceteData {
   createdAt          DateTime @default(now())
   company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@unique([companyId, period, accountNumber])
   @@index([companyId, period])
   @@index([accountNumber])
 }
@@ -134,4 +136,22 @@ model BalanceteRow {
   createdAt    DateTime @default(now())
 
   @@index([companyId, periodo])
+}
+
+model DeParaMapping {
+  id                 String   @id @default(cuid())
+  companyId           String
+  contaFederacao      String
+  descricaoFederacao  String?
+  padraoBP            String?
+  padraoDRE           String?
+  padraoDFC           String?
+  padraoDMPL          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, contaFederacao])
+  @@index([companyId])
 }

@@ -1,9 +1,13 @@
 /**
  * Serviço de Mapeamento de Estrutura
  * Adapta dados do balancete à estrutura base padronizada usando o mapeamento "de-para"
+ * 
+ * ATUALIZADO: Agora carrega estruturas do banco de dados (StandardStructure)
+ * com fallback para os arquivos JSON estáticos em public/data/
  */
 
 import { BalanceteData } from '@prisma/client';
+import { prisma } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -33,33 +37,135 @@ export interface DeParaMapping {
   DMPL: Record<string, MapeamentoDePara>;
 }
 
-// Cache para estruturas carregadas
+// Cache para estruturas carregadas (com versão para invalidação)
 let estruturaDRECache: ContaEstrutura[] | null = null;
+let estruturaDREVersion: number = -1;
 let estruturaBPCache: ContaEstrutura[] | null = null;
+let estruturaBPVersion: number = -1;
 let deParaMappingCache: DeParaMapping | null = null;
 
 /**
+ * Converte as rows do banco (formato JSON) para o formato ContaEstrutura[]
+ * O banco armazena: { ordem, codigo, descricao, codigoSuperior, nivel, isTotal, grupo }
+ * Precisamos de: { codigo, descricao, codigoSuperior, nivel, nivelVisualizacao }
+ */
+function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
+  return rows.map((row: any) => ({
+    codigo: String(row.codigo || ''),
+    descricao: String(row.descricao || ''),
+    codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
+    nivel: Number(row.nivel) || 1,
+    nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
+  }));
+}
+
+/**
+ * Carrega estrutura do banco de dados por tipo.
+ * Retorna null se não houver estrutura salva no banco.
+ */
+async function loadEstruturaFromDB(tipo: 'BP' | 'DRE' | 'DFC' | 'DMPL'): Promise<{ rows: ContaEstrutura[]; version: number } | null> {
+  try {
+    const record = await prisma.standardStructure.findUnique({
+      where: { type: tipo },
+    });
+
+    if (!record || !record.data) return null;
+
+    const data = record.data as any;
+    const rows = data?.rows;
+
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+
+    return {
+      rows: dbRowsToContaEstrutura(rows),
+      version: record.version,
+    };
+  } catch (error) {
+    console.error(`[loadEstruturaFromDB] Erro ao carregar ${tipo} do banco:`, error);
+    return null;
+  }
+}
+
+/**
  * Carrega a estrutura base do DRE
+ * 1º tenta o banco de dados (StandardStructure)
+ * 2º fallback para o arquivo JSON estático
  */
 export async function loadEstruturaDRE(): Promise<ContaEstrutura[]> {
+  // Tenta carregar do banco
+  const fromDB = await loadEstruturaFromDB('DRE');
+
+  if (fromDB) {
+    // Se a versão mudou ou cache está vazio, atualiza
+    if (!estruturaDRECache || estruturaDREVersion !== fromDB.version) {
+      estruturaDRECache = fromDB.rows;
+      estruturaDREVersion = fromDB.version;
+      console.log(`[loadEstruturaDRE] Carregado do banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+    }
+    return estruturaDRECache;
+  }
+
+  // Fallback: arquivo JSON estático
   if (estruturaDRECache) return estruturaDRECache;
-  
+
+  console.log('[loadEstruturaDRE] Banco vazio, usando fallback JSON estático');
   const filePath = path.join(process.cwd(), 'public', 'data', 'estrutura_dre.json');
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  estruturaDRECache = JSON.parse(fileContent);
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    estruturaDRECache = JSON.parse(fileContent);
+  } catch (e) {
+    console.error('[loadEstruturaDRE] Falha ao ler JSON estático:', e);
+    estruturaDRECache = [];
+  }
   return estruturaDRECache!;
 }
 
 /**
  * Carrega a estrutura base do BP
+ * 1º tenta o banco de dados (StandardStructure)
+ * 2º fallback para o arquivo JSON estático
  */
 export async function loadEstruturaBP(): Promise<ContaEstrutura[]> {
+  // Tenta carregar do banco
+  const fromDB = await loadEstruturaFromDB('BP');
+
+  if (fromDB) {
+    if (!estruturaBPCache || estruturaBPVersion !== fromDB.version) {
+      estruturaBPCache = fromDB.rows;
+      estruturaBPVersion = fromDB.version;
+      console.log(`[loadEstruturaBP] Carregado do banco - versão ${fromDB.version}, ${fromDB.rows.length} linhas`);
+    }
+    return estruturaBPCache;
+  }
+
+  // Fallback: arquivo JSON estático
   if (estruturaBPCache) return estruturaBPCache;
-  
+
+  console.log('[loadEstruturaBP] Banco vazio, usando fallback JSON estático');
   const filePath = path.join(process.cwd(), 'public', 'data', 'estrutura_bp.json');
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  estruturaBPCache = JSON.parse(fileContent);
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    estruturaBPCache = JSON.parse(fileContent);
+  } catch (e) {
+    console.error('[loadEstruturaBP] Falha ao ler JSON estático:', e);
+    estruturaBPCache = [];
+  }
   return estruturaBPCache!;
+}
+
+/**
+ * Invalida os caches de estrutura (chamar após upload de nova versão)
+ */
+export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE' | 'DFC' | 'DMPL') {
+  if (!tipo || tipo === 'DRE') {
+    estruturaDRECache = null;
+    estruturaDREVersion = -1;
+  }
+  if (!tipo || tipo === 'BP') {
+    estruturaBPCache = null;
+    estruturaBPVersion = -1;
+  }
+  console.log(`[invalidateEstruturaCache] Cache invalidado para: ${tipo || 'todos'}`);
 }
 
 /**
@@ -130,6 +236,8 @@ const MAPEAMENTO_BP_ANALITICAS: Record<string, {codigoPadrao: string; descricao:
   
   // ===== PASSIVO CIRCULANTE - FORNECEDORES =====
   '2.1.20.100.0': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
+  '2.1.20.100.1': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
+  '2.1.20.100.2': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
   '2.1.20.100.3': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
   '2.1.20.100.7': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
   '2.1.20.100.8': { codigoPadrao: '79', descricao: 'Fornecedores Nacionais' },
@@ -155,106 +263,91 @@ const MAPEAMENTO_BP_ANALITICAS: Record<string, {codigoPadrao: string; descricao:
  * IMPORTANTE: Apenas contas ANALÍTICAS (último nível) devem ser mapeadas.
  * As contas sintéticas são calculadas automaticamente pela soma das suas filhas.
  * 
- * CÓDIGOS DA ESTRUTURA BASE DRE:
- * 40 = Outras Receitas Operacionais, 191 = Receitas Financeiras
- * 54 = Organização de Jogos, 61 = Honorários de Árbitros, 66 = Prêmios em Dinheiro, 67 = Troféus, 69 = Material Esportivo
- * 106 = Salários, 111 = Encargos, 115 = Benefícios
- * 126 = Instalações, 131 = Utilidades, 136 = Material, 139 = Serviços, 155 = Seguros, 158 = Viagens, 164 = Marketing
- * 180 = Tributos, 187 = Perdas, 200 = Juros e Encargos
+ * Este objeto precisa ser mantido/atualizado conforme o plano de contas da empresa.
+ * TODO: No futuro, este mapeamento pode vir do banco de dados (DeParaMapping).
  */
 const MAPEAMENTO_DRE_ANALITICAS: Record<string, {codigoPadrao: string; descricao: string}> = {
-  // ===== RECEITAS =====
-  '3.1.11.200.001': { codigoPadrao: '40', descricao: 'Receitas - Programa de Auxílios' },
-  '3.1.11.200.002': { codigoPadrao: '40', descricao: 'Outras Receitas' },
-  '3.1.11.200.008': { codigoPadrao: '40', descricao: 'Receitas - Transferências' },
-  '3.1.11.400.003': { codigoPadrao: '195', descricao: 'Receitas Financeiras' },
+  // ===== RECEITAS OPERACIONAIS =====
+  '3.1.11.100.001': { codigoPadrao: '3', descricao: 'Receitas de Competições Estaduais' },
+  '3.1.11.100.002': { codigoPadrao: '3', descricao: 'Receitas de Competições Nacionais' },
+  '3.1.11.100.003': { codigoPadrao: '3', descricao: 'Receitas de Outras Competições' },
+  '3.1.11.200.001': { codigoPadrao: '6', descricao: 'Taxas de Registro de Atletas' },
+  '3.1.11.200.002': { codigoPadrao: '6', descricao: 'Taxas de Transferência' },
+  '3.1.11.200.003': { codigoPadrao: '6', descricao: 'Emolumentos Diversos' },
+  '3.1.11.300.001': { codigoPadrao: '10', descricao: 'Contribuição Obrigatória de Clubes' },
+  '3.1.11.300.002': { codigoPadrao: '10', descricao: 'Anuidade de Filiação' },
+  '3.1.11.300.003': { codigoPadrao: '10', descricao: 'Contribuição de Ligas' },
+  '3.1.11.400.001': { codigoPadrao: '13', descricao: 'Subvenções Governamentais' },
+  '3.1.11.500.001': { codigoPadrao: '16', descricao: 'Receita de Patrocínios' },
+  '3.1.11.500.002': { codigoPadrao: '16', descricao: 'Receita de Publicidade' },
+  '3.1.11.600.001': { codigoPadrao: '19', descricao: 'Receitas de Convênios' },
+  '3.1.11.600.002': { codigoPadrao: '19', descricao: 'Receitas de Projetos Sociais' },
+  '3.1.11.700.001': { codigoPadrao: '22', descricao: 'Receitas com Cessão de Direitos' },
+  '3.1.11.800.001': { codigoPadrao: '24', descricao: 'Receitas com Cursos e Clínicas' },
+  '3.1.11.800.002': { codigoPadrao: '24', descricao: 'Receitas com Seminários' },
+  '3.1.11.900.001': { codigoPadrao: '27', descricao: 'Multas e Penalidades' },
+  '3.1.11.900.002': { codigoPadrao: '27', descricao: 'Rendimento de Aplicações' },
+  '3.1.11.900.003': { codigoPadrao: '27', descricao: 'Outras Receitas Operacionais' },
   
-  // ===== DESPESAS COM PESSOAL =====
-  '4.2.11.100.001': { codigoPadrao: '106', descricao: 'Salários e Ordenados' },
-  '4.2.11.100.003': { codigoPadrao: '106', descricao: 'Férias' },
-  '4.2.11.100.004': { codigoPadrao: '106', descricao: '13º Salário' },
-  '4.2.11.100.005': { codigoPadrao: '111', descricao: 'INSS' },
-  '4.2.11.100.006': { codigoPadrao: '111', descricao: 'FGTS' },
-  '4.2.11.100.011': { codigoPadrao: '111', descricao: 'Outros Encargos' },
-  '4.2.11.100.012': { codigoPadrao: '115', descricao: 'Vale Transporte' },
-  '4.2.11.100.014': { codigoPadrao: '111', descricao: 'FGTS - Artigo 22 CLT' },
+  // ===== CUSTOS OPERACIONAIS =====
+  '4.1.11.100.001': { codigoPadrao: '53', descricao: 'Custos com Arbitragem' },
+  '4.1.11.100.002': { codigoPadrao: '53', descricao: 'Custos com Premiação' },
+  '4.1.11.100.003': { codigoPadrao: '53', descricao: 'Custos com Logística de Jogos' },
+  '4.1.11.200.001': { codigoPadrao: '57', descricao: 'Custos com Capacitação Técnica' },
+  '4.1.11.200.002': { codigoPadrao: '57', descricao: 'Custos com Material Esportivo' },
+  '4.1.11.300.001': { codigoPadrao: '60', descricao: 'Custos com Delegações' },
+  '4.1.11.300.002': { codigoPadrao: '60', descricao: 'Custos com Transporte' },
   
-  // ===== DESPESAS COM DEPRECIAÇÃO =====
-  '4.2.11.200.003': { codigoPadrao: '145', descricao: 'Depreciação e Amortização' },
+  // ===== CUSTOS COM COMPETIÇÕES DETALHADOS =====
+  '4.2.11.100.001': { codigoPadrao: '53', descricao: 'Alimentação Competições' },
+  '4.2.11.100.002': { codigoPadrao: '53', descricao: 'Hospedagem Competições' },
+  '4.2.11.100.003': { codigoPadrao: '53', descricao: 'Transporte Competições' },
+  '4.2.11.100.004': { codigoPadrao: '53', descricao: 'Material Competições' },
+  '4.2.11.200.001': { codigoPadrao: '53', descricao: 'Premiação Competições' },
+  '4.2.11.200.002': { codigoPadrao: '53', descricao: 'Troféus e Medalhas' },
+  '4.2.11.300.001': { codigoPadrao: '53', descricao: 'Locação de Estádios' },
+  '4.2.11.300.002': { codigoPadrao: '53', descricao: 'Segurança em Eventos' },
+  '4.2.11.400.001': { codigoPadrao: '53', descricao: 'Taxas CBF' },
+  '4.2.11.500.001': { codigoPadrao: '53', descricao: 'Seguro de Atletas' },
   
-  // ===== DESPESAS COM OCUPAÇÃO / INSTALAÇÕES =====
-  '4.2.11.200.007': { codigoPadrao: '126', descricao: 'Manutenção de Veículos' },
-  '4.2.11.200.008': { codigoPadrao: '126', descricao: 'Conservação e Manutenção em Imóveis' },
-  '4.2.11.200.009': { codigoPadrao: '126', descricao: 'Manutenção de Estádios' },
-  '4.2.11.200.010': { codigoPadrao: '126', descricao: 'Manutenção de Móveis' },
-  
-  // ===== DESPESAS COM UTILIDADES =====
-  '4.2.11.300.001': { codigoPadrao: '131', descricao: 'Energia Elétrica' },
-  '4.2.11.300.002': { codigoPadrao: '131', descricao: 'Água' },
-  '4.2.11.300.003': { codigoPadrao: '131', descricao: 'Telefone/Internet' },
-  '4.2.11.300.007': { codigoPadrao: '155', descricao: 'Seguros' },
-  '4.2.11.300.008': { codigoPadrao: '131', descricao: 'Transportes do Pessoal' },
-  
-  // ===== DESPESAS GERAIS =====
-  '4.2.11.500.001': { codigoPadrao: '158', descricao: 'Viagens e Representações' },
-  '4.2.11.500.002': { codigoPadrao: '136', descricao: 'Material de Escritório' },
-  '4.2.11.500.003': { codigoPadrao: '69', descricao: 'Material Esportivo' },
-  '4.2.11.500.004': { codigoPadrao: '136', descricao: 'Copa e Cozinha' },
-  '4.2.11.500.005': { codigoPadrao: '136', descricao: 'Conduções e Lanches' },
-  '4.2.11.500.006': { codigoPadrao: '164', descricao: 'Propaganda e Publicidade' },
-  '4.2.11.500.012': { codigoPadrao: '187', descricao: 'Multas Extra-Fiscais' },
-  '4.2.11.500.013': { codigoPadrao: '67', descricao: 'Troféus e Medalhas' },
-  '4.2.11.500.014': { codigoPadrao: '139', descricao: 'Serviços de Terceiros PJ' },
-  '4.2.11.500.015': { codigoPadrao: '139', descricao: 'Serviços de Terceiros PF' },
-  '4.2.11.500.016': { codigoPadrao: '187', descricao: 'Despesas Diversas' },
-  '4.2.11.500.019': { codigoPadrao: '115', descricao: 'Clínica/Farmácia/Medicamentos' },
-  '4.2.11.500.020': { codigoPadrao: '106', descricao: 'Ajuda de Custo' },
-  '4.2.11.500.022': { codigoPadrao: '54', descricao: 'Despesa de Jogos' },
-  '4.2.11.500.026': { codigoPadrao: '61', descricao: 'Despesas com Arbitragem' },
-  '4.2.11.500.027': { codigoPadrao: '139', descricao: 'Instituto de Futebol do Piauí' },
-  '4.2.11.500.028': { codigoPadrao: '54', descricao: 'CBF / Federação' },
-  
-  // ===== DESPESAS FINANCEIRAS =====
-  '4.2.11.600.001': { codigoPadrao: '200', descricao: 'Juros Pagos' },
-  '4.2.11.600.004': { codigoPadrao: '200', descricao: 'Multas de Mora' },
-  
-  // ===== DESPESAS TRIBUTÁRIAS =====
-  '4.2.11.700.001': { codigoPadrao: '180', descricao: 'Impostos e Taxas' },
-  '4.2.11.700.007': { codigoPadrao: '180', descricao: 'PIS s/ Folha' },
-  '4.2.11.700.008': { codigoPadrao: '180', descricao: 'Parcelamento Tributos Federais' },
-  '4.2.11.700.009': { codigoPadrao: '180', descricao: 'Parcelamento INSS' },
-  '4.2.11.700.011': { codigoPadrao: '180', descricao: 'INSS s/ Eventos' },
-  
-  // ===== REPASSES PARA CLUBES (Prêmios em Dinheiro) =====
-  '4.2.11.800.001': { codigoPadrao: '66', descricao: 'River Atlético Club' },
-  '4.2.11.800.002': { codigoPadrao: '66', descricao: 'Esporte Clube Flamengo' },
-  '4.2.11.800.003': { codigoPadrao: '66', descricao: 'Associação Atlética Corissaba' },
-  '4.2.11.800.004': { codigoPadrao: '66', descricao: 'Parnaíba Sport Clube' },
-  '4.2.11.800.005': { codigoPadrao: '66', descricao: 'Caiçara Esporte Clube' },
-  '4.2.11.800.006': { codigoPadrao: '66', descricao: 'Sociedade Esportiva de Picos' },
-  '4.2.11.800.007': { codigoPadrao: '66', descricao: 'Piauí Esporte Clube' },
-  '4.2.11.800.008': { codigoPadrao: '66', descricao: '4 de Julho Esporte Clube' },
-  '4.2.11.800.009': { codigoPadrao: '66', descricao: 'Associação Atlética Oeirense' },
-  '4.2.11.800.011': { codigoPadrao: '66', descricao: 'APCDEP' },
-  '4.2.11.800.013': { codigoPadrao: '66', descricao: 'Comercial Atlético Clube' },
-  '4.2.11.800.016': { codigoPadrao: '66', descricao: 'Sociedade Esportiva Tiradentes' },
-  '4.2.11.800.021': { codigoPadrao: '66', descricao: 'Associação Atlética de Altos' },
-  '4.2.11.800.025': { codigoPadrao: '66', descricao: 'Escola De Futebol Boca Junior' },
-  '4.2.11.800.029': { codigoPadrao: '66', descricao: 'Equipe Abelha Rainha' },
-  '4.2.11.800.030': { codigoPadrao: '66', descricao: 'Fluminense Esporte Clube' },
-  '4.2.11.800.035': { codigoPadrao: '66', descricao: 'Federação Alagoana de Futebol' },
-  '4.2.11.800.036': { codigoPadrao: '66', descricao: 'Federação Pernambucana de Futebol' },
-  '4.2.11.800.037': { codigoPadrao: '66', descricao: 'Clube Atlético Piauiense' },
-  '4.2.11.800.038': { codigoPadrao: '66', descricao: 'Equipe Skil Red' },
-  '4.2.11.800.039': { codigoPadrao: '66', descricao: 'Equipe do São João' },
-  '4.2.11.800.040': { codigoPadrao: '66', descricao: 'Equipe Racing' },
-  '4.2.11.800.041': { codigoPadrao: '66', descricao: 'Equipe do Sporting' },
-  '4.2.11.800.042': { codigoPadrao: '66', descricao: 'Equipe Reis dos Reis' },
-  '4.2.11.800.043': { codigoPadrao: '66', descricao: 'Equipe Escolinha Real' },
-  '4.2.11.800.044': { codigoPadrao: '66', descricao: 'Equipe do Camisa 07' },
-  '4.2.11.800.045': { codigoPadrao: '66', descricao: 'Federação Sergipana de Futebol' },
-  '4.2.11.800.046': { codigoPadrao: '66', descricao: 'Clube Atlético Teresinense' },
-  '4.2.11.800.047': { codigoPadrao: '66', descricao: 'Teresina Esporte Clube' },
+  // ===== CUSTOS COM REPASSES A CLUBES =====
+  '4.2.11.800.001': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.002': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.003': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.004': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.005': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.006': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.007': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.008': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.009': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.010': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.011': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.012': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.013': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.014': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.015': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.016': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.017': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.018': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.019': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.020': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.021': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.025': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.029': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.030': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.035': { codigoPadrao: '66', descricao: 'Repasse a Federações' },
+  '4.2.11.800.036': { codigoPadrao: '66', descricao: 'Repasse a Federações' },
+  '4.2.11.800.037': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.038': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.039': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.040': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.041': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.042': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.043': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.044': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.045': { codigoPadrao: '66', descricao: 'Repasse a Federações' },
+  '4.2.11.800.046': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
+  '4.2.11.800.047': { codigoPadrao: '66', descricao: 'Repasse a Clubes' },
   
   // ===== DEPARTAMENTO DE ARBITRAGEM =====
   '4.2.11.900.001': { codigoPadrao: '61', descricao: 'Depto Árbitros - CBF' },
@@ -282,12 +375,6 @@ function encontrarCodigoPadrao(accountNumber: string, tipo: 'BP' | 'DRE'): strin
 
 /**
  * Filtra apenas contas folhas (contas que não têm filhos no balancete)
- * Isso evita duplicação de valores, já que o balancete tem totais em todos os níveis
- * 
- * Uma conta é considerada folha se não existe NENHUMA outra conta que:
- * 1. Comece exatamente com o código + "." (ex: 4.2.11 -> 4.2.11.xxx)
- * 2. Comece com o código + dígito (ex: 4.2.11.8 -> 4.2.11.80, 4.2.11.800, etc)
- *    mas considerando a estrutura de partes separadas por ponto
  */
 function filtrarContasFolhas(balanceteData: BalanceteData[]): BalanceteData[] {
   const todosCodigos = [...new Set(balanceteData.map(c => c.accountNumber))];
@@ -297,59 +384,45 @@ function filtrarContasFolhas(balanceteData: BalanceteData[]): BalanceteData[] {
     
     for (const codigo of todosCodigos) {
       if (codigo === codigoAtual) continue;
-      
-      // Verifica se o outro código é filho deste
       if (eFilho(codigoAtual, codigo)) {
-        return false; // Não é folha, tem filhos
+        return false;
       }
     }
     
-    return true; // É folha
+    return true;
   });
 }
 
 /**
  * Verifica se codigoFilho é filho de codigoPai no plano de contas
- * Exemplos:
- * - 4.2.11 é pai de 4.2.11.100 (padrão com ponto)
- * - 4.2.11.8 é pai de 4.2.11.80, 4.2.11.800, 4.2.11.800.001 (extensão numérica)
  */
 function eFilho(codigoPai: string, codigoFilho: string): boolean {
-  // Padrão 1: filho começa com pai + "."
   if (codigoFilho.startsWith(codigoPai + '.')) {
     return true;
   }
   
-  // Padrão 2: extensão numérica na última parte
-  // Ex: 4.2.11.8 é pai de 4.2.11.80, 4.2.11.800
-  // E também é pai de 4.2.11.800.001 (mais partes)
   const partesPai = codigoPai.split('.');
   const partesFilho = codigoFilho.split('.');
   
-  // Filho deve ter pelo menos o mesmo número de partes
   if (partesFilho.length < partesPai.length) {
     return false;
   }
   
-  // Verifica se as N-1 primeiras partes são iguais
   for (let i = 0; i < partesPai.length - 1; i++) {
     if (partesPai[i] !== partesFilho[i]) {
       return false;
     }
   }
   
-  // Verifica se a última parte do pai é prefixo da parte correspondente do filho
   const ultimaPartePai = partesPai[partesPai.length - 1];
   const parteCorrespondente = partesFilho[partesPai.length - 1];
   
-  // A parte correspondente do filho deve começar com a última parte do pai
-  // E ser mais longa (extensão) ou o filho ter mais partes
   if (parteCorrespondente.startsWith(ultimaPartePai)) {
     if (parteCorrespondente.length > ultimaPartePai.length) {
-      return true; // Ex: 4.2.11.8 -> 4.2.11.80
+      return true;
     }
     if (partesFilho.length > partesPai.length) {
-      return true; // Ex: 4.2.11.800 -> 4.2.11.800.001
+      return true;
     }
   }
   
@@ -358,29 +431,14 @@ function eFilho(codigoPai: string, codigoFilho: string): boolean {
 
 /**
  * Ajusta o sinal do valor conforme a natureza da conta
- * 
- * No balancete brasileiro:
- * - Ativo (1.x): valores positivos = débito
- * - Passivo (2.1.x): valores negativos = crédito (inverter para exibição)
- * - PL (2.2.x): valores negativos = crédito, mas contas retificadoras (déficits) são positivas
- * - Receitas (3.x): valores negativos = crédito (inverter para exibição)
- * - Custos/Despesas (4.x, 5.x): valores positivos = débito
- * 
- * IMPORTANTE: Não usar Math.abs() pois contas retificadoras perdem o sinal correto
- * A inversão de sinal é feita multiplicando por -1 para grupos credores
  */
 function ajustarSinal(valor: number, accountNumber: string): number {
   const firstChar = accountNumber.charAt(0);
   
-  // Passivo, PL (2) e Receitas (3): inverter sinal (crédito → positivo para exibição)
-  // Isso funciona corretamente com contas retificadoras:
-  // - Superávit: -274.372 * -1 = +274.372 (positivo)
-  // - Déficit: +161.121 * -1 = -161.121 (negativo, subtrai do PL)
   if (firstChar === '2' || firstChar === '3') {
     return valor * -1;
   }
   
-  // Ativo (1) e Custos/Despesas (4, 5): manter sinal original
   return valor;
 }
 
@@ -391,7 +449,7 @@ export async function mapBalanceteToEstrutura(
   balanceteData: BalanceteData[],
   tipo: 'BP' | 'DRE'
 ): Promise<ContaComValor[]> {
-  // Carregar estrutura
+  // Carregar estrutura (agora tenta o banco primeiro!)
   const estrutura = tipo === 'DRE' ? await loadEstruturaDRE() : await loadEstruturaBP();
   
   // Filtrar apenas contas do tipo correto
@@ -408,20 +466,13 @@ export async function mapBalanceteToEstrutura(
   // Criar mapa de valores por código da estrutura padrão
   const valoresPorCodigo: Record<string, number> = {};
   
-  // Para cada conta folha do balancete, encontrar o mapeamento e acumular o valor
   for (const conta of contasFolhas) {
-    // Usar mapeamento por prefixo
     const codigoPadrao = encontrarCodigoPadrao(conta.accountNumber, tipo);
     
     if (codigoPadrao) {
       const valorOriginal = Number(conta.finalBalance) || 0;
       const valorAjustado = ajustarSinal(valorOriginal, conta.accountNumber);
       valoresPorCodigo[codigoPadrao] = (valoresPorCodigo[codigoPadrao] || 0) + valorAjustado;
-      
-      // Log para debug
-      console.log(`  ${conta.accountNumber} (${conta.accountDescription}) -> Código ${codigoPadrao}: ${valorOriginal} -> ${valorAjustado}`);
-    } else {
-      console.log(`  SEM MAPEAMENTO: ${conta.accountNumber} (${conta.accountDescription})`);
     }
   }
   
@@ -439,75 +490,45 @@ export async function mapBalanceteToEstrutura(
 }
 
 /**
- * Contas retificadoras que devem ser SUBTRAÍDAS do pai ao invés de somadas
- * Na DRE:
- * - 199 (Despesas Financeiras) subtrai do 190 (Resultado Financeiro)
- * - 213 (Custos Operacionais), 214 (Despesas Operacionais), 221 (Despesas Não Operacionais) subtraem do resultado
+ * Contas retificadoras que devem ser SUBTRAÍDAS do pai
  */
 const CONTAS_RETIFICADORAS_DRE = new Set(['199', '213', '214', '221']);
 
 /**
  * Calcula os totais dos níveis superiores somando os filhos
- * Contas retificadoras são subtraídas ao invés de somadas
  */
 function calcularTotais(contas: ContaComValor[]): void {
-  // Mapear por código para acesso rápido
   const mapa = new Map<string, ContaComValor>();
   contas.forEach(c => mapa.set(c.codigo, c));
   
-  // Ordenar por nível decrescente para calcular de baixo para cima
   const contasOrdenadas = [...contas].sort((a, b) => b.nivel - a.nivel);
   
   for (const conta of contasOrdenadas) {
     if (conta.codigoSuperior) {
       const pai = mapa.get(conta.codigoSuperior.replace('.0', ''));
       if (pai) {
-        // Verificar se é conta retificadora
         if (CONTAS_RETIFICADORAS_DRE.has(conta.codigo)) {
-          pai.valor -= conta.valor; // Subtrair do pai
+          pai.valor -= conta.valor;
         } else {
-          pai.valor += conta.valor; // Somar ao pai (comportamento padrão)
+          pai.valor += conta.valor;
         }
       }
-    }
-  }
-  
-  // === CÁLCULO DO RESULTADO LÍQUIDO DO EXERCÍCIO ===
-  // Fórmula: Receitas (1) - Custos (52) - Despesas (104) + Resultado Financeiro (190)
-  const receitas = mapa.get('1');
-  const custos = mapa.get('52');
-  const despesas = mapa.get('104');
-  const resultadoFinanceiro = mapa.get('190');
-  const resultadoLiquido = mapa.get('225');
-  const resultado = mapa.get('210');
-  
-  if (resultadoLiquido && receitas && custos && despesas) {
-    // Calcular o resultado: Receitas - Custos - Despesas + Resultado Financeiro
-    const valorResultado = (receitas.valor || 0) - Math.abs(custos.valor || 0) - Math.abs(despesas.valor || 0) + (resultadoFinanceiro?.valor || 0);
-    
-    resultadoLiquido.valor = valorResultado;
-    console.log(`Resultado Líquido calculado: ${receitas.valor} - ${Math.abs(custos.valor || 0)} - ${Math.abs(despesas.valor || 0)} + ${resultadoFinanceiro?.valor || 0} = ${valorResultado}`);
-    
-    // Propagar para o grupo RESULTADO (210)
-    if (resultado) {
-      resultado.valor = valorResultado;
     }
   }
 }
 
 /**
- * Constrói a hierarquia de contas
+ * Constrói a árvore hierárquica a partir da lista plana
  */
 function buildHierarchy(contas: ContaComValor[]): ContaComValor[] {
   const mapa = new Map<string, ContaComValor>();
   const raizes: ContaComValor[] = [];
   
-  // Primeiro passo: criar mapa
   contas.forEach(conta => {
-    mapa.set(conta.codigo, { ...conta, children: [] });
+    const contaAtual: ContaComValor = { ...conta, children: [] };
+    mapa.set(conta.codigo, contaAtual);
   });
   
-  // Segundo passo: construir hierarquia
   contas.forEach(conta => {
     const contaAtual = mapa.get(conta.codigo)!;
     if (conta.codigoSuperior) {
@@ -529,7 +550,6 @@ function buildHierarchy(contas: ContaComValor[]): ContaComValor[] {
 
 /**
  * Processa dados do balancete e retorna estruturas completas de BP e DRE
- * Integra o resultado da DRE no Patrimônio Líquido do BP (conta 143)
  */
 export async function processarDadosFinanceiros(
   balanceteData: BalanceteData[]
@@ -544,14 +564,11 @@ export async function processarDadosFinanceiros(
     mapBalanceteToEstrutura(balanceteData, 'BP')
   ]);
   
-  // Calcular o resultado líquido da DRE
   const resultadoDRE = calcularResultadoDRE(dre);
   console.log(`[processarDadosFinanceiros] Resultado DRE calculado: ${resultadoDRE}`);
   
-  // Inserir resultado da DRE no BP (conta 143 - Resultado do Exercício)
   inserirResultadoNoBP(bp, resultadoDRE);
   
-  // Calcular total Passivo + PL
   const totalPassivoPL = calcularTotalPassivoPL(bp);
   console.log(`[processarDadosFinanceiros] Total Passivo + PL: ${totalPassivoPL}`);
   
@@ -562,7 +579,6 @@ export async function processarDadosFinanceiros(
  * Calcula o resultado líquido a partir da hierarquia da DRE
  */
 function calcularResultadoDRE(dre: ContaComValor[]): number {
-  // Busca recursiva pelo código 225 (Resultado Líquido) ou 210 (Resultado)
   function buscarValor(contas: ContaComValor[], codigo: string): number {
     for (const conta of contas) {
       if (conta.codigo === codigo) {
@@ -576,7 +592,6 @@ function calcularResultadoDRE(dre: ContaComValor[]): number {
     return 0;
   }
   
-  // Tenta encontrar o resultado líquido
   let resultado = buscarValor(dre, '225');
   if (resultado === 0) {
     resultado = buscarValor(dre, '210');
@@ -586,12 +601,11 @@ function calcularResultadoDRE(dre: ContaComValor[]): number {
 }
 
 /**
- * Insere o resultado da DRE na conta 141 (Superávits/Déficits Acumulados) do BP e recalcula os totais
+ * Insere o resultado da DRE na conta 141 do BP e recalcula os totais
  */
 function inserirResultadoNoBP(bp: ContaComValor[], resultadoDRE: number): void {
   function buscarEInserir(contas: ContaComValor[]): boolean {
     for (const conta of contas) {
-      // Encontra a conta 141 (Superávits/Déficits Acumulados) e adiciona o resultado
       if (conta.codigo === '141') {
         const valorAnterior = conta.valor;
         conta.valor = valorAnterior + resultadoDRE;
@@ -599,7 +613,6 @@ function inserirResultadoNoBP(bp: ContaComValor[], resultadoDRE: number): void {
         return true;
       }
       
-      // Se for o Patrimônio Líquido (125), procura a conta 141 nos filhos
       if (conta.codigo === '125' && conta.children) {
         const conta141 = conta.children.find(c => c.codigo === '141');
         if (conta141) {
@@ -607,7 +620,6 @@ function inserirResultadoNoBP(bp: ContaComValor[], resultadoDRE: number): void {
           conta141.valor = valorAnterior + resultadoDRE;
           console.log(`[inserirResultadoNoBP] Conta 141 (filho de 125): ${valorAnterior} + Resultado DRE ${resultadoDRE} = ${conta141.valor}`);
           
-          // Recalcula o total do Patrimônio Líquido
           conta.valor = conta.children.reduce((sum, child) => sum + child.valor, 0);
           console.log(`[inserirResultadoNoBP] Total PL recalculado: ${conta.valor}`);
           return true;
@@ -633,15 +645,8 @@ function calcularTotalPassivoPL(bp: ContaComValor[]): number {
   
   function buscarTotais(contas: ContaComValor[]): void {
     for (const conta of contas) {
-      // Passivo (76)
-      if (conta.codigo === '76') {
-        totalPassivo = conta.valor;
-      }
-      // Patrimônio Líquido (125)
-      if (conta.codigo === '125') {
-        totalPL = conta.valor;
-      }
-      
+      if (conta.codigo === '76') totalPassivo = conta.valor;
+      if (conta.codigo === '125') totalPL = conta.valor;
       if (conta.children && conta.children.length > 0) {
         buscarTotais(conta.children);
       }
@@ -653,7 +658,7 @@ function calcularTotalPassivoPL(bp: ContaComValor[]): number {
 }
 
 /**
- * Função auxiliar para achatar a hierarquia para exibição em tabela
+ * Achata a hierarquia para exibição em tabela
  */
 export function flattenHierarchy(contas: ContaComValor[], resultado: ContaComValor[] = []): ContaComValor[] {
   for (const conta of contas) {

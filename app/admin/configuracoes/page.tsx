@@ -1,167 +1,675 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
-  Settings,
-  ArrowLeft,
-  FileSpreadsheet,
   Upload,
+  FileSpreadsheet,
+  RefreshCw,
   CheckCircle,
   AlertCircle,
   Download,
+  ArrowLeft,
+  Eye,
+  Trash2,
+  Info,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
-const standardFiles = [
-  { type: "BP", name: "Balanço Patrimonial", description: "Estrutura padrão do Balanço Patrimonial" },
-  { type: "DRE", name: "DRE", description: "Estrutura padrão da Demonstração do Resultado" },
-  { type: "DFC", name: "DFC", description: "Estrutura padrão da Demonstração dos Fluxos de Caixa" },
-  { type: "DMPL", name: "DMPL", description: "Estrutura padrão das Mutações do PL" },
+// ─── Types ──────────────────────────────────────────────────
+
+type StructureType = "BP" | "DRE" | "DFC" | "DMPL";
+
+type StructureRow = {
+  ordem: number;
+  codigo: string;
+  descricao: string;
+  codigoSuperior: string | null;
+  nivel: number | null;
+  isTotal: boolean;
+  grupo: string | null;
+};
+
+type StructureData = {
+  type: string;
+  version: number;
+  rows: StructureRow[];
+  meta: {
+    originalFileName?: string;
+    uploadedAt?: string;
+    totalRows?: number;
+  } | null;
+  updatedAt?: string;
+};
+
+const TYPES: { type: StructureType; label: string; description: string }[] = [
+  { type: "BP", label: "Balanço Patrimonial", description: "Estrutura do BP" },
+  { type: "DRE", label: "DRE", description: "Demonstração do Resultado" },
+  { type: "DFC", label: "DFC", description: "Demonstração dos Fluxos de Caixa" },
+  { type: "DMPL", label: "DMPL", description: "Mutações do Patrimônio Líquido" },
 ];
 
-export default function AdminConfiguracoesPage() {
+// ─── Flexible parser (same logic as backend, for preview) ───
+
+function norm(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function findKey(keys: string[], candidates: string[]): string | null {
+  const normKeys = keys.map((k) => ({ k, nk: norm(k) }));
+  for (const c of candidates) {
+    const nc = norm(c);
+    const hit = normKeys.find((x) => x.nk === nc);
+    if (hit) return hit.k;
+  }
+  for (const c of candidates) {
+    const nc = norm(c);
+    const hit = normKeys.find((x) => x.nk.includes(nc) || nc.includes(x.nk));
+    if (hit) return hit.k;
+  }
+  return null;
+}
+
+function parseBoolean(v: any): boolean {
+  if (typeof v === "boolean") return v;
+  const s = (v ?? "").toString().trim().toLowerCase();
+  return ["1", "true", "sim", "yes", "y", "s"].includes(s);
+}
+
+function parseFileToRows(rawRows: Record<string, any>[]): StructureRow[] {
+  if (!rawRows.length) return [];
+
+  const keys = Object.keys(rawRows[0]);
+  const kCodigo = findKey(keys, ["codigo", "código", "code", "conta", "cod", "conta_padrao"]);
+  const kDescricao = findKey(keys, ["descricao", "descrição", "description", "nome", "name"]);
+  const kSuperior = findKey(keys, [
+    "codigoSuperior", "códigoSuperior", "contaSuperior", "pai",
+    "parent", "parentCode", "parentcode", "codPai", "parent_code",
+  ]);
+  const kNivel = findKey(keys, ["nivelVisualizacao", "nivel_visualizacao", "nivel", "nível", "level", "depth"]);
+  const kOrdem = findKey(keys, ["ordem", "order", "sequencia", "sequência", "seq"]);
+  const kTotal = findKey(keys, ["isTotal", "is_total", "total", "subtotal"]);
+  const kGrupo = findKey(keys, ["grupo", "group", "categoria"]);
+
+  if (!kCodigo || !kDescricao) {
+    throw new Error("Colunas 'codigo' e 'descricao' são obrigatórias.");
+  }
+
+  const rows: StructureRow[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    const codigo = String(r[kCodigo] ?? "").trim();
+    const descricao = String(r[kDescricao] ?? "").trim();
+    if (!codigo || !descricao) continue;
+
+    if (seen.has(codigo)) {
+      throw new Error(`Código duplicado na linha ${i + 2}: "${codigo}"`);
+    }
+    seen.add(codigo);
+
+    const ordemRaw = kOrdem ? Number(String(r[kOrdem] ?? "").replace(",", ".")) : NaN;
+    const nivelRaw = kNivel ? Number(String(r[kNivel] ?? "").replace(",", ".")) : NaN;
+
+    rows.push({
+      ordem: Number.isFinite(ordemRaw) ? ordemRaw : i + 1,
+      codigo,
+      descricao,
+      codigoSuperior: kSuperior ? (String(r[kSuperior] ?? "").trim() || null) : null,
+      nivel: Number.isFinite(nivelRaw) ? nivelRaw : null,
+      isTotal: kTotal ? parseBoolean(r[kTotal]) : false,
+      grupo: kGrupo ? (String(r[kGrupo] ?? "").trim() || null) : null,
+    });
+  }
+
+  rows.sort((a, b) => a.ordem - b.ordem);
+  return rows;
+}
+
+// ─── Component ──────────────────────────────────────────────
+
+export default function EstruturasPage() {
   const router = useRouter();
-  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
-  const [uploadStatus, setUploadStatus] = useState<{ [key: string]: "idle" | "uploading" | "success" | "error" }>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (type: string, file: File) => {
-    setUploadStatus((prev) => ({ ...prev, [type]: "uploading" }));
+  const [activeType, setActiveType] = useState<StructureType>("BP");
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewRows, setPreviewRows] = useState<StructureRow[]>([]);
+  const [previewError, setPreviewError] = useState<string>("");
+
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  const [data, setData] = useState<StructureData>({
+    type: "BP",
+    version: 0,
+    rows: [],
+    meta: null,
+  });
+
+  // ── Summary of all types ──
+  const [summary, setSummary] = useState<
+    { type: string; version: number; updatedAt: string }[]
+  >([]);
+
+  // ── Fetch summary on mount ──
+  useEffect(() => {
+    fetchSummary();
+  }, []);
+
+  const fetchSummary = async () => {
     try {
-      // 1. Get presigned URL
-      const presignedRes = await fetch("/api/upload/presigned", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          isPublic: false,
-        }),
-      });
-
-      const { uploadUrl, cloudStoragePath } = await presignedRes.json();
-
-      // 2. Upload to S3
-      await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-        body: file,
-      });
-
-      // 3. Save standard file reference
-      await fetch("/api/admin/standard-files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          name: file.name,
-          cloudStoragePath,
-        }),
-      });
-
-      setUploadStatus((prev) => ({ ...prev, [type]: "success" }));
-    } catch (error) {
-      console.error("Upload error:", error);
-      setUploadStatus((prev) => ({ ...prev, [type]: "error" }));
+      const res = await fetch("/api/admin/standard-files", { cache: "no-store" });
+      const json = await res.json();
+      if (json.structures) setSummary(json.structures);
+    } catch (e) {
+      console.error(e);
     }
   };
 
+  // ── Fetch active structure when tab changes ──
+  useEffect(() => {
+    fetchStructure(activeType);
+    setSelectedFile(null);
+    setPreviewRows([]);
+    setPreviewError("");
+    setStatus("idle");
+    setMessage("");
+  }, [activeType]);
+
+  const fetchStructure = async (type: StructureType) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/standard-files?type=${type}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao buscar");
+      setData(json);
+    } catch (e: any) {
+      setData({ type, version: 0, rows: [], meta: null });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── File selection + local preview ──
+  const handleFileSelect = async (file: File) => {
+    setSelectedFile(file);
+    setPreviewError("");
+    setStatus("idle");
+    setMessage("");
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const isXlsx =
+        file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls");
+
+      let rawRows: Record<string, any>[];
+
+      if (isXlsx) {
+        const wb = XLSX.read(arrayBuffer, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      } else {
+        const text = new TextDecoder("utf-8").decode(arrayBuffer);
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) throw new Error("Arquivo vazio");
+        const sep = lines[0].includes(";") ? ";" : ",";
+        const headers = lines[0].split(sep).map((h) => h.trim());
+        rawRows = lines.slice(1).map((row) => {
+          const cols = row.split(sep);
+          const obj: Record<string, any> = {};
+          headers.forEach((h, i) => (obj[h] = (cols[i] ?? "").trim()));
+          return obj;
+        });
+      }
+
+      const rows = parseFileToRows(rawRows);
+      setPreviewRows(rows);
+    } catch (e: any) {
+      setPreviewRows([]);
+      setPreviewError(e?.message || "Erro ao ler arquivo");
+    }
+  };
+
+  // ── Upload to server ──
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setStatus("idle");
+    setMessage("");
+
+    try {
+      const form = new FormData();
+      form.append("type", activeType);
+      form.append("file", selectedFile);
+
+      const res = await fetch("/api/admin/standard-files", {
+        method: "POST",
+        body: form,
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Falha no upload");
+
+      setStatus("success");
+      setMessage(
+        `Estrutura ${activeType} atualizada! Versão ${json.version} — ${json.totalRows} linhas.`
+      );
+      setSelectedFile(null);
+      setPreviewRows([]);
+
+      // Refresh data
+      await fetchStructure(activeType);
+      await fetchSummary();
+    } catch (e: any) {
+      setStatus("error");
+      setMessage(e?.message || "Erro no upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ── Template CSV download ──
+  const downloadTemplate = () => {
+    const header = "ordem;codigo;descricao;codigoSuperior;nivel;isTotal;grupo";
+    const ex1 = "1;1;ATIVO;;1;false;";
+    const ex2 = "2;1.1;Ativo Circulante;1;2;false;";
+    const ex3 = "3;1.1.01;Caixa e Equivalentes de Caixa;1.1;3;false;";
+    const ex4 = "4;1.1.01.01;Caixa;1.1.01;4;false;";
+    const ex5 = "5;1.1.01.02;Bancos;1.1.01;4;false;";
+    const ex6 = "6;1.1;TOTAL ATIVO CIRCULANTE;1;2;true;";
+
+    const content = [header, ex1, ex2, ex3, ex4, ex5, ex6].join("\n");
+    const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `template_estrutura_${activeType}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Rows to show (preview if file selected, otherwise saved) ──
+  const displayRows = previewRows.length > 0 ? previewRows : data.rows;
+  const isPreviewMode = previewRows.length > 0;
+  const MAX_DISPLAY = 300;
+
+  const getTypeInfo = (type: string) => summary.find((s) => s.type === type);
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-all"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Configurações</h1>
-            <p className="text-gray-500">Gerencie os arquivos padrões do sistema</p>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow p-6"
+        >
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.back()}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-all"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="w-7 h-7 text-blue-600" />
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">
+                    Estruturas Padrão das Demonstrações
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    Base global para todas as empresas — editável via XLSX/CSV
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => fetchStructure(activeType)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-all text-sm"
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              Atualizar
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl shadow p-2 flex gap-2 flex-wrap">
+          {TYPES.map((t) => {
+            const info = getTypeInfo(t.type);
+            return (
+              <button
+                key={t.type}
+                onClick={() => setActiveType(t.type)}
+                className={`flex-1 min-w-[140px] px-4 py-3 rounded-xl font-medium transition-all text-sm ${
+                  activeType === t.type
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <div className="font-semibold">{t.label}</div>
+                {info && info.version > 0 ? (
+                  <div
+                    className={`text-xs mt-0.5 ${
+                      activeType === t.type ? "text-blue-200" : "text-slate-400"
+                    }`}
+                  >
+                    v{info.version}
+                  </div>
+                ) : (
+                  <div
+                    className={`text-xs mt-0.5 ${
+                      activeType === t.type ? "text-blue-200" : "text-amber-500"
+                    }`}
+                  >
+                    Não configurado
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Upload Panel */}
+          <div className="bg-white rounded-2xl shadow p-6 space-y-4">
+            <h2 className="font-bold text-slate-900 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-blue-600" />
+              Upload da Estrutura
+            </h2>
+
+            {/* Info */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm text-blue-800">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium mb-1">Formatos aceitos: XLSX ou CSV</p>
+                  <p className="text-blue-700 text-xs">
+                    Colunas: <code className="bg-blue-100 px-1 rounded">codigo</code>,{" "}
+                    <code className="bg-blue-100 px-1 rounded">descricao</code>,{" "}
+                    <code className="bg-blue-100 px-1 rounded">codigoSuperior</code>,{" "}
+                    <code className="bg-blue-100 px-1 rounded">nivel</code>,{" "}
+                    <code className="bg-blue-100 px-1 rounded">ordem</code>,{" "}
+                    <code className="bg-blue-100 px-1 rounded">isTotal</code>
+                  </p>
+                  <p className="text-blue-600 text-xs mt-1">
+                    Também aceita nomes em inglês: code, description, parentCode, etc.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Download template */}
+            <button
+              onClick={downloadTemplate}
+              className="inline-flex items-center gap-2 text-blue-700 hover:text-blue-900 text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Baixar template CSV de exemplo
+            </button>
+
+            {/* File input area */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                selectedFile
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-slate-300 hover:border-blue-400 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileSelect(f);
+                }}
+                className="hidden"
+              />
+
+              {selectedFile ? (
+                <div>
+                  <FileSpreadsheet className="w-10 h-10 text-blue-600 mx-auto mb-2" />
+                  <p className="font-semibold text-slate-800 text-sm">{selectedFile.name}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {previewRows.length > 0
+                      ? `${previewRows.length} linhas detectadas`
+                      : "Processando..."}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Upload className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600">Clique para selecionar arquivo</p>
+                  <p className="text-xs text-slate-400 mt-1">XLSX ou CSV</p>
+                </div>
+              )}
+            </div>
+
+            {/* Preview error */}
+            {previewError && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700">{previewError}</p>
+              </div>
+            )}
+
+            {/* Clear file */}
+            {selectedFile && (
+              <button
+                onClick={() => {
+                  setSelectedFile(null);
+                  setPreviewRows([]);
+                  setPreviewError("");
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-red-600"
+              >
+                <Trash2 className="w-3 h-3" />
+                Limpar seleção
+              </button>
+            )}
+
+            {/* Upload button */}
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading || previewRows.length === 0}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-700 transition-all"
+            >
+              <Upload className="w-5 h-5" />
+              {uploading ? "Enviando..." : "Publicar nova versão"}
+            </button>
+
+            {/* Status messages */}
+            <AnimatePresence>
+              {status === "success" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-200"
+                >
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-green-800">{message}</p>
+                </motion.div>
+              )}
+              {status === "error" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200"
+                >
+                  <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-red-800">{message}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Current version info */}
+            {data.version > 0 && (
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2">Versão Atual</h3>
+                <div className="space-y-1 text-sm text-slate-600">
+                  <p>
+                    Versão: <span className="font-semibold text-slate-800">{data.version}</span>
+                  </p>
+                  <p>
+                    Linhas: <span className="font-semibold text-slate-800">{data.rows.length}</span>
+                  </p>
+                  {data.meta?.originalFileName && (
+                    <p>
+                      Arquivo:{" "}
+                      <span className="font-medium text-slate-700">
+                        {data.meta.originalFileName}
+                      </span>
+                    </p>
+                  )}
+                  {data.updatedAt && (
+                    <p>
+                      Atualizado:{" "}
+                      <span className="text-slate-700">
+                        {new Date(data.updatedAt).toLocaleString("pt-BR")}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Preview / Data Table */}
+          <div className="bg-white rounded-2xl shadow p-6 lg:col-span-2">
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+              <div>
+                <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-slate-600" />
+                  {isPreviewMode ? "Preview do Arquivo" : "Estrutura Salva"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {activeType} —{" "}
+                  {isPreviewMode ? (
+                    <span className="text-amber-600 font-medium">
+                      {previewRows.length} linhas (não salvo ainda)
+                    </span>
+                  ) : (
+                    <span>
+                      Versão {data.version || "—"} — {data.rows.length} linhas
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              {isPreviewMode && (
+                <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">
+                  PREVIEW
+                </span>
+              )}
+            </div>
+
+            <div className="overflow-auto border rounded-xl max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold w-16">#</th>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold">Código</th>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold">Descrição</th>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold">Pai</th>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold w-16">Nível</th>
+                    <th className="text-left px-3 py-2.5 text-slate-600 font-semibold w-16">Total?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-12 text-center text-slate-400">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+                        Carregando...
+                      </td>
+                    </tr>
+                  ) : displayRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-12 text-center text-slate-400">
+                        <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <p>Nenhuma estrutura configurada para {activeType}.</p>
+                        <p className="text-xs mt-1">
+                          Faça upload de um arquivo XLSX ou CSV para começar.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    displayRows.slice(0, MAX_DISPLAY).map((row, idx) => (
+                      <tr
+                        key={`${row.codigo}-${idx}`}
+                        className={`border-t transition-colors ${
+                          row.isTotal
+                            ? "bg-blue-50 font-semibold"
+                            : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-slate-400 text-xs">{row.ordem}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{row.codigo}</td>
+                        <td
+                          className="px-3 py-2"
+                          style={{
+                            paddingLeft: row.nivel
+                              ? `${Math.min((row.nivel - 1) * 16 + 12, 80)}px`
+                              : undefined,
+                          }}
+                        >
+                          {row.descricao}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-500">
+                          {row.codigoSuperior ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-center text-xs">{row.nivel ?? "—"}</td>
+                        <td className="px-3 py-2 text-center">
+                          {row.isTotal ? (
+                            <span className="inline-block w-5 h-5 bg-blue-100 text-blue-700 rounded text-xs leading-5 font-bold">
+                              T
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {displayRows.length > MAX_DISPLAY && (
+                <div className="p-3 text-xs text-slate-500 bg-slate-50 border-t">
+                  Exibindo {MAX_DISPLAY} de {displayRows.length} linhas.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Standard Files Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <Settings className="w-6 h-6 text-gray-600" />
-            <h2 className="text-lg font-semibold">Arquivos Padrões das Demonstrações</h2>
-          </div>
-
-          <p className="text-gray-500 mb-6">
-            Faça upload das estruturas padrões que serão utilizadas para o mapeamento De x Para.
-          </p>
-
-          <div className="space-y-4">
-            {standardFiles.map((sf) => (
-              <div
-                key={sf.type}
-                className="flex items-center justify-between p-4 border rounded-lg hover:border-blue-500 transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-800">{sf.name}</h3>
-                    <p className="text-sm text-gray-500">{sf.description}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {uploadStatus[sf.type] === "success" && (
-                    <span className="flex items-center gap-1 text-green-600 text-sm">
-                      <CheckCircle className="w-4 h-4" />
-                      Atualizado
-                    </span>
-                  )}
-                  {uploadStatus[sf.type] === "error" && (
-                    <span className="flex items-center gap-1 text-red-600 text-sm">
-                      <AlertCircle className="w-4 h-4" />
-                      Erro
-                    </span>
-                  )}
-
-                  <button
-                    onClick={() => window.open(`/api/admin/standard-files/${sf.type}/download`, "_blank")}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600"
-                    title="Download atual"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-
-                  <input
-                    type="file"
-                    ref={(el) => { fileInputRefs.current[sf.type] = el; }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(sf.type, file);
-                    }}
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRefs.current[sf.type]?.click()}
-                    disabled={uploadStatus[sf.type] === "uploading"}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {uploadStatus[sf.type] === "uploading" ? "Enviando..." : "Atualizar"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+        {/* Footer info */}
+        <div className="text-xs text-slate-400 text-center">
+          Governança: cada upload cria uma <b>nova versão</b>. Estruturas são globais e
+          servem como base para todas as empresas.
+        </div>
       </div>
     </div>
   );

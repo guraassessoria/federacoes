@@ -2,82 +2,253 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * GET /api/admin/standard-files?type=BP|DRE|DFC|DMPL
- * Retorna a estrutura padrão salva no banco.
- */
+const ALLOWED_TYPES = ["BP", "DRE", "DFC", "DMPL"] as const;
+type AllowedType = (typeof ALLOWED_TYPES)[number];
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function norm(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function findKey(keys: string[], candidates: string[]): string | null {
+  const normKeys = keys.map((k) => ({ k, nk: norm(k) }));
+  for (const c of candidates) {
+    const nc = norm(c);
+    const hit = normKeys.find((x) => x.nk === nc);
+    if (hit) return hit.k;
+  }
+  for (const c of candidates) {
+    const nc = norm(c);
+    const hit = normKeys.find((x) => x.nk.includes(nc) || nc.includes(x.nk));
+    if (hit) return hit.k;
+  }
+  return null;
+}
+
+function parseBoolean(v: any): boolean {
+  if (typeof v === "boolean") return v;
+  const s = (v ?? "").toString().trim().toLowerCase();
+  return ["1", "true", "sim", "yes", "y", "s"].includes(s);
+}
+
+function parseNumber(v: any): number | undefined {
+  if (v === null || v === undefined || String(v).trim() === "") return undefined;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const s = String(v).replace(",", ".").trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+type StructureRow = {
+  ordem: number;
+  codigo: string;
+  descricao: string;
+  codigoSuperior: string | null;
+  nivel: number | null;
+  isTotal: boolean;
+  grupo: string | null;
+};
+
+function parseCsv(content: string): Record<string, any>[] {
+  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const sep = lines[0].includes(";") ? ";" : ",";
+  const headers = lines[0].split(sep).map((h) => h.trim());
+  return lines.slice(1).map((row) => {
+    const cols = row.split(sep);
+    const obj: Record<string, any> = {};
+    headers.forEach((h, i) => (obj[h] = (cols[i] ?? "").trim()));
+    return obj;
+  });
+}
+
+function mapRows(rows: Record<string, any>[]): StructureRow[] {
+  if (!rows.length) return [];
+  const keys = Object.keys(rows[0]);
+
+  const kCodigo = findKey(keys, ["codigo", "código", "code", "conta", "cod", "conta_padrao"]);
+  const kDescricao = findKey(keys, ["descricao", "descrição", "description", "nome", "name"]);
+  const kSuperior = findKey(keys, ["codigoSuperior", "códigoSuperior", "contaSuperior", "pai", "parent", "parentCode", "parentcode", "codPai", "parent_code"]);
+  const kNivel = findKey(keys, ["nivelVisualizacao", "nivel_visualizacao", "nivel", "nível", "level", "depth"]);
+  const kOrdem = findKey(keys, ["ordem", "order", "sequencia", "sequência", "seq", "posicao", "posição"]);
+  const kTotal = findKey(keys, ["isTotal", "is_total", "total", "subtotal", "ehTotal"]);
+  const kGrupo = findKey(keys, ["grupo", "group", "categoria", "category"]);
+
+  if (!kCodigo || !kDescricao) {
+    throw new Error("Arquivo inválido: precisa ter pelo menos colunas 'codigo' (ou 'code') e 'descricao' (ou 'description').");
+  }
+
+  const parsed: StructureRow[] = [];
+  const seenCodes = new Set<string>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const codigo = String(r[kCodigo] ?? "").trim();
+    const descricao = String(r[kDescricao] ?? "").trim();
+    if (!codigo || !descricao) continue;
+
+    if (seenCodes.has(codigo)) {
+      throw new Error(`Código duplicado na linha ${i + 2}: "${codigo}"`);
+    }
+    seenCodes.add(codigo);
+
+    const codigoSuperior = kSuperior ? (String(r[kSuperior] ?? "").trim() || null) : null;
+    const nivel = kNivel ? (parseNumber(r[kNivel]) ?? null) : null;
+    const ordem = kOrdem ? (parseNumber(r[kOrdem]) ?? i + 1) : i + 1;
+    const isTotal = kTotal ? parseBoolean(r[kTotal]) : false;
+    const grupo = kGrupo ? (String(r[kGrupo] ?? "").trim() || null) : null;
+
+    parsed.push({ ordem, codigo, descricao, codigoSuperior, nivel, isTotal, grupo });
+  }
+
+  parsed.sort((a, b) => a.ordem - b.ordem);
+  return parsed;
+}
+
+// ─── GET /api/admin/standard-files ──────────────────────────
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user || (session.user as any).role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type");
+    const type = (searchParams.get("type") || "").toUpperCase();
 
     if (!type) {
-      return NextResponse.json({ error: "type is required" }, { status: 400 });
+      const all = await prisma.standardStructure.findMany({
+        orderBy: { type: "asc" },
+        select: { type: true, version: true, updatedAt: true },
+      });
+      return NextResponse.json({ structures: all });
+    }
+
+    if (!ALLOWED_TYPES.includes(type as AllowedType)) {
+      return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
     }
 
     const record = await prisma.standardStructure.findUnique({
       where: { type: type as any },
     });
 
+    if (!record) {
+      return NextResponse.json({ type, version: 0, rows: [], meta: null });
+    }
+
+    const data = record.data as any;
     return NextResponse.json({
-      type,
-      version: record?.version ?? 0,
-      data: record?.data ?? null,
-      updatedAt: record?.updatedAt ?? null,
+      type: record.type,
+      version: record.version,
+      rows: data?.rows ?? [],
+      meta: data?.meta ?? null,
+      updatedAt: record.updatedAt,
     });
   } catch (err) {
     console.error("GET standard-files error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
 
-/**
- * POST /api/admin/standard-files
- * Body: { type: "BP"|"DRE"|"DFC"|"DMPL", data: any }
- * Salva a estrutura padrão no banco (sobrescreve e incrementa versão).
- */
+// ─── POST /api/admin/standard-files ─────────────────────────
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user || (session.user as any).role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Acesso negado" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { type, data } = body as { type?: string; data?: any };
+    const contentType = req.headers.get("content-type") || "";
+    let type: string;
+    let rows: StructureRow[];
+    let fileName: string;
 
-    if (!type) {
-      return NextResponse.json({ error: "type is required" }, { status: 400 });
+    if (contentType.includes("multipart/form-data")) {
+      const form = await req.formData();
+      type = (form.get("type") || "").toString().trim().toUpperCase();
+      const file = form.get("file") as File | null;
+
+      if (!file) {
+        return NextResponse.json({ error: "Arquivo é obrigatório" }, { status: 400 });
+      }
+
+      fileName = file.name || "estrutura";
+      const isXlsx = fileName.toLowerCase().endsWith(".xlsx") || fileName.toLowerCase().endsWith(".xls");
+      const isCsv = fileName.toLowerCase().endsWith(".csv");
+
+      if (!isXlsx && !isCsv) {
+        return NextResponse.json({ error: "Formato inválido. Envie XLSX ou CSV." }, { status: 400 });
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      let rawRows: Record<string, any>[];
+
+      if (isXlsx) {
+        const wb = XLSX.read(buffer, { type: "buffer" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      } else {
+        rawRows = parseCsv(buffer.toString("utf-8"));
+      }
+
+      rows = mapRows(rawRows);
+    } else {
+      const body = await req.json();
+      type = (body.type || "").toString().trim().toUpperCase();
+      fileName = body.meta?.originalFileName || "manual";
+
+      if (body.data?.rows && Array.isArray(body.data.rows)) {
+        rows = body.data.rows;
+      } else if (body.rows && Array.isArray(body.rows)) {
+        rows = body.rows;
+      } else {
+        return NextResponse.json({ error: "data.rows é obrigatório" }, { status: 400 });
+      }
     }
-    if (!data) {
-      return NextResponse.json({ error: "data is required" }, { status: 400 });
+
+    if (!ALLOWED_TYPES.includes(type as AllowedType)) {
+      return NextResponse.json({ error: `Tipo inválido: "${type}". Use: ${ALLOWED_TYPES.join(", ")}` }, { status: 400 });
+    }
+
+    if (!rows.length) {
+      return NextResponse.json({ error: "Nenhuma linha válida encontrada. Verifique colunas: codigo e descricao." }, { status: 400 });
     }
 
     const existing = await prisma.standardStructure.findUnique({
       where: { type: type as any },
+      select: { version: true },
     });
+
+    const nextVersion = (existing?.version ?? 0) + 1;
 
     const saved = await prisma.standardStructure.upsert({
       where: { type: type as any },
       create: {
         type: type as any,
-        data,
         version: 1,
+        data: {
+          rows,
+          meta: { originalFileName: fileName, uploadedAt: new Date().toISOString(), totalRows: rows.length },
+        },
       },
       update: {
-        data,
-        version: (existing?.version ?? 0) + 1,
+        version: nextVersion,
+        data: {
+          rows,
+          meta: { originalFileName: fileName, uploadedAt: new Date().toISOString(), totalRows: rows.length },
+        },
       },
     });
 
@@ -85,10 +256,11 @@ export async function POST(req: NextRequest) {
       ok: true,
       type: saved.type,
       version: saved.version,
+      totalRows: rows.length,
       updatedAt: saved.updatedAt,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("POST standard-files error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Erro ao salvar estrutura" }, { status: 500 });
   }
 }

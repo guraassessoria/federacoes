@@ -8,6 +8,8 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+// ─── Usuários ───────────────────────────────────────────────
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -20,16 +22,18 @@ model User {
   companies     UserCompany[]
 }
 
+// ─── Empresas ───────────────────────────────────────────────
+
 model Company {
-  id         String          @id @default(cuid())
-  name       String
-  cnpj       String?         @unique
-  active     Boolean         @default(true)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  balancetes BalanceteData[]
-  files      CompanyFile[]
-  users      UserCompany[]
+  id             String          @id @default(cuid())
+  name           String
+  cnpj           String?         @unique
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  balancetes     BalanceteData[]
+  files          CompanyFile[]
+  users          UserCompany[]
   deParaMappings DeParaMapping[]
 }
 
@@ -45,22 +49,7 @@ model UserCompany {
   @@unique([userId, companyId])
 }
 
-model StandardFile {
-  id          String   @id @default(cuid())
-  type        FileType @unique
-  name        String
-  description String?
-
-  // ✅ NOVO: conteúdo da estrutura salvo no banco
-  contentJson Json
-
-  // opcional: guardar o CSV “original” (bom para auditoria)
-  rawText     String?
-
-  version     Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
+// ─── Arquivos de Empresa ────────────────────────────────────
 
 model CompanyFile {
   id               String   @id @default(cuid())
@@ -75,6 +64,8 @@ model CompanyFile {
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   uploadedBy       User     @relation("UploadedBy", fields: [uploadedById], references: [id])
 }
+
+// ─── Balancete ──────────────────────────────────────────────
 
 model BalanceteData {
   id                 String   @id @default(cuid())
@@ -95,23 +86,27 @@ model BalanceteData {
   @@index([accountNumber])
 }
 
-enum UserRole {
-  ADMIN
-  EDITOR
-  CONSULTA
+model BalanceteRow {
+  id           String   @id @default(cuid())
+  companyId    String
+  periodo      String
+  conta        String
+  descricao    String?
+  saldoInicial Decimal? @db.Decimal(18,2)
+  debito       Decimal? @db.Decimal(18,2)
+  credito      Decimal? @db.Decimal(18,2)
+  saldoFinal   Decimal? @db.Decimal(18,2)
+  natureza     String?
+
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, periodo])
 }
 
-enum FileType {
-  BP
-  DRE
-  DFC
-  DMPL
-  DE_PARA
-  BALANCETE
-}
+// ─── De x Para ──────────────────────────────────────────────
 
 model DeParaRow {
-  id                String   @id @default(cuid())
+  id                 String   @id @default(cuid())
   companyId          String
   contaBalancete     String
   descricaoBalancete String?
@@ -127,67 +122,56 @@ model DeParaRow {
   @@index([companyId])
 }
 
-model BalanceteRow {
-  id          String   @id @default(cuid())
-  companyId    String
-  periodo      String   // ex: "2025-12" ou "2025-12-31"
-  conta        String
-  descricao    String?
-  saldoInicial Decimal? @db.Decimal(18,2)
-  debito       Decimal? @db.Decimal(18,2)
-  credito      Decimal? @db.Decimal(18,2)
-  saldoFinal   Decimal? @db.Decimal(18,2)
-  natureza     String?  // "D"/"C" se você tiver
-
-  createdAt    DateTime @default(now())
-
-  @@index([companyId, periodo])
-}
-
 model DeParaMapping {
   id                 String   @id @default(cuid())
-  companyId           String
-  contaFederacao      String
-  descricaoFederacao  String?
-  padraoBP            String?
-  padraoDRE           String?
-  padraoDFC           String?
-  padraoDMPL          String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  companyId          String
+  contaFederacao     String
+  descricaoFederacao String?
+  padraoBP           String?
+  padraoDRE          String?
+  padraoDFC          String?
+  padraoDMPL         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, contaFederacao])
   @@index([companyId])
 }
 
+// ─── Estruturas Padrão (GLOBAL — JSON no banco) ────────────
+//
+// Uma única tabela com campo Json para armazenar a estrutura.
+// Cada tipo (BP, DRE, DFC, DMPL) tem exatamente 1 registro.
+// O campo `data` contém: { rows: [...], meta: {...} }
+// Versionamento via campo `version` (incrementa a cada upload).
+//
+
 model StandardStructure {
   id        String        @id @default(cuid())
-  type      StructureType
+  type      StructureType @unique
+  data      Json
   version   Int           @default(1)
-  isActive  Boolean       @default(true)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-  lines     StandardStructureLine[]
-
-  @@index([type, isActive])
 }
 
-model StandardStructureLine {
-  id                 String   @id @default(cuid())
-  structureId         String
-  order               Int
-  code                String
-  description         String
-  group               String?
-  parentCode          String?
-  isTotal             Boolean  @default(false)
+// ─── Enums ──────────────────────────────────────────────────
 
-  structure           StandardStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+enum UserRole {
+  ADMIN
+  EDITOR
+  CONSULTA
+}
 
-  @@index([structureId, order])
-  @@index([code])
+enum FileType {
+  BP
+  DRE
+  DFC
+  DMPL
+  DE_PARA
+  BALANCETE
 }
 
 enum StructureType {
@@ -197,13 +181,4 @@ enum StructureType {
   DMPL
   DVA
   DRA
-}
-model StandardStructure {
-  id        String   @id @default(cuid())
-  type      FileType @unique
-  // Estrutura normalizada em JSON, editável via upload de XLSX/CSV
-  data      Json
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

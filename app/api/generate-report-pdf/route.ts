@@ -468,11 +468,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar dados do balancete
-    const yearFilter = year || '25'; // Default: 2025
+    // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
+    const yearShort = year ? year.slice(-2) : '25';
     const balanceteData = await prisma.balanceteData.findMany({
       where: {
         companyId,
-        period: { contains: yearFilter }
+        period: { contains: `/${yearShort}` }
       },
       orderBy: { accountNumber: 'asc' }
     });
@@ -498,7 +499,7 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
 
     // Gerar HTML
-    const periodo = `20${yearFilter}`;
+    const periodo = year || `20${yearShort}`;
     const html = generateReportHTML(
       company.name,
       dre,

@@ -566,19 +566,6 @@ export async function POST(request: NextRequest) {
         valores,
         indices: indicesPDF
       });
-      const valores = extrairValoresPrincipais(dre, bp);
-
-      federacoes.push({
-        id: company.id,
-        nome: company.name,
-        sigla: gerarSigla(company.name),
-        dre,
-        bp,
-        resultadoDRE,
-        totalPassivoPL,
-        valores,
-        indices: indicesPDF
-      });
     }
 
     if (federacoes.length < 2) {

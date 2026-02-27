@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
-import { useDashboard } from '@/lib/contexts/DashboardContext';
 
 // Interface para conta hierárquica (dados brutos do balancete)
 interface HierarchicalAccount {
@@ -63,10 +62,13 @@ interface FinancialApiData {
     resultados?: Record<string, number>;
     total?: number;
   };
+  // Dados da estrutura base (de-para) - PRIORIDADE
   estruturaDRE?: ContaComValor[];
   estruturaBP?: ContaComValor[];
+  // Totais calculados (integração DRE no BP)
   resultadoDRE?: number;
   totalPassivoPL?: number;
+  // Dados hierárquicos brutos (fallback)
   hierarchicalDRE?: HierarchicalDRE;
   hierarchicalBP?: HierarchicalBP;
 }
@@ -80,11 +82,11 @@ interface UserCompany {
   role: string;
 }
 
-// Todas as federações do sistema - agora derivadas das empresas do usuário
-// (removido lista estática - usa userCompanies diretamente)
+// Anos disponíveis
+const anosDisponiveis = ['2023', '2024', '2025'];
 
-const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const MONTH_NAMES_FULL = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+// Todas as federações do sistema (com dados disponíveis na API)
+// Federações derivadas das empresas do usuário (não mais lista estática)
 
 const bpGroups = [
   { title: 'Ativo Circulante', keys: ['Total Disponibilidades', 'Total Contas a Receber', 'Total Estoques', 'Total Ativo Circulante'], total: 'Total Ativo Circulante' },
@@ -130,89 +132,128 @@ const dvaGroups = [
   { title: 'Distribuicao - Capitais Proprios', keys: ['Superavit do Exercicio', 'Destinacao para Reservas', 'Total Capitais Proprios'], total: 'Total Capitais Proprios' }
 ];
 
-// Dados fictícios para DFC, DMPL, DVA (mantidos)
+// Dados fictícios para DFC
 const dfcData: Record<string, Record<string, number>> = {
   '2025': {
-    'Resultado do Periodo': 6100, 'Ajustes de Depreciacoes': 3400, 'Ajustes de Provisoes': 1600,
-    'Variacao de Contas a Receber': -3200, 'Variacao de Estoques': -500, 'Variacao de Fornecedores': 2400,
-    'Total Atividades Operacionais': 9800, 'Aquisicao de Imobilizado': -9000, 'Venda de Ativos': 1500,
-    'Investimentos em Intangiveis': -2200, 'Total Atividades Investimento': -9700,
-    'Captacao de Emprestimos': 6000, 'Pagamento de Emprestimos': -5800,
-    'Aumento de Capital': 4000, 'Distribuicao de Resultados': -3000,
-    'Total Atividades Financiamento': 1200, 'Variacao Liquida do Caixa': 1300,
-    'Caixa Inicial': 15000, 'Caixa Final': 16300
+    'Resultado do Periodo': 6100,
+    'Ajustes de Depreciacoes': 3400,
+    'Ajustes de Provisoes': 1600,
+    'Variacao de Contas a Receber': -3200,
+    'Variacao de Estoques': -500,
+    'Variacao de Fornecedores': 2400,
+    'Total Atividades Operacionais': 9800,
+    'Aquisicao de Imobilizado': -9000,
+    'Venda de Ativos': 1500,
+    'Investimentos em Intangiveis': -2200,
+    'Total Atividades Investimento': -9700,
+    'Captacao de Emprestimos': 6000,
+    'Pagamento de Emprestimos': -5800,
+    'Aumento de Capital': 4000,
+    'Distribuicao de Resultados': -3000,
+    'Total Atividades Financiamento': 1200,
+    'Variacao Liquida do Caixa': 1300,
+    'Caixa Inicial': 15000,
+    'Caixa Final': 16300
   }
 };
 
+// Dados fictícios para DMPL
 const dmplData: Record<string, Record<string, number>> = {
   '2025': {
-    'Saldo Inicial Capital': 40500, 'Integralizacao de Capital': 4000, 'Ajustes de Capital': 0,
-    'Saldo Final Capital': 44500, 'Saldo Inicial Reservas': 3250, 'Constituicao de Reservas': 700,
-    'Utilizacao de Reservas': -100, 'Saldo Final Reservas': 3850, 'Saldo Inicial Reserva Legal': 2285,
-    'Destinacao do Resultado': 305, 'Saldo Final Reserva Legal': 2590, 'Saldo Inicial Resultados': 26415,
-    'Resultado do Exercicio': 6100, 'Destinacao para Reservas': -1005, 'Ajustes de Exercicios Anteriores': 0,
-    'Saldo Final Resultados': 31510, 'Saldo Inicial PL': 72450, 'Mutacoes do Periodo': 10000, 'Saldo Final PL': 82450
+    'Saldo Inicial Capital': 40500,
+    'Integralizacao de Capital': 4000,
+    'Ajustes de Capital': 0,
+    'Saldo Final Capital': 44500,
+    'Saldo Inicial Reservas': 3250,
+    'Constituicao de Reservas': 700,
+    'Utilizacao de Reservas': -100,
+    'Saldo Final Reservas': 3850,
+    'Saldo Inicial Reserva Legal': 2285,
+    'Destinacao do Resultado': 305,
+    'Saldo Final Reserva Legal': 2590,
+    'Saldo Inicial Resultados': 26415,
+    'Resultado do Exercicio': 6100,
+    'Destinacao para Reservas': -1005,
+    'Ajustes de Exercicios Anteriores': 0,
+    'Saldo Final Resultados': 31510,
+    'Saldo Inicial PL': 72450,
+    'Mutacoes do Periodo': 10000,
+    'Saldo Final PL': 82450
   }
 };
 
+// Dados fictícios para DVA
 const dvaData: Record<string, Record<string, number>> = {
   '2025': {
-    'Receitas de Competicoes e Eventos': 42000, 'Receitas Comerciais e de Patrocinio': 28000,
-    'Receitas de Subvencoes e Convenios': 15000, 'Outras Receitas Operacionais': 5000,
-    'Total Receitas': 90000, 'Custos de Competicoes e Eventos': -18000,
-    'Materiais e Servicos de Terceiros': -12000, 'Servicos Tecnicos Especializados': -6000,
-    'Outros Insumos': -4000, 'Total Insumos': -40000, 'Valor Adicionado Bruto': 50000,
-    'Depreciacao de Imobilizado': -2800, 'Amortizacao de Intangiveis': -600,
-    'Total Depreciacao': -3400, 'Valor Adicionado Liquido': 46600,
-    'Receitas Financeiras': 3500, 'Resultado de Equivalencia': 500, 'Total Transferencias': 4000,
-    'Valor Adicionado Total': 50600, 'Remuneracao Direta': 18000, 'Beneficios': 4500,
-    'FGTS': 1800, 'Total Pessoal': 24300, 'Tributos Federais': 8000, 'Tributos Estaduais': 2500,
-    'Tributos Municipais': 1500, 'Total Impostos': 12000, 'Despesas Financeiras': 4200,
-    'Alugueis': 2000, 'Total Capitais Terceiros': 6200, 'Superavit do Exercicio': 6100,
-    'Destinacao para Reservas': 2000, 'Total Capitais Proprios': 8100
+    'Receitas de Competicoes e Eventos': 42000,
+    'Receitas Comerciais e de Patrocinio': 28000,
+    'Receitas de Subvencoes e Convenios': 15000,
+    'Outras Receitas Operacionais': 5000,
+    'Total Receitas': 90000,
+    'Custos de Competicoes e Eventos': -18000,
+    'Materiais e Servicos de Terceiros': -12000,
+    'Servicos Tecnicos Especializados': -6000,
+    'Outros Insumos': -4000,
+    'Total Insumos': -40000,
+    'Valor Adicionado Bruto': 50000,
+    'Depreciacao de Imobilizado': -2800,
+    'Amortizacao de Intangiveis': -600,
+    'Total Depreciacao': -3400,
+    'Valor Adicionado Liquido': 46600,
+    'Receitas Financeiras': 3500,
+    'Resultado de Equivalencia': 500,
+    'Total Transferencias': 4000,
+    'Valor Adicionado Total': 50600,
+    'Remuneracao Direta': 18000,
+    'Beneficios': 4500,
+    'FGTS': 1800,
+    'Total Pessoal': 24300,
+    'Tributos Federais': 8000,
+    'Tributos Estaduais': 2500,
+    'Tributos Municipais': 1500,
+    'Total Impostos': 12000,
+    'Despesas Financeiras': 4200,
+    'Alugueis': 2000,
+    'Total Capitais Terceiros': 6200,
+    'Superavit do Exercicio': 6100,
+    'Destinacao para Reservas': 2000,
+    'Total Capitais Proprios': 8100
   }
 };
 
 export default function DemonstracoesPage() {
-  // ═══ CONTEXTO GLOBAL (menu lateral) ═══
-  const { viewMode, selectedYear, selectedMonth, selectedCompanyId, selectedCompanyName, dataVersion } = useDashboard();
-
   const [activeTab, setActiveTab] = useState<TabType>('bp');
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('2025');
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Ativo Circulante', 'Patrimonio Liquido', 'Receitas Operacionais', 'Resultados', 'Atividades Operacionais', 'Variacao do Caixa', 'Capital Social', 'Total Patrimonio Liquido', 'Receitas', 'Distribuicao - Pessoal']);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingComparative, setGeneratingComparative] = useState(false);
+  const [companyName, setCompanyName] = useState('Federação de Futebol');
   const [showFederacaoModal, setShowFederacaoModal] = useState(false);
   const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
-  const [loadingFinancialData, setLoadingFinancialData] = useState(false);
-
-  // Dados anuais: { '2025': FinancialApiData }
   const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
-  // Dados mensais: { '2025': { '01': FinancialApiData, '02': FinancialApiData, ... } }
-  const [monthlyData, setMonthlyData] = useState<Record<string, Record<string, FinancialApiData>>>({});
-
-  // ═══ Forçar DRE no modo mensal ═══
-  useEffect(() => {
-    if (viewMode === 'mensal') {
-      setActiveTab('dre');
-    }
-  }, [viewMode]);
-
-  // ═══ Empresas disponíveis para comparação (direto do cadastro do usuário) ═══
+  const [loadingFinancialData, setLoadingFinancialData] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  
+  // Empresas disponíveis para comparação (direto do cadastro do usuário)
   const federacoesDisponiveis = userCompanies.map(uc => ({
     id: uc.id,
     nome: uc.name,
-    sigla: uc.name.split(' ').map(w => w[0]).filter(c => c === c?.toUpperCase()).join('').substring(0, 4),
+    sigla: uc.name.split(' ').filter(w => w.length > 2 && !['de', 'do', 'da', 'dos', 'das'].includes(w.toLowerCase())).map(w => w[0].toUpperCase()).join('').substring(0, 4),
   }));
 
+  // Buscar empresas do usuário
   useEffect(() => {
     const fetchUserCompanies = async () => {
       try {
         const response = await fetch('/api/user/companies');
         if (response.ok) {
           const data = await response.json();
+          console.log('Empresas do usuário:', data.companies);
           setUserCompanies(data.companies || []);
+        } else {
+          console.error('Erro ao buscar empresas:', response.status);
         }
       } catch (error) {
         console.error('Erro ao buscar empresas:', error);
@@ -223,22 +264,45 @@ export default function DemonstracoesPage() {
     fetchUserCompanies();
   }, []);
 
+  // Atualizar seleção quando as federações disponíveis mudarem
   useEffect(() => {
+    console.log('Federações disponíveis:', federacoesDisponiveis);
     if (federacoesDisponiveis.length > 0) {
       setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
     }
   }, [userCompanies]);
 
-  // ═══ FETCH DADOS ANUAIS ═══
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const stored = localStorage.getItem('selectedCompanyName');
+      const storedId = localStorage.getItem('selectedCompany');
+      if (stored) setCompanyName(stored);
+      if (storedId) setSelectedCompanyId(storedId);
+    };
+    
+    // Ler ao montar
+    syncFromStorage();
+    
+    // Ouvir mudanças (quando sidebar troca empresa e faz reload)
+    window.addEventListener('storage', syncFromStorage);
+    return () => window.removeEventListener('storage', syncFromStorage);
+  }, []);
+
+  // Buscar dados financeiros da API quando empresa ou ano mudar
   const fetchFinancialData = useCallback(async (companyId: string, year: string) => {
     if (!companyId) return;
+    
     setLoadingFinancialData(true);
     try {
       const response = await fetch(`/api/financial-data?companyId=${companyId}&viewMode=anual&year=${year}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
-          setFinancialData(prev => ({ ...prev, [year]: result.data }));
+          setFinancialData(prev => ({
+            ...prev,
+            [year]: result.data
+          }));
+          console.log(`Dados financeiros ${year}:`, result.data);
         }
       }
     } catch (error) {
@@ -248,49 +312,15 @@ export default function DemonstracoesPage() {
     }
   }, []);
 
-  // ═══ FETCH DADOS MENSAIS (para visão mensal) ═══
-  const fetchMonthlyDRE = useCallback(async (companyId: string, year: string, upToMonth: number) => {
-    if (!companyId) return;
-    setLoadingFinancialData(true);
-    try {
-      const promises = [];
-      for (let m = 1; m <= upToMonth; m++) {
-        const monthStr = String(m).padStart(2, '0');
-        promises.push(
-          fetch(`/api/financial-data?companyId=${companyId}&viewMode=mensal&year=${year}&month=${monthStr}`)
-            .then(r => r.json())
-            .then(result => ({ month: String(m).padStart(2, '0'), data: result.success ? result.data : null }))
-            .catch(() => ({ month: String(m).padStart(2, '0'), data: null }))
-        );
-      }
-      const results = await Promise.all(promises);
-      const monthly: Record<string, FinancialApiData> = {};
-      results.forEach(r => { if (r.data) monthly[r.month] = r.data; });
-      setMonthlyData(prev => ({ ...prev, [year]: monthly }));
-    } catch (error) {
-      console.error('Erro ao buscar dados mensais:', error);
-    } finally {
-      setLoadingFinancialData(false);
-    }
-  }, []);
-
-  // ═══ EFEITO PRINCIPAL: buscar dados quando empresa/ano/mês mudam ═══
+  // Buscar dados para todos os anos quando a empresa for selecionada
   useEffect(() => {
-    if (!selectedCompanyId) return;
-    
-    if (viewMode === 'mensal') {
-      const monthNum = parseInt(selectedMonth);
-      // Busca meses do ano atual e do ano anterior
-      fetchMonthlyDRE(selectedCompanyId, selectedYear, monthNum);
-      const anoAnterior = String(Number(selectedYear) - 1);
-      fetchMonthlyDRE(selectedCompanyId, anoAnterior, monthNum);
-    } else {
-      // Anual: busca o ano selecionado
-      fetchFinancialData(selectedCompanyId, selectedYear);
+    if (selectedCompanyId) {
+      anosDisponiveis.forEach(year => {
+        fetchFinancialData(selectedCompanyId, year);
+      });
     }
-  }, [selectedCompanyId, selectedYear, selectedMonth, viewMode, dataVersion, fetchFinancialData, fetchMonthlyDRE]);
+  }, [selectedCompanyId, fetchFinancialData]);
 
-  // ═══ PDF ═══
   const handleGeneratePdf = async () => {
     if (!selectedCompanyId) {
       alert('Selecione uma empresa no menu lateral');
@@ -301,17 +331,19 @@ export default function DemonstracoesPage() {
       const response = await fetch('/api/generate-report-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: selectedCompanyId, companyName: selectedCompanyName, year: selectedYear }),
+        body: JSON.stringify({ companyId: selectedCompanyId, companyName, year: selectedYear }),
       });
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erro ao gerar PDF');
       }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `relatorio_financeiro_${selectedCompanyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
+      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -325,7 +357,11 @@ export default function DemonstracoesPage() {
   };
 
   const handleGenerateComparativePdf = async () => {
-    if (selectedFederacoes.length < 2) { alert('Selecione pelo menos 2 empresas'); return; }
+    if (selectedFederacoes.length < 2) {
+      alert('Selecione pelo menos 2 federações para comparar');
+      return;
+    }
+    
     setShowFederacaoModal(false);
     setGeneratingComparative(true);
     try {
@@ -334,7 +370,12 @@ export default function DemonstracoesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year: selectedYear, companyIds: selectedFederacoes }),
       });
-      if (!response.ok) { const error = await response.json(); throw new Error(error.error || 'Erro'); }
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao gerar PDF comparativo');
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -352,13 +393,27 @@ export default function DemonstracoesPage() {
     }
   };
 
-  // ═══ Helpers ═══
-  const toggleFederacao = (id: string) => setSelectedFederacoes(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
-  const selectAllFederacoes = () => setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
-  const deselectAllFederacoes = () => setSelectedFederacoes([]);
-  const toggleGroup = (group: string) => setExpandedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
+  const toggleFederacao = (id: string) => {
+    setSelectedFederacoes(prev => 
+      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
+    );
+  };
 
-  // ═══ Value getters (para fallback estático) ═══
+  const selectAllFederacoes = () => {
+    setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
+  };
+
+  const deselectAllFederacoes = () => {
+    setSelectedFederacoes([]);
+  };
+
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
+    );
+  };
+
+  // Mapeamento de chaves da interface para chaves da API
   const dreKeyMapping: Record<string, { group: 'receitas' | 'custos' | 'despesas' | 'resultados', apiKey?: string }> = {
     'Receitas de Competicoes': { group: 'receitas', apiKey: 'Receitas de Competições' },
     'Receitas de Repasses': { group: 'receitas', apiKey: 'Programa de Auxilios Financeiros' },
@@ -401,32 +456,44 @@ export default function DemonstracoesPage() {
   };
 
   const getDreValue = (year: string, key: string) => {
+    // Primeiro tenta buscar da API
     const apiData = financialData[year];
     if (apiData?.dre) {
       const mapping = dreKeyMapping[key];
       if (mapping) {
         const group = apiData.dre[mapping.group];
         if (group && mapping.apiKey) {
+          // Busca pela chave exata ou normalizada
           const value = group[mapping.apiKey];
-          if (value !== undefined) return value / 1000;
+          if (value !== undefined) return value / 1000; // Converte para milhares
+          
+          // Tenta buscar por chave normalizada
           const normalizedApiKey = mapping.apiKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey);
+          const foundKey = Object.keys(group).find(k => 
+            k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey
+          );
           if (foundKey) return group[foundKey] / 1000;
         }
       }
+      
+      // Busca genérica em todos os grupos
       const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
       for (const groupName of ['receitas', 'custos', 'despesas', 'resultados'] as const) {
         const group = apiData.dre[groupName];
         if (group) {
-          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey);
+          const foundKey = Object.keys(group).find(k => 
+            k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey
+          );
           if (foundKey) return group[foundKey] / 1000;
         }
       }
     }
+    
     return 0;
   };
 
   const getBpValue = (year: string, key: string) => {
+    // Primeiro tenta buscar da API
     const apiData = financialData[year];
     if (apiData?.bp) {
       const mapping = bpKeyMapping[key];
@@ -434,82 +501,128 @@ export default function DemonstracoesPage() {
         const group = apiData.bp[mapping.group];
         if (group && mapping.apiKey) {
           const value = group[mapping.apiKey];
-          if (value !== undefined) return value / 1000;
+          if (value !== undefined) return value / 1000; // Converte para milhares
+          
+          // Tenta buscar por chave normalizada
           const normalizedApiKey = mapping.apiKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey);
+          const foundKey = Object.keys(group).find(k => 
+            k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedApiKey
+          );
           if (foundKey) return group[foundKey] / 1000;
         }
       }
+      
+      // Busca genérica em todos os grupos
       const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
       for (const groupName of ['ativoCirculante', 'ativoNaoCirculante', 'passivoCirculante', 'passivoNaoCirculante', 'patrimonioLiquido'] as const) {
         const group = apiData.bp[groupName];
         if (group) {
-          const foundKey = Object.keys(group).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey);
+          const foundKey = Object.keys(group).find(k => 
+            k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey
+          );
           if (foundKey) return group[foundKey] / 1000;
         }
       }
     }
+    
     return 0;
   };
 
-  const getDfcValue = (year: string, key: string) => dfcData[year]?.[key] ?? 0;
-  const getDmplValue = (year: string, key: string) => dmplData[year]?.[key] ?? 0;
-  const getDvaValue = (year: string, key: string) => dvaData[year]?.[key] ?? 0;
+  const getDfcValue = (year: string, key: string) => {
+    return dfcData[year]?.[key] ?? 0;
+  };
+
+  const getDmplValue = (year: string, key: string) => {
+    return dmplData[year]?.[key] ?? 0;
+  };
+
+  const getDvaValue = (year: string, key: string) => {
+    return dvaData[year]?.[key] ?? 0;
+  };
 
   const getGroups = () => {
     switch (activeTab) {
-      case 'bp': return bpGroups; case 'dre': return dreGroups; case 'dfc': return dfcGroups;
-      case 'dmpl': return dmplGroups; case 'dva': return dvaGroups; default: return bpGroups;
+      case 'bp': return bpGroups;
+      case 'dre': return dreGroups;
+      case 'dfc': return dfcGroups;
+      case 'dmpl': return dmplGroups;
+      case 'dva': return dvaGroups;
+      default: return bpGroups;
     }
   };
 
   const getValue = (year: string, key: string) => {
     switch (activeTab) {
-      case 'bp': return getBpValue(year, key); case 'dre': return getDreValue(year, key);
-      case 'dfc': return getDfcValue(year, key); case 'dmpl': return getDmplValue(year, key);
-      case 'dva': return getDvaValue(year, key); default: return 0;
+      case 'bp': return getBpValue(year, key);
+      case 'dre': return getDreValue(year, key);
+      case 'dfc': return getDfcValue(year, key);
+      case 'dmpl': return getDmplValue(year, key);
+      case 'dva': return getDvaValue(year, key);
+      default: return 0;
     }
   };
 
   const groups = getGroups();
-  const chartData = groups.map(g => ({ name: g.title.substring(0, 15), [selectedYear]: Math.abs(getValue(selectedYear, g.total)) }));
+
+  const chartData = groups.map(g => ({
+    name: g.title.substring(0, 15),
+    [selectedYear]: Math.abs(getValue(selectedYear, g.total))
+  }));
 
   const getTabTitle = () => {
     switch (activeTab) {
-      case 'bp': return 'Balanço Patrimonial'; case 'dre': return 'DRE - Demonstração do Resultado';
-      case 'dfc': return 'DFC - Demonstração do Fluxo de Caixa'; case 'dmpl': return 'DMPL - Demonstração das Mutações do PL';
-      case 'dva': return 'DVA - Demonstração do Valor Adicionado'; default: return '';
+      case 'bp': return 'Balanço Patrimonial';
+      case 'dre': return 'DRE - Demonstração do Resultado';
+      case 'dfc': return 'DFC - Demonstração do Fluxo de Caixa';
+      case 'dmpl': return 'DMPL - Demonstração das Mutações do PL';
+      case 'dva': return 'DVA - Demonstração do Valor Adicionado';
+      default: return '';
     }
   };
 
   const getTabColor = () => {
     switch (activeTab) {
-      case 'bp': return 'bg-blue-600'; case 'dre': return 'bg-indigo-600'; case 'dfc': return 'bg-emerald-600';
-      case 'dmpl': return 'bg-purple-600'; case 'dva': return 'bg-amber-600'; default: return 'bg-blue-600';
+      case 'bp': return 'bg-blue-600';
+      case 'dre': return 'bg-indigo-600';
+      case 'dfc': return 'bg-emerald-600';
+      case 'dmpl': return 'bg-purple-600';
+      case 'dva': return 'bg-amber-600';
+      default: return 'bg-blue-600';
     }
   };
 
-  // ═══ RENDERIZAÇÃO: Estrutura base (anual) ═══
-  const renderEstruturaRows = (accounts: ContaComValor[], level: number = 0): JSX.Element[] => {
+  // Função para renderizar contas da estrutura base recursivamente
+  // Mostra contas sintéticas (níveis 1-2) com opção de expandir para analíticas
+  const renderEstruturaRows = (accounts: ContaComValor[], level: number = 0, showAll: boolean = false): JSX.Element[] => {
     const rows: JSX.Element[] = [];
+    
     accounts.forEach((account) => {
       const isExpandable = account.children && account.children.length > 0;
       const isExpanded = expandedGroups.includes(account.codigo);
       const indent = account.nivelVisualizacao * 16;
+      
+      // Determina o estilo baseado no nível de visualização
       const nivelVis = account.nivelVisualizacao;
       const bgClass = nivelVis === 1 ? 'bg-slate-200' : nivelVis === 2 ? 'bg-slate-100' : nivelVis === 3 ? 'bg-slate-50' : '';
       const fontWeight = nivelVis <= 2 ? 'font-semibold' : nivelVis === 3 ? 'font-medium' : 'font-normal';
       const textColor = nivelVis === 1 ? 'text-slate-900' : nivelVis === 2 ? 'text-slate-800' : nivelVis === 3 ? 'text-slate-700' : 'text-slate-600';
       const fontSize = nivelVis <= 2 ? 'text-sm' : 'text-xs';
-
+      
+      // Verifica se tem valor ou filhos com valor (recursivo)
       const hasValueRecursive = (acc: ContaComValor): boolean => {
         if (acc.valor !== 0) return true;
-        return (acc.children || []).some(child => hasValueRecursive(child));
+        if (acc.children && acc.children.length > 0) {
+          return acc.children.some(child => hasValueRecursive(child));
+        }
+        return false;
       };
+      
+      // Só exibe linhas com valor ou que tenham filhos com valor
       if (!hasValueRecursive(account)) return;
-
+      
       rows.push(
-        <tr key={account.codigo}
+        <tr 
+          key={account.codigo}
           className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100 transition-colors`}
           onClick={() => isExpandable && toggleGroup(account.codigo)}
         >
@@ -528,425 +641,388 @@ export default function DemonstracoesPage() {
           </td>
         </tr>
       );
+      
+      // Renderiza filhos se expandido (mostra grupos sintéticos e analíticos)
       if (isExpandable && isExpanded && account.children) {
-        rows.push(...renderEstruturaRows(account.children, level + 1));
+        rows.push(...renderEstruturaRows(account.children, level + 1, showAll));
       }
     });
+    
     return rows;
   };
-
-  // ═══ RENDERIZAÇÃO: DRE Mensal (colunas por mês) ═══
-  const renderMensalDRE = () => {
-    const monthNum = parseInt(selectedMonth);
-    const anoAtual = selectedYear;
-    const anoAnterior = String(Number(selectedYear) - 1);
-    const dadosAtual = monthlyData[anoAtual] || {};
-    const dadosAnterior = monthlyData[anoAnterior] || {};
-
-    // Pega estrutura do último mês disponível
-    let estrutura: ContaComValor[] = [];
-    for (let m = monthNum; m >= 1; m--) {
-      const ms = String(m).padStart(2, '0');
-      if (dadosAtual[ms]?.estruturaDRE?.length) {
-        estrutura = dadosAtual[ms].estruturaDRE!;
-        break;
-      }
-    }
-
-    if (!estrutura.length) {
-      return (
-        <tr>
-          <td colSpan={monthNum + 4} className="text-center py-12 text-slate-400">
-            {loadingFinancialData ? (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Carregando dados mensais...
-              </div>
-            ) : 'Sem dados mensais disponíveis para o período selecionado'}
-          </td>
-        </tr>
-      );
-    }
-
-    // Helper: valor de um código para um mês/ano
-    const getVal = (dados: Record<string, FinancialApiData>, month: string, codigo: string): number => {
-      const mesData = dados[month];
-      if (!mesData?.estruturaDRE) return 0;
-      const findInTree = (contas: ContaComValor[]): number => {
-        for (const c of contas) {
-          if (c.codigo === codigo) return c.valor;
-          if (c.children?.length) { const v = findInTree(c.children); if (v !== 0) return v; }
-        }
-        return 0;
-      };
-      return findInTree(mesData.estruturaDRE);
-    };
-
-    const rows: JSX.Element[] = [];
-
-    const renderRow = (conta: ContaComValor) => {
-      const isExpandable = conta.children && conta.children.length > 0;
-      const isExpanded = expandedGroups.includes(conta.codigo);
-      const nivelVis = conta.nivelVisualizacao;
-      const bgClass = nivelVis === 1 ? 'bg-slate-200' : nivelVis === 2 ? 'bg-slate-100' : nivelVis === 3 ? 'bg-slate-50' : '';
-      const fontWeight = nivelVis <= 2 ? 'font-semibold' : nivelVis === 3 ? 'font-medium' : 'font-normal';
-      const textColor = nivelVis === 1 ? 'text-slate-900' : nivelVis === 2 ? 'text-slate-800' : nivelVis === 3 ? 'text-slate-700' : 'text-slate-600';
-      const fontSize = nivelVis <= 2 ? 'text-xs' : 'text-[11px]';
-
-      // Valores mensais
-      let totalAtual = 0;
-      let totalAnterior = 0;
-      const cells: JSX.Element[] = [];
-
-      for (let m = 1; m <= monthNum; m++) {
-        const ms = String(m).padStart(2, '0');
-        const val = getVal(dadosAtual, ms, conta.codigo);
-        totalAtual += val;
-        cells.push(
-          <td key={`m${m}`} className={`text-right px-2 py-1.5 ${fontWeight} ${textColor} ${fontSize} whitespace-nowrap`}>
-            {val !== 0 ? formatCurrency(val / 1000) : '-'}
-          </td>
-        );
-      }
-
-      for (let m = 1; m <= monthNum; m++) {
-        const ms = String(m).padStart(2, '0');
-        totalAnterior += getVal(dadosAnterior, ms, conta.codigo);
-      }
-
-      const variacao = totalAnterior !== 0 ? ((totalAtual / totalAnterior) - 1) * 100 : 0;
-      
-      // Lógica de cor da variação conforme natureza da conta:
-      // Receita/Margem positiva: aumento=bom(verde), redução=ruim(vermelho)
-      // Custo/Despesa: aumento=ruim(vermelho), redução=bom(verde)
-      // Resultado: depende do sinal (superávit: aumento=bom; déficit: aumento=ruim)
-      const getVarColor = (): string => {
-        if (variacao === 0) return 'text-slate-400';
-        
-        // Códigos de custos e despesas (aumento = ruim)
-        const isCustoOuDespesa = ['57', '110', '52', '207', '223', '228'].includes(conta.codigo);
-        // Códigos de receita e margens (aumento = bom)
-        const isReceitaOuMargem = ['51', '56', '109', '199', '219'].includes(conta.codigo);
-        // Códigos de resultado (depende do sinal do valor atual)
-        const isResultado = ['196', '197', '198', '218', '227', '229'].includes(conta.codigo);
-        
-        if (isCustoOuDespesa) {
-          // Custo/despesa: diminuiu=verde, aumentou=vermelho
-          return variacao < 0 ? 'text-green-700' : 'text-red-600';
-        }
-        
-        if (isResultado) {
-          // Se resultado atual é positivo (superávit): aumento=verde
-          // Se resultado atual é negativo (déficit): aumento=vermelho
-          if (totalAtual >= 0) {
-            return variacao > 0 ? 'text-green-700' : 'text-red-600';
-          } else {
-            // Déficit: se ficou menos negativo (variação positiva mas valor negativo), 
-            // na verdade piorou (ficou mais déficit)
-            // Melhorou = diminuiu em módulo = totalAtual mais próximo de zero
-            const melhorou = Math.abs(totalAtual) < Math.abs(totalAnterior);
-            return melhorou ? 'text-green-700' : 'text-red-600';
-          }
-        }
-        
-        // Receita e demais: aumento=verde, redução=vermelho (padrão)
-        return variacao > 0 ? 'text-green-700' : 'text-red-600';
-      };
-      const varColor = getVarColor();
-
-      // Só exibe se tem algum valor
-      if (totalAtual === 0 && totalAnterior === 0) return;
-
-      rows.push(
-        <tr key={conta.codigo}
-          className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100`}
-          onClick={() => isExpandable && toggleGroup(conta.codigo)}
-        >
-          <td className={`px-3 py-1.5 ${fontWeight} ${textColor} ${fontSize} sticky left-0 ${bgClass || 'bg-white'} min-w-[220px] z-10`}>
-            <div className="flex items-center gap-1" style={{ paddingLeft: `${(nivelVis - 1) * 12}px` }}>
-              {isExpandable && (
-                <span className="flex-shrink-0">
-                  {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                </span>
-              )}
-              <span className="truncate">{conta.descricao}</span>
-            </div>
-          </td>
-          {cells}
-          <td className={`text-right px-2 py-1.5 font-bold ${textColor} ${fontSize} bg-blue-50 border-l border-blue-200`}>
-            {formatCurrency(totalAtual / 1000)}
-          </td>
-          <td className={`text-right px-2 py-1.5 ${fontWeight} text-slate-500 ${fontSize} bg-slate-50 border-l border-slate-200`}>
-            {totalAnterior !== 0 ? formatCurrency(totalAnterior / 1000) : '-'}
-          </td>
-          <td className={`text-right px-2 py-1.5 font-semibold ${varColor} ${fontSize} border-l border-slate-200`}>
-            {totalAnterior !== 0 ? `${variacao > 0 ? '+' : ''}${variacao.toFixed(1)}%` : '-'}
-          </td>
-        </tr>
-      );
-
-      if (isExpandable && isExpanded && conta.children) {
-        conta.children.forEach(child => renderRow(child));
-      }
-    };
-
-    estrutura.forEach(conta => renderRow(conta));
-    return rows;
-  };
-
-  // ═══ Helpers de dados ═══
+  
+  // Função para calcular o total Passivo + PL para exibição
   const getTotalPassivoPL = (): number => {
     const data = financialData[selectedYear];
-    if (data?.totalPassivoPL) return data.totalPassivoPL;
+    if (data?.totalPassivoPL) {
+      return data.totalPassivoPL;
+    }
+    // Fallback: calcula a partir dos dados
     if (data?.estruturaBP) {
+      let totalPassivo = 0;
+      let totalPL = 0;
+      
       const buscarValor = (contas: ContaComValor[], codigo: string): number => {
-        for (const c of contas) {
-          if (c.codigo === codigo) return c.valor;
-          if (c.children) { const v = buscarValor(c.children, codigo); if (v !== 0) return v; }
+        for (const conta of contas) {
+          if (conta.codigo === codigo) return conta.valor;
+          if (conta.children) {
+            const val = buscarValor(conta.children, codigo);
+            if (val !== 0) return val;
+          }
         }
         return 0;
       };
-      return buscarValor(data.estruturaBP, '76');
+      
+      totalPassivo = buscarValor(data.estruturaBP, '76');
+      totalPL = buscarValor(data.estruturaBP, '125');
+      return totalPassivo + totalPL;
     }
     return 0;
   };
 
+  // Função para renderizar contas hierárquicas brutas (fallback)
   const renderHierarchicalRows = (accounts: HierarchicalAccount[], level: number = 0): JSX.Element[] => {
     const rows: JSX.Element[] = [];
+    
     accounts.forEach((account) => {
       const isExpandable = account.children && account.children.length > 0;
       const isExpanded = expandedGroups.includes(account.codigo);
       const indent = level * 20;
+      
+      // Determina o estilo baseado no nível
       const bgClass = level === 0 ? 'bg-slate-100' : level === 1 ? 'bg-slate-50' : '';
       const fontWeight = level <= 1 ? 'font-semibold' : 'font-normal';
-      const textColor = level === 0 ? 'text-slate-900' : level === 1 ? 'text-slate-800' : 'text-slate-600';
-      if (account.valor === 0 && (!account.children || account.children.length === 0)) return;
+      const textColor = level === 0 ? 'text-slate-800' : level === 1 ? 'text-slate-700' : 'text-slate-600';
+      
       rows.push(
-        <tr key={account.codigo} className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-200' : 'hover:bg-slate-50'} border-b border-slate-100`}
-          onClick={() => isExpandable && toggleGroup(account.codigo)}>
+        <tr 
+          key={account.codigo}
+          className={`${bgClass} ${isExpandable ? 'cursor-pointer hover:bg-slate-100' : 'hover:bg-slate-50'} border-b border-slate-100`}
+          onClick={() => isExpandable && toggleGroup(account.codigo)}
+        >
           <td className={`px-4 py-2 ${fontWeight} ${textColor}`} style={{ paddingLeft: `${16 + indent}px` }}>
             <div className="flex items-center gap-2">
-              {isExpandable && (isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+              {isExpandable && (
+                isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+              )}
               <span className="text-xs text-slate-400 mr-2">{account.codigo}</span>
               {account.descricao}
             </div>
           </td>
-          <td className={`text-right px-4 py-2 ${fontWeight} ${textColor}`}>{formatCurrency(account.valor / 1000)}</td>
+          <td className={`text-right px-4 py-2 ${fontWeight} ${textColor}`}>
+            {formatCurrency(account.valor / 1000)}
+          </td>
         </tr>
       );
+      
+      // Renderiza filhos se expandido
       if (isExpandable && isExpanded && account.children) {
         rows.push(...renderHierarchicalRows(account.children, level + 1));
       }
     });
+    
     return rows;
   };
 
+  // Verifica se tem dados da estrutura base disponíveis (prioridade)
   const hasEstruturaData = (tab: TabType): boolean => {
     const data = financialData[selectedYear];
     if (!data) return false;
+    
     if (tab === 'dre' && data.estruturaDRE && data.estruturaDRE.length > 0) return true;
     if (tab === 'bp' && data.estruturaBP && data.estruturaBP.length > 0) return true;
     return false;
   };
 
+  // Verifica se tem dados hierárquicos disponíveis (fallback)
   const hasHierarchicalData = (tab: TabType): boolean => {
     const data = financialData[selectedYear];
     if (!data) return false;
+    
     if (tab === 'dre' && data.hierarchicalDRE) return true;
     if (tab === 'bp' && data.hierarchicalBP) return true;
     return false;
   };
 
+  // Obtém dados da estrutura base para a tab atual
   const getEstruturaData = (): ContaComValor[] => {
     const data = financialData[selectedYear];
     if (!data) return [];
+    
     if (activeTab === 'dre' && data.estruturaDRE) return data.estruturaDRE;
     if (activeTab === 'bp' && data.estruturaBP) return data.estruturaBP;
     return [];
   };
 
+  // Obtém dados hierárquicos para a tab atual (fallback)
   const getHierarchicalData = (): HierarchicalAccount[] => {
     const data = financialData[selectedYear];
     if (!data) return [];
-    if (activeTab === 'dre' && data.hierarchicalDRE) return [...data.hierarchicalDRE.receitas, ...data.hierarchicalDRE.custos];
-    if (activeTab === 'bp' && data.hierarchicalBP) return [...data.hierarchicalBP.ativo, ...data.hierarchicalBP.passivo, ...data.hierarchicalBP.patrimonioLiquido];
+    
+    if (activeTab === 'dre' && data.hierarchicalDRE) {
+      return [...data.hierarchicalDRE.receitas, ...data.hierarchicalDRE.custos];
+    }
+    if (activeTab === 'bp' && data.hierarchicalBP) {
+      return [...data.hierarchicalBP.ativo, ...data.hierarchicalBP.passivo, ...data.hierarchicalBP.patrimonioLiquido];
+    }
     return [];
   };
 
-  const isMensal = viewMode === 'mensal';
-  const monthNum = parseInt(selectedMonth);
-
-  // ═══ RENDER ═══
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl">
+    <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl"
+      >
         <div className="flex items-center gap-3 mb-2">
           <FileSpreadsheet className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Demonstrações Financeiras</h1>
         </div>
-        <p className="text-blue-100">
-          {isMensal
-            ? `DRE Mensal — ${MONTH_NAMES_FULL[1]} a ${MONTH_NAMES_FULL[monthNum]} de ${selectedYear}`
-            : `BP, DRE, DFC, DMPL e DVA — Exercício ${selectedYear}`
-          }
-        </p>
+        <p className="text-blue-100">BP, DRE, DFC, DMPL e DVA</p>
       </motion.div>
 
-      {/* Tabs + Botões PDF */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {isMensal ? (
-          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm">
-            <FileSpreadsheet className="w-4 h-4" />
-            DRE Mensal — {selectedYear}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {(['bp', 'dre', 'dfc', 'dmpl', 'dva'] as TabType[]).map(tab => {
-              const colors: Record<TabType, string> = { bp: 'bg-blue-600', dre: 'bg-indigo-600', dfc: 'bg-emerald-600', dmpl: 'bg-purple-600', dva: 'bg-amber-600' };
-              const labels: Record<TabType, string> = { bp: 'BP', dre: 'DRE', dfc: 'DFC', dmpl: 'DMPL', dva: 'DVA' };
-              return (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === tab ? `${colors[tab]} text-white shadow-lg` : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-                  {labels[tab]}
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {/* Seletor de Ano */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2 bg-white rounded-lg px-4 py-2 shadow">
+          <span className="text-sm font-medium text-slate-600">Exercício:</span>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="px-3 py-1 bg-slate-100 border-0 rounded-lg font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
+          >
+            {anosDisponiveis.map(ano => (
+              <option key={ano} value={ano}>{ano}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
+      {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <button onClick={handleGeneratePdf} disabled={generatingPdf}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-70">
-            {generatingPdf ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</> : <><Download className="w-4 h-4" />PDF Individual</>}
+          <button
+            onClick={() => setActiveTab('bp')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            BP
           </button>
+          <button
+            onClick={() => setActiveTab('dre')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            DRE
+          </button>
+          <button
+            onClick={() => setActiveTab('dfc')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dfc' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            DFC
+          </button>
+          <button
+            onClick={() => setActiveTab('dmpl')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dmpl' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            DMPL
+          </button>
+          <button
+            onClick={() => setActiveTab('dva')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dva' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            DVA
+          </button>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleGeneratePdf}
+            disabled={generatingPdf}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {generatingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                PDF Individual
+              </>
+            )}
+          </button>
+          {/* Botão PDF Comparativo - só aparece se o usuário tem acesso a 2+ federações */}
           {!loadingCompanies && federacoesDisponiveis.length >= 2 && (
-            <button onClick={() => setShowFederacaoModal(true)} disabled={generatingComparative}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold shadow-lg hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-70">
-              {generatingComparative ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando...</> : <><FileBarChart className="w-4 h-4" />PDF Comparativo</>}
+            <button
+              onClick={() => setShowFederacaoModal(true)}
+              disabled={generatingComparative}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold shadow-lg hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {generatingComparative ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <FileBarChart className="w-4 h-4" />
+                  PDF Comparativo
+                </>
+              )}
             </button>
           )}
         </div>
       </div>
 
-      {/* Tabela Principal */}
-      <motion.div key={activeTab + selectedYear + viewMode} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className={`${isMensal ? 'bg-indigo-600' : getTabColor()} px-4 py-3`}>
-          <h2 className="font-semibold text-white">
-            {isMensal
-              ? `DRE - Demonstração do Resultado — ${MONTH_NAMES_FULL[1]} a ${MONTH_NAMES_FULL[monthNum]} de ${selectedYear}`
-              : `${getTabTitle()} - Exercício ${selectedYear}`
-            }
-          </h2>
+      <motion.div
+        key={activeTab + selectedYear}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-lg overflow-hidden"
+      >
+        <div className={`${getTabColor()} px-4 py-3`}>
+          <h2 className="font-semibold text-white">{getTabTitle()} - Exercício {selectedYear}</h2>
         </div>
-
-        <div className={isMensal ? 'overflow-x-auto' : ''}>
-          <table className={`w-full text-sm ${isMensal ? 'min-w-[800px]' : ''}`}>
-            <thead>
-              <tr className="bg-slate-100">
-                <th className={`text-left px-4 py-3 font-semibold text-slate-700 ${isMensal ? 'sticky left-0 bg-slate-100 z-10 min-w-[220px]' : 'w-2/3'}`}>
-                  Conta
-                </th>
-                {isMensal ? (
-                  <>
-                    {Array.from({ length: monthNum }, (_, i) => (
-                      <th key={i} className="text-right px-2 py-3 font-semibold text-slate-600 text-xs whitespace-nowrap">
-                        {MONTH_NAMES_SHORT[i + 1]}
-                      </th>
-                    ))}
-                    <th className="text-right px-2 py-3 font-bold text-blue-700 text-xs bg-blue-50 border-l border-blue-200 whitespace-nowrap">
-                      Total {selectedYear}
-                    </th>
-                    <th className="text-right px-2 py-3 font-semibold text-slate-500 text-xs bg-slate-50 border-l border-slate-200 whitespace-nowrap">
-                      Total {Number(selectedYear) - 1}
-                    </th>
-                    <th className="text-right px-2 py-3 font-semibold text-slate-600 text-xs border-l border-slate-200 whitespace-nowrap">
-                      Var %
-                    </th>
-                  </>
-                ) : (
-                  <th className="text-right px-4 py-3 font-semibold text-slate-700 w-1/3">Valor (R$ mil)</th>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-100">
+              <th className="text-left px-4 py-3 font-semibold text-slate-700 w-2/3">Conta</th>
+              <th className="text-right px-4 py-3 font-semibold text-slate-700 w-1/3">
+                Valor (R$ mil)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {hasEstruturaData(activeTab) ? (
+              // PRIORIDADE: Renderiza dados da estrutura base (de-para)
+              <>
+                {renderEstruturaRows(getEstruturaData())}
+                {/* Totalizador para Balanço Patrimonial: Total Passivo + PL */}
+                {activeTab === 'bp' && (
+                  <tr className="bg-blue-100 border-t-2 border-blue-300">
+                    <td className="px-4 py-3 font-bold text-blue-900 text-sm">
+                      TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO
+                    </td>
+                    <td className="text-right px-4 py-3 font-bold text-blue-900 text-sm">
+                      {formatCurrency(getTotalPassivoPL() / 1000)}
+                    </td>
+                  </tr>
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {isMensal ? (
-                // ═══ VISÃO MENSAL: DRE com colunas por mês ═══
-                renderMensalDRE()
-              ) : hasEstruturaData(activeTab) ? (
-                // ═══ VISÃO ANUAL: Estrutura base (de-para) ═══
-                <>
-                  {renderEstruturaRows(getEstruturaData())}
-                  {activeTab === 'bp' && (
-                    <tr className="bg-blue-100 border-t-2 border-blue-300">
-                      <td className="px-4 py-3 font-bold text-blue-900 text-sm">TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO</td>
-                      <td className="text-right px-4 py-3 font-bold text-blue-900 text-sm">{formatCurrency(getTotalPassivoPL() / 1000)}</td>
-                    </tr>
-                  )}
-                </>
-              ) : hasHierarchicalData(activeTab) ? (
-                renderHierarchicalRows(getHierarchicalData())
-              ) : (
-                groups.map((group) => (
-                  <React.Fragment key={group.title}>
-                    <tr className="bg-slate-50 cursor-pointer hover:bg-slate-100" onClick={() => toggleGroup(group.title)}>
-                      <td className="px-4 py-3 font-semibold text-slate-800 flex items-center gap-2">
-                        {expandedGroups.includes(group.title) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        {group.title}
+              </>
+            ) : hasHierarchicalData(activeTab) ? (
+              // FALLBACK 1: Renderiza dados hierárquicos brutos do banco
+              renderHierarchicalRows(getHierarchicalData())
+            ) : (
+              // FALLBACK 2: Grupos estáticos de demonstração
+              groups.map((group) => (
+                <React.Fragment key={group.title}>
+                  <tr 
+                    className="bg-slate-50 cursor-pointer hover:bg-slate-100"
+                    onClick={() => toggleGroup(group.title)}
+                  >
+                    <td className="px-4 py-3 font-semibold text-slate-800 flex items-center gap-2">
+                      {expandedGroups.includes(group.title) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      {group.title}
+                    </td>
+                    <td className="text-right px-4 py-3 font-semibold text-slate-800">
+                      {formatCurrency(getValue(selectedYear, group.total))}
+                    </td>
+                  </tr>
+                  {expandedGroups.includes(group.title) && group.keys.filter(k => k !== group.total).map((key) => (
+                    <tr key={key} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-2 pl-10 text-slate-600">{key}</td>
+                      <td className="text-right px-4 py-2 text-slate-700">
+                        {formatCurrency(getValue(selectedYear, key))}
                       </td>
-                      <td className="text-right px-4 py-3 font-semibold text-slate-800">{formatCurrency(getValue(selectedYear, group.total))}</td>
                     </tr>
-                    {expandedGroups.includes(group.title) && group.keys.filter(k => k !== group.total).map((key) => (
-                      <tr key={key} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-2 pl-10 text-slate-600">{key}</td>
-                        <td className="text-right px-4 py-2 text-slate-700">{formatCurrency(getValue(selectedYear, key))}</td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </React.Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
       </motion.div>
 
-      {/* Gráfico (apenas no modo anual) */}
-      {!isMensal && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Composição por Grupo - {getTabTitle()} ({selectedYear})</h2>
-          <CustomBarChart
-            data={chartData}
-            bars={[{ dataKey: selectedYear, color: activeTab === 'bp' ? '#3B82F6' : activeTab === 'dre' ? '#6366F1' : activeTab === 'dfc' ? '#10B981' : activeTab === 'dmpl' ? '#8B5CF6' : '#F59E0B', name: selectedYear }]}
-          />
-        </motion.div>
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white rounded-xl shadow-lg p-6"
+      >
+        <h2 className="text-lg font-bold text-slate-800 mb-4">Composição por Grupo - {getTabTitle()} ({selectedYear})</h2>
+        <CustomBarChart
+          data={chartData}
+          bars={[
+            { dataKey: selectedYear, color: activeTab === 'bp' ? '#3B82F6' : activeTab === 'dre' ? '#6366F1' : activeTab === 'dfc' ? '#10B981' : activeTab === 'dmpl' ? '#8B5CF6' : '#F59E0B', name: selectedYear }
+          ]}
+        />
+      </motion.div>
 
-      {/* Modal de Federações */}
+      {/* Modal de Seleção de Federações */}
       {showFederacaoModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+          >
             <div className="bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Selecionar Federações para Comparação</h3>
-              <button onClick={() => setShowFederacaoModal(false)} className="text-white/80 hover:text-white"><X className="w-5 h-5" /></button>
+              <button
+                onClick={() => setShowFederacaoModal(false)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
             <div className="p-6">
-              <p className="text-slate-600 mb-4">Selecione as federações que deseja incluir no relatório comparativo (mínimo 2):</p>
+              <p className="text-slate-600 mb-4">
+                Selecione as federações que deseja incluir no relatório comparativo (mínimo 2):
+              </p>
+
               <div className="flex gap-2 mb-4">
-                <button onClick={selectAllFederacoes} className="text-sm px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200">Selecionar Todas</button>
-                <button onClick={deselectAllFederacoes} className="text-sm px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Limpar Seleção</button>
+                <button
+                  onClick={selectAllFederacoes}
+                  className="text-sm px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200 transition-colors"
+                >
+                  Selecionar Todas
+                </button>
+                <button
+                  onClick={deselectAllFederacoes}
+                  className="text-sm px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Limpar Seleção
+                </button>
               </div>
+
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {federacoesDisponiveis.map((fed) => (
-                  <label key={fed.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedFederacoes.includes(fed.id) ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className={`w-5 h-5 rounded flex items-center justify-center ${selectedFederacoes.includes(fed.id) ? 'bg-violet-600' : 'bg-slate-200'}`}>
-                      {selectedFederacoes.includes(fed.id) && <Check className="w-3.5 h-3.5 text-white" />}
+                  <label
+                    key={fed.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedFederacoes.includes(fed.id)
+                        ? 'border-violet-500 bg-violet-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded flex items-center justify-center ${
+                        selectedFederacoes.includes(fed.id)
+                          ? 'bg-violet-600'
+                          : 'bg-slate-200'
+                      }`}
+                    >
+                      {selectedFederacoes.includes(fed.id) && (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      )}
                     </div>
-                    <input type="checkbox" checked={selectedFederacoes.includes(fed.id)} onChange={() => toggleFederacao(fed.id)} className="sr-only" />
+                    <input
+                      type="checkbox"
+                      checked={selectedFederacoes.includes(fed.id)}
+                      onChange={() => toggleFederacao(fed.id)}
+                      className="sr-only"
+                    />
                     <div className="flex-1">
                       <span className="font-medium text-slate-800">{fed.nome}</span>
                       <span className="ml-2 text-sm text-slate-500">({fed.sigla})</span>
@@ -954,12 +1030,23 @@ export default function DemonstracoesPage() {
                   </label>
                 ))}
               </div>
+
               <div className="mt-6 flex items-center justify-between">
-                <span className="text-sm text-slate-500">{selectedFederacoes.length} de {federacoesDisponiveis.length} selecionadas</span>
+                <span className="text-sm text-slate-500">
+                  {selectedFederacoes.length} de {federacoesDisponiveis.length} selecionadas
+                </span>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowFederacaoModal(false)} className="px-4 py-2 text-slate-600 hover:text-slate-800">Cancelar</button>
-                  <button onClick={handleGenerateComparativePdf} disabled={selectedFederacoes.length < 2}
-                    className="px-6 py-2 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold hover:from-violet-700 hover:to-violet-800 disabled:opacity-50">
+                  <button
+                    onClick={() => setShowFederacaoModal(false)}
+                    className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleGenerateComparativePdf}
+                    disabled={selectedFederacoes.length < 2}
+                    className="px-6 py-2 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Gerar PDF
                   </button>
                 </div>

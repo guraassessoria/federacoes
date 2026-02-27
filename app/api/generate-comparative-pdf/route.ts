@@ -396,6 +396,72 @@ function generateComparativeHTML(
 `;
 }
 
+// Gerar dados fictícios no formato ContaComValor[] para empresas sem balancete
+function gerarDadosFicticiosComparativo(year: string): {
+  dre: ContaComValor[];
+  bp: ContaComValor[];
+  resultadoDRE: number;
+  totalPassivoPL: number;
+} {
+  const yearFactors: Record<string, number> = { "2023": 0.85, "2024": 0.95, "2025": 1.0, "2026": 1.05 };
+  const f = yearFactors[year] || 1.0;
+
+  const conta = (codigo: string, descricao: string, valor: number, nivel: number = 1, children?: ContaComValor[]): ContaComValor => ({
+    codigo, descricao, valor, nivel, nivelVisualizacao: nivel, codigoSuperior: null, children: children || [],
+  });
+
+  // BP
+  const bp: ContaComValor[] = [
+    conta('1', 'ATIVO', 50000000 * f, 1, [
+      conta('2', 'Ativo Circulante', 15000000 * f, 2, [
+        conta('3', 'Disponibilidades', 3000000 * f, 3),
+        conta('7', 'Contas a Receber', 4500000 * f, 3),
+        conta('20', 'Estoques', 1500000 * f, 3),
+      ]),
+      conta('33', 'Ativo Não Circulante', 35000000 * f, 2, [
+        conta('34', 'Realizável a Longo Prazo', 5000000 * f, 3),
+        conta('43', 'Imobilizado', 20000000 * f, 3),
+      ]),
+    ]),
+    conta('76', 'PASSIVO + PL', 50000000 * f, 1, [
+      conta('77', 'Passivo Circulante', 10000000 * f, 2, [
+        conta('78', 'Fornecedores', 3000000 * f, 3),
+      ]),
+      conta('113', 'Passivo Não Circulante', 15000000 * f, 2),
+      conta('125', 'Patrimônio Líquido', 25000000 * f, 2, [
+        conta('126', 'Capital Social', 15000000 * f, 3),
+        conta('141', 'Superávits Acumulados', 10000000 * f, 3),
+      ]),
+    ]),
+  ];
+
+  // DRE
+  const receitaLiquida = 45000000 * f;
+  const custos = 25000000 * f;
+  const despesas = 10000000 * f;
+  const resultadoOp = receitaLiquida - custos - despesas;
+  const resultadoFin = -2000000 * f;
+  const resultadoLiq = resultadoOp + resultadoFin;
+
+  const dre: ContaComValor[] = [
+    conta('1', 'Receita Bruta', receitaLiquida, 1),
+    conta('51', 'Receita Líquida', receitaLiquida, 1),
+    conta('52', '(-) Custos', custos, 1),
+    conta('104', '(-) Despesas', despesas, 1),
+    conta('190', 'Resultado Financeiro', resultadoFin, 1),
+    conta('211', 'Resultado Operacional', resultadoOp, 1),
+    conta('225', 'Resultado Líquido', resultadoLiq, 1),
+    conta('229', 'Superávit/Déficit', resultadoLiq, 1),
+  ];
+
+  return {
+    dre,
+    bp,
+    resultadoDRE: resultadoLiq,
+    totalPassivoPL: 50000000 * f,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -452,27 +518,54 @@ export async function POST(request: NextRequest) {
         orderBy: { accountNumber: 'asc' }
       });
 
+  let dre: ContaComValor[];
+      let bp: ContaComValor[];
+      let resultadoDRE: number;
+      let totalPassivoPL: number;
+
       if (balanceteData.length === 0) {
-        console.log(`Sem dados para ${company.name}`);
-        continue;
+        // Gerar dados fictícios para empresa sem balancete
+        console.log(`Sem dados reais para ${company.name} — usando dados fictícios`);
+        const demo = gerarDadosFicticiosComparativo(year);
+        dre = demo.dre;
+        bp = demo.bp;
+        resultadoDRE = demo.resultadoDRE;
+        totalPassivoPL = demo.totalPassivoPL;
+      } else {
+        // Buscar de-para para a empresa
+        const deParaRows = await prisma.deParaMapping.findMany({
+          where: { companyId: company.id },
+          select: { contaFederacao: true, padraoBP: true, padraoDRE: true, padraoDFC: true, padraoDMPL: true },
+        });
+        const deParaRecords = deParaRows.map(r => ({
+          contaFederacao: r.contaFederacao,
+          padraoBP: r.padraoBP,
+          padraoDRE: r.padraoDRE,
+          padraoDFC: r.padraoDFC,
+          padraoDMPL: r.padraoDMPL,
+        }));
+        const processado = await processarDadosFinanceiros(balanceteData, deParaRecords);
+        dre = processado.dre;
+        bp = processado.bp;
+        resultadoDRE = processado.resultadoDRE;
+        totalPassivoPL = processado.totalPassivoPL;
       }
 
-      // Buscar de-para da empresa (necessário para mapear contas corretamente)
-      const deParaRows = await prisma.deParaMapping.findMany({
-        where: { companyId: company.id },
-        select: { contaFederacao: true, padraoBP: true, padraoDRE: true, padraoDFC: true, padraoDMPL: true },
-      });
-      const deParaRecords = deParaRows.map(r => ({
-        contaFederacao: r.contaFederacao,
-        padraoBP: r.padraoBP,
-        padraoDRE: r.padraoDRE,
-        padraoDFC: r.padraoDFC,
-        padraoDMPL: r.padraoDMPL,
-      }));
-
-      const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
       const indices = calcularIndices(bp, dre);
       const indicesPDF = indicesParaPDF(indices);
+      const valores = extrairValoresPrincipais(dre, bp);
+
+      federacoes.push({
+        id: company.id,
+        nome: company.name,
+        sigla: gerarSigla(company.name),
+        dre,
+        bp,
+        resultadoDRE,
+        totalPassivoPL,
+        valores,
+        indices: indicesPDF
+      });
       const valores = extrairValoresPrincipais(dre, bp);
 
       federacoes.push({

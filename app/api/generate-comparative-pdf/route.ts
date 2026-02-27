@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { processarDadosFinanceiros, ContaComValor } from '@/lib/services/estruturaMapping';
+import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -457,7 +457,20 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData);
+      // Buscar de-para da empresa (necessário para mapear contas corretamente)
+      const deParaRows = await prisma.deParaMapping.findMany({
+        where: { companyId: company.id },
+        select: { contaFederacao: true, padraoBP: true, padraoDRE: true, padraoDFC: true, padraoDMPL: true },
+      });
+      const deParaRecords = deParaRows.map(r => ({
+        contaFederacao: r.contaFederacao,
+        padraoBP: r.padraoBP,
+        padraoDRE: r.padraoDRE,
+        padraoDFC: r.padraoDFC,
+        padraoDMPL: r.padraoDMPL,
+      }));
+
+      const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
       const indices = calcularIndices(bp, dre);
       const indicesPDF = indicesParaPDF(indices);
       const valores = extrairValoresPrincipais(dre, bp);

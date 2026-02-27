@@ -480,7 +480,7 @@ export async function POST(request: NextRequest) {
 
     if (balanceteData.length === 0) {
       return NextResponse.json({ 
-        error: `Nenhum dado de balancete encontrado para o ano ${yearFilter}` 
+        error: `Nenhum dado de balancete encontrado para o ano ${yearShort}` 
       }, { status: 404 });
     }
 

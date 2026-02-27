@@ -403,10 +403,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-   const body = await request.json();
+ const body = await request.json();
     const { year, companyIds, federacoes: federacoesNomes } = body;
 
-    // Buscar empresas - prioriza companyIds (IDs reais), fallback para nomes
+    // Buscar empresas — prioriza companyIds (IDs reais), fallback para nomes
     let companies: { id: string; name: string }[] = [];
     
     if (companyIds && Array.isArray(companyIds) && companyIds.length > 0) {
@@ -427,7 +427,6 @@ export async function POST(request: NextRequest) {
         where: { email: session.user.email },
         include: { companies: { include: { company: { select: { id: true, name: true } } } } }
       });
-      
       if (user?.companies) {
         companies = user.companies.map(uc => uc.company);
       }
@@ -435,11 +434,12 @@ export async function POST(request: NextRequest) {
 
     if (companies.length < 2) {
       return NextResponse.json({ 
-        error: 'Não foram encontradas federações suficientes no banco de dados' 
-      }, { status: 404 });
+        error: 'São necessárias pelo menos 2 empresas para gerar o relatório comparativo' 
+      }, { status: 400 });
     }
 
-    const yearFilter = year || '25';
+    // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
+    const yearShort = year ? year.slice(-2) : '25';
     const federacoes: DadosFederacao[] = [];
 
     // Processar cada federação
@@ -447,7 +447,7 @@ export async function POST(request: NextRequest) {
       const balanceteData = await prisma.balanceteData.findMany({
         where: {
           companyId: company.id,
-          period: { contains: yearFilter }
+          period: { contains: `/${yearShort}` }
         },
         orderBy: { accountNumber: 'asc' }
       });
@@ -482,7 +482,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar HTML
-    const periodo = `20${yearFilter}`;
+    const periodo = year || `20${yearShort}`;
     const html = generateComparativeHTML(federacoes, periodo);
 
     // Verificar se API de PDF está configurada

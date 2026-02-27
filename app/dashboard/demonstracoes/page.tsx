@@ -343,7 +343,10 @@ export default function DemonstracoesPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
+      // Detectar se é HTML ou PDF pelo content-type
+      const contentType = response.headers.get('content-type') || '';
+      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
+      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.${ext}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -380,7 +383,10 @@ export default function DemonstracoesPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `comparativo_federacoes_${selectedYear}.pdf`;
+      // Detectar se é HTML ou PDF pelo content-type
+      const contentType = response.headers.get('content-type') || '';
+      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
+      link.download = `comparativo_federacoes_${selectedYear}.${ext}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

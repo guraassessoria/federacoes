@@ -60,12 +60,14 @@ function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
   };
 }
 
-// Função para gerar linhas da tabela hierárquica
 function gerarLinhasTabela(contas: ContaComValor[], maxNivel: number = 3): string {
   let html = '';
   
   function processar(conta: ContaComValor, nivel: number = 0): void {
     if (nivel > maxNivel) return;
+    
+    // Ocultar linhas sem valor (exceto totalizadores nível 1 e 2)
+    if (conta.valor === 0 && conta.nivel > 2) return;
     
     const indent = '&nbsp;'.repeat(nivel * 4);
     const isTotal = conta.nivel === 1;
@@ -269,7 +271,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '1'), 4)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === '1'), 3)}
     </table>
 
     <div class="subsection-title">PASSIVO</div>
@@ -278,7 +280,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '76'), 4)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === '76'), 3)}
     </table>
 
     <div class="subsection-title">PATRIMÔNIO LÍQUIDO</div>
@@ -287,7 +289,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 4)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 3)}
     </table>
 
     <table>
@@ -310,7 +312,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(dre, 4)}
+      ${gerarLinhasTabela(dre, 3)}
     </table>
 
     <table>

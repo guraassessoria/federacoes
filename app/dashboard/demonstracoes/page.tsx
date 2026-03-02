@@ -922,6 +922,20 @@ export default function DemonstracoesPage() {
     const currentYearMonths = monthlyDreData[selectedYear] || {};
     const previousYearMonths = monthlyDreData[previousYear] || {};
 
+    const globalParentMap = new Map<string, string | null>();
+    const registerParents = (contas: ContaComValor[]) => {
+      flattenContas(contas).forEach((conta) => {
+        if (!globalParentMap.has(conta.codigo)) {
+          globalParentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+        }
+      });
+    };
+
+    MONTHS.forEach((month) => {
+      registerParents(currentYearMonths[month.value] || []);
+      registerParents(previousYearMonths[month.value] || []);
+    });
+
     const monthPriority = [
       selectedMonth,
       ...MONTHS.map((m) => m.value).filter((month) => month !== selectedMonth),
@@ -1029,13 +1043,18 @@ export default function DemonstracoesPage() {
     rowMap.forEach((row) => {
       allParentMap.set(row.codigo, row.codigoSuperior ?? null);
     });
+    globalParentMap.forEach((parent, codigo) => {
+      if (!allParentMap.has(codigo)) {
+        allParentMap.set(codigo, parent ?? null);
+      }
+    });
 
     const getAnchorOrder = (codigo: string): number | undefined => {
       if (structureOrderMap.has(codigo)) {
         return structureOrderMap.get(codigo);
       }
 
-      let parent = allParentMap.get(codigo) ?? null;
+      let parent = allParentMap.get(codigo) ?? globalParentMap.get(codigo) ?? null;
       const visited = new Set<string>();
 
       while (parent && !visited.has(parent)) {
@@ -1043,7 +1062,7 @@ export default function DemonstracoesPage() {
         if (structureOrderMap.has(parent)) {
           return structureOrderMap.get(parent);
         }
-        parent = allParentMap.get(parent) ?? null;
+        parent = allParentMap.get(parent) ?? globalParentMap.get(parent) ?? null;
       }
 
       return undefined;

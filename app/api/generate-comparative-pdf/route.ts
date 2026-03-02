@@ -64,15 +64,58 @@ function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
     return null;
   };
 
+  const flatten = (contas: ContaComValor[]): ContaComValor[] => {
+    const result: ContaComValor[] = [];
+    const walk = (items: ContaComValor[]) => {
+      for (const item of items) {
+        result.push(item);
+        if (item.children?.length) walk(item.children);
+      }
+    };
+    walk(contas);
+    return result;
+  };
+
+  const buscarPorCodigos = (contas: ContaComValor[], codigos: string[]): number | null => {
+    for (const codigo of codigos) {
+      const valor = buscar(contas, codigo);
+      if (valor !== null) return valor;
+    }
+    return null;
+  };
+
+  const buscarPorDescricao = (contas: ContaComValor[], termos: string[]): number | null => {
+    const flat = flatten(contas);
+    for (const conta of flat) {
+      const descricao = conta.descricao?.toLowerCase?.() || '';
+      if (termos.some((termo) => descricao.includes(termo))) {
+        return conta.valor !== 0 ? conta.valor : null;
+      }
+    }
+    return null;
+  };
+
+  const receitasTotal =
+    buscarPorCodigos(dre, ['1', '51', '56']) ??
+    buscarPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
+
+  const custosTotal =
+    buscarPorCodigos(dre, ['52', '57']) ??
+    buscarPorDescricao(dre, ['custos']);
+
+  const despesasTotal =
+    buscarPorCodigos(dre, ['104', '110']) ??
+    buscarPorDescricao(dre, ['despesas']);
+
   return {
     ativoTotal: buscar(bp, '1'),
     ativoCirculante: buscar(bp, '2'),
     passivoCirculante: buscar(bp, '77'),
     passivoNaoCirculante: buscar(bp, '113'),
     patrimonioLiquido: buscar(bp, '125'),
-    receitasTotal: buscar(dre, '1'),
-    custosTotal: buscar(dre, '52'),
-    despesasTotal: buscar(dre, '104')
+    receitasTotal,
+    custosTotal,
+    despesasTotal
   };
 }
 
@@ -584,12 +627,9 @@ export async function POST(request: NextRequest) {
     const html2pdfKey = process.env.HTML2PDF_API_KEY;
 
     if (!html2pdfUrl || !html2pdfKey) {
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="comparativo_federacoes_${periodo}.html"`
-        }
-      });
+      return NextResponse.json({
+        error: 'Serviço de geração de PDF não configurado. Defina HTML2PDF_API_URL e HTML2PDF_API_KEY.'
+      }, { status: 500 });
     }
 
     // Gerar PDF via API
@@ -610,12 +650,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!pdfResponse.ok) {
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="comparativo_federacoes_${periodo}.html"`
-        }
-      });
+      const errorText = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Falha no serviço de PDF: ${errorText || 'erro desconhecido'}`
+      }, { status: 502 });
     }
 
     // Verificar se é resposta assíncrona
@@ -638,6 +676,11 @@ export async function POST(request: NextRequest) {
           
           if (statusData.status === 'completed' && statusData.pdfUrl) {
             const pdfDownload = await fetch(statusData.pdfUrl);
+            const downloadType = pdfDownload.headers.get('content-type') || '';
+            if (!downloadType.includes('application/pdf')) {
+              const invalidBody = await pdfDownload.text();
+              throw new Error(`Resposta inválida do serviço de PDF: ${invalidBody.slice(0, 200)}`);
+            }
             const pdfBuffer = await pdfDownload.arrayBuffer();
             
             return new NextResponse(pdfBuffer, {
@@ -657,6 +700,12 @@ export async function POST(request: NextRequest) {
       throw new Error('Timeout na geração do PDF');
     }
 
+    if (!contentType?.includes('application/pdf')) {
+      const invalidBody = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Serviço retornou conteúdo não-PDF: ${invalidBody.slice(0, 200)}`
+      }, { status: 502 });
+    }
     const pdfBuffer = await pdfResponse.arrayBuffer();
     return new NextResponse(pdfBuffer, {
       headers: {

@@ -33,9 +33,9 @@ const CODIGOS_BP = {
 
 // Códigos das contas na estrutura padrão - DRE
 const CODIGOS_DRE = {
-  RECEITAS_TOTAL: '1',
-  CUSTOS_TOTAL: '52',
-  DESPESAS_TOTAL: '104',
+  RECEITAS_TOTAL: '56',
+  CUSTOS_TOTAL: '57',
+  DESPESAS_TOTAL: '110',
   RESULTADO_FINANCEIRO: '190',
   RECEITAS_FINANCEIRAS: '191',
   DESPESAS_FINANCEIRAS: '199',
@@ -123,6 +123,29 @@ function buscarValorPorCodigo(contas: ContaComValor[], codigo: string): number |
   return null;
 }
 
+function buscarValorPorCodigos(contas: ContaComValor[], codigos: string[]): number | null {
+  for (const codigo of codigos) {
+    const valor = buscarValorPorCodigo(contas, codigo);
+    if (valor !== null) return valor;
+  }
+  return null;
+}
+
+function buscarValorPorDescricao(contas: ContaComValor[], termos: string[]): number | null {
+  const stack = [...contas];
+  while (stack.length > 0) {
+    const conta = stack.shift()!;
+    const descricao = conta.descricao?.toLowerCase?.() || '';
+    if (termos.some((termo) => descricao.includes(termo))) {
+      return conta.valor !== 0 ? conta.valor : null;
+    }
+    if (conta.children?.length) {
+      stack.push(...conta.children);
+    }
+  }
+  return null;
+}
+
 /**
  * Extrai todos os valores necessários do BP e DRE
  */
@@ -130,6 +153,26 @@ export function extrairValores(
   bp: ContaComValor[],
   dre: ContaComValor[]
 ): ValoresExtraidos {
+  const receitasTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_TOTAL, '51', '1']) ??
+    buscarValorPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
+
+  const custosTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.CUSTOS_TOTAL, '52']) ??
+    buscarValorPorDescricao(dre, ['custos']);
+
+  const despesasTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_TOTAL, '104']) ??
+    buscarValorPorDescricao(dre, ['despesas']);
+
+  const resultadoOperacional =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_OPERACIONAL, '196']) ??
+    buscarValorPorDescricao(dre, ['resultado operacional']);
+
+  const resultadoLiquido =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_LIQUIDO, '229']) ??
+    buscarValorPorDescricao(dre, ['resultado líquido', 'superávit', 'déficit']);
+
   return {
     // BP
     ativoTotal: buscarValorPorCodigo(bp, CODIGOS_BP.ATIVO_TOTAL),
@@ -146,14 +189,14 @@ export function extrairValores(
     patrimonioLiquido: buscarValorPorCodigo(bp, CODIGOS_BP.PATRIMONIO_LIQUIDO),
     
     // DRE
-    receitasTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.RECEITAS_TOTAL),
-    custosTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.CUSTOS_TOTAL),
-    despesasTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.DESPESAS_TOTAL),
+    receitasTotal,
+    custosTotal,
+    despesasTotal,
     resultadoFinanceiro: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_FINANCEIRO),
     receitasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.RECEITAS_FINANCEIRAS),
     despesasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.DESPESAS_FINANCEIRAS),
-    resultadoOperacional: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_OPERACIONAL),
-    resultadoLiquido: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_LIQUIDO)
+    resultadoOperacional,
+    resultadoLiquido
   };
 }
 

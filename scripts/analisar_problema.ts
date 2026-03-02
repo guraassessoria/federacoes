@@ -20,7 +20,7 @@ function eFilho(codigoPai: string, codigoFilho: string): boolean {
 }
 
 function filtrarContasFolhas(dados: any[]): any[] {
-  const todosCodigos = [...new Set(dados.map(c => c.accountNumber))];
+  const todosCodigos = [...new Set(dados.map(c => c.accountCode))];
   return dados.filter(conta => {
     const codigoAtual = conta.accountNumber;
     for (const codigo of todosCodigos) {
@@ -32,32 +32,32 @@ function filtrarContasFolhas(dados: any[]): any[] {
 }
 
 async function main() {
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' },
-    orderBy: { accountNumber: 'asc' }
+    orderBy: { accountCode: 'asc' }
   });
   
   const contasDRE = dados2024.filter(d => 
-    d.accountNumber.startsWith('3') || d.accountNumber.startsWith('4')
+    d.accountCode.startsWith('3') || d.accountCode.startsWith('4')
   );
   const folhas = filtrarContasFolhas(contasDRE);
   
   console.log('=== TODAS AS CONTAS FOLHAS DRE 2024 ===');
   let total = 0;
   folhas.forEach(c => {
-    const valor = Number(c.finalBalance);
+    const valor = Number(c.closingBalance);
     total += valor;
-    console.log(`${c.accountNumber.padEnd(20)} | ${c.accountDescription.padEnd(50)} | ${valor.toFixed(2)}`);
+    console.log(`${c.accountCode.padEnd(20)} | ${c.accountDescription.padEnd(50)} | ${valor.toFixed(2)}`);
   });
   
   console.log(`\nTotal: ${total.toFixed(2)}`);
   
   // Calcular resultado correto
-  const receitas = folhas.filter(c => c.accountNumber.startsWith('3'));
-  const custosDespesas = folhas.filter(c => c.accountNumber.startsWith('4'));
+  const receitas = folhas.filter(c => c.accountCode.startsWith('3'));
+  const custosDespesas = folhas.filter(c => c.accountCode.startsWith('4'));
   
-  const totalReceitas = receitas.reduce((sum, c) => sum + Math.abs(Number(c.finalBalance)), 0);
-  const totalCustosDespesas = custosDespesas.reduce((sum, c) => sum + Number(c.finalBalance), 0);
+  const totalReceitas = receitas.reduce((sum, c) => sum + Math.abs(Number(c.closingBalance)), 0);
+  const totalCustosDespesas = custosDespesas.reduce((sum, c) => sum + Number(c.closingBalance), 0);
   
   console.log(`\nReceitas: ${totalReceitas.toFixed(2)}`);
   console.log(`Custos/Despesas: ${totalCustosDespesas.toFixed(2)}`);

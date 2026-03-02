@@ -18,7 +18,7 @@
  *   Superávit/Déficit       = LAI - IR
  */
 
-import { BalanceteData } from '@prisma/client';
+import { Balancete } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 
@@ -110,25 +110,25 @@ export function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
 
 // ─── Classificação e Filtro ───────────────────────────────────
 
-function getTipoDemonstracao(accountNumber: string): 'BP' | 'DRE' | null {
-  const c = accountNumber.charAt(0);
+function getTipoDemonstracao(accountCode: string): 'BP' | 'DRE' | null {
+  const c = accountCode.charAt(0);
   if (c === '1' || c === '2') return 'BP';
   if (c === '3' || c === '4' || c === '5') return 'DRE';
   return null;
 }
 
-function filtrarContasFolhas(data: BalanceteData[]): BalanceteData[] {
-  const codigos = new Set(data.map(c => c.accountNumber));
+function filtrarContasFolhas(data: Balancete[]): Balancete[] {
+  const codigos = new Set(data.map(c => c.accountCode));
   return data.filter(conta => {
     for (const outro of codigos) {
-      if (outro !== conta.accountNumber && outro.startsWith(conta.accountNumber + '.')) return false;
+      if (outro !== conta.accountCode && outro.startsWith(conta.accountCode + '.')) return false;
     }
     return true;
   });
 }
 
-function ajustarSinal(valor: number, accountNumber: string): number {
-  const c = accountNumber.charAt(0);
+function ajustarSinal(valor: number, accountCode: string): number {
+  const c = accountCode.charAt(0);
   if (c === '2' || c === '3') return valor * -1;
   return valor;
 }
@@ -145,21 +145,21 @@ function buildDeParaLookup(records: DeParaRecord[], tipo: 'BP' | 'DRE'): Record<
 // ─── Mapear Valores do Balancete ──────────────────────────────
 
 function mapearValores(
-  balanceteData: BalanceteData[],
+  balancetes: Balancete[],
   tipo: 'BP' | 'DRE',
   deParaRecords?: DeParaRecord[]
 ): Record<string, number> {
   let lookup: Record<string, string> = {};
   if (deParaRecords?.length) lookup = buildDeParaLookup(deParaRecords, tipo);
 
-  const contasTipo = balanceteData.filter(c => getTipoDemonstracao(c.accountNumber) === tipo);
+  const contasTipo = balancetes.filter(c => getTipoDemonstracao(c.accountCode) === tipo);
   const folhas = filtrarContasFolhas(contasTipo);
 
   const valores: Record<string, number> = {};
   for (const conta of folhas) {
-    const codPadrao = lookup[conta.accountNumber];
+    const codPadrao = lookup[conta.accountCode];
     if (codPadrao) {
-      const val = ajustarSinal(Number(conta.finalBalance) || 0, conta.accountNumber);
+      const val = ajustarSinal(Number(conta.closingBalance) || 0, conta.accountCode);
       valores[codPadrao] = (valores[codPadrao] || 0) + val;
     }
   }
@@ -171,13 +171,13 @@ function mapearValores(
 // ═══════════════════════════════════════════════════════════════
 
 export async function mapBalanceteToBP(
-  balanceteData: BalanceteData[],
+  balancetes: Balancete[],
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
   const estrutura = await loadEstruturaBP();
   if (!estrutura?.length) return [];
 
-  const valores = mapearValores(balanceteData, 'BP', deParaRecords);
+  const valores = mapearValores(balancetes, 'BP', deParaRecords);
 
   const contas: ContaComValor[] = estrutura.map(c => ({
     ...c,
@@ -222,13 +222,13 @@ function buildTree(contas: ContaComValor[]): ContaComValor[] {
 // ═══════════════════════════════════════════════════════════════
 
 export async function mapBalanceteToDRE(
-  balanceteData: BalanceteData[],
+  balancetes: Balancete[],
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
   const estrutura = await loadEstruturaDRE();
   if (!estrutura?.length) return [];
 
-  const valores = mapearValores(balanceteData, 'DRE', deParaRecords);
+  const valores = mapearValores(balancetes, 'DRE', deParaRecords);
 
   // Criar mapa de contas com valores analíticos
   const mapa = new Map<string, ContaComValor>();
@@ -366,16 +366,16 @@ export async function mapBalanceteToDRE(
 
 /** Mantém compatibilidade com chamadas existentes */
 export async function mapBalanceteToEstrutura(
-  balanceteData: BalanceteData[],
+  balancetes: Balancete[],
   tipo: 'BP' | 'DRE',
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
-  if (tipo === 'BP') return mapBalanceteToBP(balanceteData, deParaRecords);
-  return mapBalanceteToDRE(balanceteData, deParaRecords);
+  if (tipo === 'BP') return mapBalanceteToBP(balancetes, deParaRecords);
+  return mapBalanceteToDRE(balancetes, deParaRecords);
 }
 
 export async function processarDadosFinanceiros(
-  balanceteData: BalanceteData[],
+  balancetes: Balancete[],
   deParaRecords?: DeParaRecord[]
 ): Promise<{
   dre: ContaComValor[];
@@ -384,8 +384,8 @@ export async function processarDadosFinanceiros(
   totalPassivoPL: number;
 }> {
   const [dre, bp] = await Promise.all([
-    mapBalanceteToDRE(balanceteData, deParaRecords),
-    mapBalanceteToBP(balanceteData, deParaRecords),
+    mapBalanceteToDRE(balancetes, deParaRecords),
+    mapBalanceteToBP(balancetes, deParaRecords),
   ]);
 
   // Resultado = valor do Superávit/Déficit (229)

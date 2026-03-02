@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { API_ENDPOINTS } from '@/lib/constants';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ArrowLeft, Info, AlertTriangle } from "lucide-react";
 
 interface ExistingFile {
@@ -37,7 +38,7 @@ export default function UploadDeParaPage() {
 
   const fetchCompanyInfo = async (companyId: string) => {
     try {
-      const res = await fetch("/api/user/companies");
+      const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
       const data = await res.json();
       const company = data.companies?.find((c: { id: string }) => c.id === companyId);
       if (company) setCompanyName(company.name);
@@ -49,7 +50,7 @@ export default function UploadDeParaPage() {
   // Mantém a UI de “arquivo existente” (opcional). Se você não precisar disso, pode remover.
   const fetchExistingFile = async (companyId: string) => {
     try {
-      const res = await fetch(`/api/files/de-para?companyId=${companyId}`);
+      const res = await fetch(`${API_ENDPOINTS.FILES_DE_PARA}?companyId=${companyId}`);
       const data = await res.json();
       setExistingFile(data.file || null);
     } catch (e) {
@@ -90,7 +91,7 @@ export default function UploadDeParaPage() {
       form.append("companyId", companyId);
       form.append("file", selectedFile);
 
-      const res = await fetch("/api/files/de-para/upload", {
+      const res = await fetch(API_ENDPOINTS.FILES_DE_PARA_UPLOAD, {
         method: "POST",
         body: form,
       });

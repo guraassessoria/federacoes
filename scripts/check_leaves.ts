@@ -29,7 +29,7 @@ function eFilho(codigoPai: string, codigoFilho: string): boolean {
 }
 
 async function main() {
-  const contas = await prisma.balanceteData.findMany({
+  const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
     select: { accountNumber: true, accountDescription: true, finalBalance: true },
     distinct: ['accountNumber'],

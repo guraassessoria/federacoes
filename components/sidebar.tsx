@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { API_ENDPOINTS } from '@/lib/constants';
 
 interface Company {
   id: string;
@@ -34,7 +35,7 @@ const navItems = [
   { href: '/dashboard/analise-vertical', label: 'Análise Vertical', icon: BarChart3 },
 ];
 
-export default function Sidebar() {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -47,7 +48,7 @@ export default function Sidebar() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const res = await fetch('/api/user/companies');
+        const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (res.ok) {
           const data = await res.json();
           setCompanies(data.companies || []);

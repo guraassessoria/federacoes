@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
+import { API_ENDPOINTS } from '@/lib/constants';
 
 // Interface para conta hierárquica (dados brutos do balancete)
 interface HierarchicalAccount {
@@ -247,7 +248,7 @@ export default function DemonstracoesPage() {
   useEffect(() => {
     const fetchUserCompanies = async () => {
       try {
-        const response = await fetch('/api/user/companies');
+        const response = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (response.ok) {
           const data = await response.json();
           console.log('Empresas do usuário:', data.companies);
@@ -294,7 +295,7 @@ export default function DemonstracoesPage() {
     
     setLoadingFinancialData(true);
     try {
-      const response = await fetch(`/api/financial-data?companyId=${companyId}&viewMode=anual&year=${year}`);
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?companyId=${companyId}&viewMode=anual&year=${year}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
@@ -328,7 +329,7 @@ export default function DemonstracoesPage() {
     }
     setGeneratingPdf(true);
     try {
-      const response = await fetch('/api/generate-report-pdf', {
+      const response = await fetch(API_ENDPOINTS.GENERATE_REPORT_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId: selectedCompanyId, companyName, year: selectedYear }),
@@ -368,7 +369,7 @@ export default function DemonstracoesPage() {
     setShowFederacaoModal(false);
     setGeneratingComparative(true);
     try {
-      const response = await fetch('/api/generate-comparative-pdf', {
+      const response = await fetch(API_ENDPOINTS.GENERATE_COMPARATIVE_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year: selectedYear, companyIds: selectedFederacoes }),

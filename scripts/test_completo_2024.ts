@@ -52,7 +52,7 @@ function filtrarContasFolhas(dados: any[]): any[] {
 }
 
 async function main() {
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' },
     orderBy: { accountNumber: 'asc' }
   });
@@ -71,7 +71,7 @@ async function main() {
   let totalDespesasFinanceiras = 0;
   
   for (const conta of folhas) {
-    const valor = Number(conta.finalBalance) || 0;
+    const valor = Number(conta.closingBalance) || 0;
     const codigo = conta.accountNumber;
     
     if (codigo.startsWith('3')) {
@@ -127,10 +127,10 @@ async function main() {
   const raizCustos = dados2024.find(d => d.accountNumber === '4');
   
   console.log(`\n=== VERIFICAÇÃO COM CONTAS RAIZ ===`);
-  console.log(`Conta 3 (Receitas): R$ ${raizReceitas?.finalBalance}`);
-  console.log(`Conta 4 (Custos): R$ ${raizCustos?.finalBalance}`);
+  console.log(`Conta 3 (Receitas): R$ ${raizReceitas?.closingBalance}`);
+  console.log(`Conta 4 (Custos): R$ ${raizCustos?.closingBalance}`);
   
-  const resultadoRaiz = Math.abs(Number(raizReceitas?.finalBalance || 0)) - Number(raizCustos?.finalBalance || 0);
+  const resultadoRaiz = Math.abs(Number(raizReceitas?.closingBalance || 0)) - Number(raizCustos?.closingBalance || 0);
   console.log(`Resultado (|3| - 4): R$ ${resultadoRaiz.toFixed(2)}`);
 }
 

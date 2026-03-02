@@ -15,7 +15,7 @@ interface IndicatorCardProps {
   invertColors?: boolean; // Para índices onde valores baixos são melhores
 }
 
-export default function IndicatorCard({ 
+export function IndicatorCard({ 
   title, 
   values, 
   type,

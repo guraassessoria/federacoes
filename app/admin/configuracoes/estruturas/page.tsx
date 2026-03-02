@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_ENDPOINTS } from '@/lib/constants';
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -36,7 +37,7 @@ export default function AdminConfiguracoesPage() {
 
   const fetchStructures = async () => {
     try {
-      const res = await fetch("/api/admin/standard-files", { cache: "no-store" });
+      const res = await fetch(API_ENDPOINTS.ADMIN_STANDARD_FILES, { cache: "no-store" });
       const data = await res.json();
       setStructures(data.structures || []);
     } catch (error) {

@@ -13,7 +13,7 @@ interface LineChartProps {
   yAxisLabel?: string;
 }
 
-export default function CustomLineChart({ data, lines, yAxisLabel }: LineChartProps) {
+export function CustomLineChart({ data, lines, yAxisLabel }: LineChartProps) {
   const safeData = data ?? [];
   const safeLines = lines ?? [];
   

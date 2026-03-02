@@ -1,12 +1,11 @@
-import { S3Client } from "@aws-sdk/client-s3";
+// AWS configuration helpers are deprecated.
+// Storage is now handled via Vercel Blob provider.  
+// If this file is accidentally imported, throw to alert the caller.
 
 export function getBucketConfig() {
-  return {
-    bucketName: process.env.AWS_BUCKET_NAME ?? "",
-    folderPrefix: process.env.AWS_FOLDER_PREFIX ?? ""
-  };
+  throw new Error("AWS bucket config is deprecated; use Vercel Blob storage instead.");
 }
 
 export function createS3Client() {
-  return new S3Client({});
+  throw new Error("AWS S3 client deprecated; use Vercel Blob storage instead.");
 }

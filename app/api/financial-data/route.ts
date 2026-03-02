@@ -24,6 +24,8 @@ import {
   ContaComValor,
   DeParaRecord 
 } from "@/lib/services/estruturaMapping";
+import { FinancialDataQuerySchema } from "@/lib/validators";
+import { handleApiError } from "@/lib/errorHandler";
 
 export const dynamic = "force-dynamic";
 
@@ -43,14 +45,18 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get("companyId");
-    const viewMode = searchParams.get("viewMode") || "anual";
-    const year = searchParams.get("year") || "2025";
-    const month = searchParams.get("month") || "12";
-
-    if (!companyId) {
-      return NextResponse.json({ error: "companyId é obrigatório" }, { status: 400 });
+    let params;
+    try {
+      params = FinancialDataQuerySchema.parse(Object.fromEntries(searchParams.entries()));
+    } catch (err) {
+      if (err instanceof Error && 'errors' in err) {
+        // ZodError
+        return NextResponse.json({ error: 'Invalid parameters', details: (err as any).errors }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
     }
+
+    const { companyId, viewMode, year, month } = params;
 
     // Verifica acesso à empresa
     const userCompany = await prisma.userCompany.findFirst({
@@ -65,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Busca todos os períodos disponíveis para a empresa
-    const periods = await prisma.balanceteData.findMany({
+    const periods = await prisma.balancete.findMany({
       where: { companyId },
       select: { period: true },
       distinct: ["period"],
@@ -105,15 +111,15 @@ export async function GET(request: NextRequest) {
     let lastProcessedAccounts: ReturnType<typeof processBalanceteData> = [];
 
     for (const period of filteredPeriods) {
-      const balanceteData = await prisma.balanceteData.findMany({
+      const balancetes = await prisma.balancete.findMany({
         where: {
           companyId,
           period,
         },
       });
 
-      if (balanceteData.length > 0) {
-        const processedAccounts = processBalanceteData(balanceteData);
+      if (balancetes.length > 0) {
+        const processedAccounts = processBalanceteData(balancetes);
         lastProcessedAccounts = processedAccounts; // Guarda para uso nos hierárquicos
         const bp = groupAccountsForBP(processedAccounts);
         const dre = groupAccountsForDRE(processedAccounts);
@@ -148,7 +154,7 @@ export async function GET(request: NextRequest) {
         let estruturaDREMensal: ContaComValor[] | null = null;
         try {
           // Busca dados do balancete APENAS deste mês
-          const balanceteMes = await prisma.balanceteData.findMany({
+          const balanceteMes = await prisma.balancete.findMany({
             where: { companyId, period: monthData.period },
           });
 
@@ -218,7 +224,7 @@ export async function GET(request: NextRequest) {
       
       if (yearlyData) {
         // Busca todos os dados do balancete para o ano
-        const allBalanceteData = await prisma.balanceteData.findMany({
+        const allBalancetes = await prisma.balancete.findMany({
           where: {
             companyId,
             period: { in: filteredPeriods },
@@ -231,7 +237,7 @@ export async function GET(request: NextRequest) {
         let resultadoDRE: number = 0;
         let totalPassivoPL: number = 0;
         
-        if (allBalanceteData.length > 0) {
+        if (allBalancetes.length > 0) {
   try {
     // Carrega o de-para do banco para a empresa
     const deParaRows = await prisma.deParaMapping.findMany({
@@ -253,7 +259,7 @@ export async function GET(request: NextRequest) {
     }));
     console.log(`[financial-data] De-para: ${deParaRecords.length} registros`);
     
-    const processado = await processarDadosFinanceiros(allBalanceteData, deParaRecords);
+    const processado = await processarDadosFinanceiros(allBalancetes, deParaRecords);
             estruturaDRE = processado.dre;
             estruturaBP = processado.bp;
             resultadoDRE = processado.resultadoDRE;
@@ -308,11 +314,8 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (error) {
-    console.error("Erro ao buscar dados financeiros:", error);
-    return NextResponse.json(
-      { error: "Erro interno ao processar dados financeiros" },
-      { status: 500 }
-    );
+    const { status, body } = handleApiError(error);
+    return NextResponse.json(body, { status });
   }
 }
 

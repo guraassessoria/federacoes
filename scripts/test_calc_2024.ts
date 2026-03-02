@@ -122,7 +122,7 @@ function ajustarSinal(valor: number, accountNumber: string): number {
 }
 
 async function main() {
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' },
     orderBy: { accountNumber: 'asc' }
   });
@@ -138,7 +138,7 @@ async function main() {
   for (const conta of folhas) {
     const mapeamento = MAPEAMENTO_DRE_ANALITICAS[conta.accountNumber];
     if (mapeamento) {
-      const valorOriginal = Number(conta.finalBalance) || 0;
+      const valorOriginal = Number(conta.closingBalance) || 0;
       const valorAjustado = ajustarSinal(valorOriginal, conta.accountNumber);
       valoresPorCodigo[mapeamento.codigoPadrao] = (valoresPorCodigo[mapeamento.codigoPadrao] || 0) + valorAjustado;
     }

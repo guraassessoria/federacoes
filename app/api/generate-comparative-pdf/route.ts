@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -510,12 +511,12 @@ export async function POST(request: NextRequest) {
 
     // Processar cada federação
     for (const company of companies) {
-      const balanceteData = await prisma.balanceteData.findMany({
+      const balancetes = await prisma.balancete.findMany({
         where: {
           companyId: company.id,
           period: { contains: `/${yearShort}` }
         },
-        orderBy: { accountNumber: 'asc' }
+        orderBy: { accountCode: 'asc' }
       });
 
   let dre: ContaComValor[];
@@ -523,7 +524,7 @@ export async function POST(request: NextRequest) {
       let resultadoDRE: number;
       let totalPassivoPL: number;
 
-      if (balanceteData.length === 0) {
+      if (balancetes.length === 0) {
         // Gerar dados fictícios para empresa sem balancete
         console.log(`Sem dados reais para ${company.name} — usando dados fictícios`);
         const demo = gerarDadosFicticiosComparativo(year);
@@ -544,7 +545,7 @@ export async function POST(request: NextRequest) {
           padraoDFC: r.padraoDFC,
           padraoDMPL: r.padraoDMPL,
         }));
-        const processado = await processarDadosFinanceiros(balanceteData, deParaRecords);
+        const processado = await processarDadosFinanceiros(balancetes, deParaRecords);
         dre = processado.dre;
         bp = processado.bp;
         resultadoDRE = processado.resultadoDRE;
@@ -665,10 +666,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Erro ao gerar relatório comparativo:', error);
-    return NextResponse.json({ 
-      error: 'Erro ao gerar relatório comparativo',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, { status: 500 });
+    const { status, body } = handleApiError(error);
+    body.error = body.error || 'Erro ao gerar relatório comparativo';
+    return NextResponse.json(body, { status });
   }
 }

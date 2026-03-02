@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ClearDataBodySchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/errorHandler';
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { companyId, startPeriod, endPeriod, dataTypes } = body;
+    const parseResult = ClearDataBodySchema.safeParse(body);
+    if (!parseResult.success) {
+      const { status, body: errBody } = handleApiError(parseResult.error);
+      return NextResponse.json(errBody, { status });
+    }
+    const { companyId, startPeriod, endPeriod, dataTypes } = parseResult.data;
 
     if (!companyId) {
       return NextResponse.json(
@@ -87,7 +94,7 @@ export async function DELETE(request: NextRequest) {
       const periodsToDelete = filesToDelete.map((f) => f.period).filter(Boolean) as string[];
 
       // Deletar dados do balancete
-      const deletedData = await prisma.balanceteData.deleteMany({
+      const deletedData = await prisma.balancete.deleteMany({
         where: {
           companyId,
           period: { in: periodsToDelete },

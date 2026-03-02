@@ -73,9 +73,9 @@ function encontrarCodigoPadrao(accountNumber: string): { codigo: string; descric
 }
 
 async function main() {
-  const contas = await prisma.balanceteData.findMany({
+  const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
-    select: { accountNumber: true, accountDescription: true, finalBalance: true },
+    select: { accountCode: true, accountDescription: true, closingBalance: true },
     distinct: ['accountNumber'],
     orderBy: { accountNumber: 'asc' }
   });
@@ -107,7 +107,7 @@ async function main() {
   
   for (const conta of folhas.filter(c => c.accountNumber.startsWith('3') || c.accountNumber.startsWith('4'))) {
     const mapping = encontrarCodigoPadrao(conta.accountNumber);
-    const valor = Number(conta.finalBalance);
+    const valor = Number(conta.closingBalance);
     
     if (mapping) {
       if (!valoresPorCodigo[mapping.codigo]) {
@@ -131,8 +131,8 @@ async function main() {
   }
   
   // Totais
-  const totalReceitas = folhas.filter(c => c.accountNumber.startsWith('3')).reduce((s, c) => s + Number(c.finalBalance), 0);
-  const totalCustos = folhas.filter(c => c.accountNumber.startsWith('4')).reduce((s, c) => s + Number(c.finalBalance), 0);
+  const totalReceitas = folhas.filter(c => c.accountCode.startsWith('3')).reduce((s, c) => s + Number(c.closingBalance), 0);
+  const totalCustos = folhas.filter(c => c.accountCode.startsWith('4')).reduce((s, c) => s + Number(c.closingBalance), 0);
   
   console.log('\n=== TOTAIS DO BALANCETE ===');
   console.log(`RECEITAS (soma folhas): ${totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
@@ -143,8 +143,8 @@ async function main() {
   const receitaRaiz = contas.find(c => c.accountNumber === '3');
   const custoRaiz = contas.find(c => c.accountNumber === '4');
   console.log('\n=== CONTAS RAIZ (verificação) ===');
-  console.log(`RECEITAS (3): ${receitaRaiz?.finalBalance}`);
-  console.log(`CUSTOS (4): ${custoRaiz?.finalBalance}`);
+  console.log(`RECEITAS (3): ${receitaRaiz?.closingBalance}`);
+  console.log(`CUSTOS (4): ${custoRaiz?.closingBalance}`);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

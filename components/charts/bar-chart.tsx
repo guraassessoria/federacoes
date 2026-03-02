@@ -15,7 +15,7 @@ interface BarChartProps {
   showPercent?: boolean;
 }
 
-export default function CustomBarChart({ data, bars, layout = 'horizontal', stacked = false, showPercent = false }: BarChartProps) {
+export function CustomBarChart({ data, bars, layout = 'horizontal', stacked = false, showPercent = false }: BarChartProps) {
   const safeData = data ?? [];
   const safeBars = bars ?? [];
   

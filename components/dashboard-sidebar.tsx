@@ -39,7 +39,7 @@ interface DashboardSidebarProps {
   companyName: string;
 }
 
-export default function DashboardSidebar({ userRole, companyName }: DashboardSidebarProps) {
+export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   
@@ -75,7 +75,7 @@ export default function DashboardSidebar({ userRole, companyName }: DashboardSid
     const fetchCompanies = async () => {
       setLoadingCompanies(true);
       try {
-        const res = await fetch("/api/user/companies");
+        const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (res.ok) {
           const data = await res.json();
           setCompanies(data.companies || []);

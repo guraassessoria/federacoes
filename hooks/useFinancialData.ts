@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
+import { API_ENDPOINTS } from "@/lib/constants";
 import type {
   ProcessedBP,
   ProcessedDRE,
@@ -62,7 +63,7 @@ export function useFinancialData(): UseFinancialDataReturn {
         month: selectedMonth,
       });
 
-      const response = await fetch(`/api/financial-data?${params}`);
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params}`);
       
       if (!response.ok) {
         throw new Error("Erro ao buscar dados financeiros");

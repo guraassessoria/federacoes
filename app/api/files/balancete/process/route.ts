@@ -323,7 +323,7 @@ export async function POST(request: NextRequest) {
     console.log("Column mapping:", colMap);
 
     // Verificar se encontramos as colunas necessárias
-    const requiredCols = ['period', 'accountNumber', 'accountDescription', 'finalBalance'];
+    const requiredCols = ['period', 'accountNumber', 'accountDescription', 'finalBalance']; // header names unchanged
     const missingCols = requiredCols.filter(col => colMap[col] === undefined);
     
     if (missingCols.length > 0) {
@@ -337,12 +337,12 @@ export async function POST(request: NextRequest) {
     const dataToInsert: {
       companyId: string;
       period: string;
-      accountNumber: string;
+      accountCode: string;
       accountDescription: string;
-      previousBalance: number;
+      openingBalance: number;
       debit: number;
       credit: number;
-      finalBalance: number;
+      closingBalance: number;
       accountNature: string;
     }[] = [];
 
@@ -356,7 +356,27 @@ export async function POST(request: NextRequest) {
       periodsFound.add(period);
       
       const accountNumber = String(row[colMap.accountNumber] || '');
-      const accountDescription = String(row[colMap.accountDescription] || '');
+      const accountDescription = String(row[colMap.accountDescription] || ''); // description
+      
+      // convert number statuses
+      const prevBal = colMap.previousBalance ? parseDecimal(row[colMap.previousBalance]) : 0;
+      const debitVal = colMap.debit ? parseDecimal(row[colMap.debit]) : 0;
+      const creditVal = colMap.credit ? parseDecimal(row[colMap.credit]) : 0;
+      const finalBal = colMap.finalBalance ? parseDecimal(row[colMap.finalBalance]) : 0;
+      const nature = colMap.accountNature ? String(row[colMap.accountNature] || 'D').trim() : 'D';
+
+      dataToInsert.push({
+        companyId,
+        period,
+        accountCode: accountNumber,
+        accountDescription,
+        openingBalance: prevBal,
+        debit: debitVal,
+        credit: creditVal,
+        closingBalance: finalBal,
+        accountNature: nature,
+      });
+    }
       
       if (!accountNumber) continue;
       
@@ -378,7 +398,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Deletar dados antigos dos períodos encontrados
-    await prisma.balanceteData.deleteMany({
+    await prisma.balancete.deleteMany({
       where: {
         companyId,
         period: { in: Array.from(periodsFound) },
@@ -391,7 +411,7 @@ export async function POST(request: NextRequest) {
     
     for (let i = 0; i < dataToInsert.length; i += batchSize) {
       const batch = dataToInsert.slice(i, i + batchSize);
-      await prisma.balanceteData.createMany({
+      await prisma.balancete.createMany({
         data: batch,
       });
       insertedCount += batch.length;

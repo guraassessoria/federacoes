@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { API_ENDPOINTS } from '@/lib/constants';
 import {
   Users,
   UserPlus,
@@ -65,8 +66,8 @@ export default function AdminUsuariosPage() {
   const fetchData = async () => {
     try {
       const [usersRes, companiesRes] = await Promise.all([
-        fetch("/api/users"),
-        fetch("/api/companies"),
+        fetch(API_ENDPOINTS.USERS),
+        fetch(API_ENDPOINTS.COMPANIES),
       ]);
       const usersData = await usersRes.json();
       const companiesData = await companiesRes.json();
@@ -116,7 +117,7 @@ export default function AdminUsuariosPage() {
     setError("");
 
     try {
-      const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
+      const url = editingUser ? API_ENDPOINTS.USER(editingUser.id) : API_ENDPOINTS.USERS;
       const method = editingUser ? "PUT" : "POST";
 
       // Para edição, só enviar senha se foi preenchida
@@ -153,7 +154,7 @@ export default function AdminUsuariosPage() {
     setError("");
 
     try {
-      const res = await fetch(`/api/users/${deletingUser.id}`, {
+      const res = await fetch(API_ENDPOINTS.USER(deletingUser.id), {
         method: "DELETE",
       });
 

@@ -75,9 +75,9 @@ function ajustarSinal(valor: number, accountNumber: string): number {
 }
 
 async function main() {
-  const contas = await prisma.balanceteData.findMany({
+  const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
-    select: { accountNumber: true, accountDescription: true, finalBalance: true },
+    select: { accountCode: true, accountDescription: true, closingBalance: true },
     distinct: ['accountNumber'],
     orderBy: { accountNumber: 'asc' }
   });
@@ -96,7 +96,7 @@ async function main() {
   
   for (const conta of folhas.filter(c => c.accountNumber.startsWith('1') || c.accountNumber.startsWith('2'))) {
     const mapping = encontrarCodigoPadrao(conta.accountNumber);
-    const valorAjustado = ajustarSinal(Number(conta.finalBalance), conta.accountNumber);
+    const valorAjustado = ajustarSinal(Number(conta.closingBalance), conta.accountCode);
     
     if (mapping) {
       if (!valoresPorCodigo[mapping.codigo]) {

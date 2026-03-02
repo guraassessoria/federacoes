@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, flattenHierarchy, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -472,15 +473,15 @@ export async function POST(request: NextRequest) {
     // Buscar dados do balancete
     // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
     const yearShort = year ? year.slice(-2) : '25';
-    const balanceteData = await prisma.balanceteData.findMany({
+    const balancetes = await prisma.balancete.findMany({
       where: {
         companyId,
         period: { contains: `/${yearShort}` }
       },
-      orderBy: { accountNumber: 'asc' }
+      orderBy: { accountCode: 'asc' }
     });
 
-    if (balanceteData.length === 0) {
+    if (balancetes.length === 0) {
       return NextResponse.json({ 
         error: `Nenhum dado de balancete encontrado para o ano ${yearShort}` 
       }, { status: 404 });
@@ -498,7 +499,7 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
   padraoDFC: r.padraoDFC,
   padraoDMPL: r.padraoDMPL,
 }));
-    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
+    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balancetes, deParaRecords);
 
     // Gerar HTML
     const periodo = year || `20${yearShort}`;
@@ -604,10 +605,9 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     });
 
   } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
-    return NextResponse.json({ 
-      error: 'Erro ao gerar relatório',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, { status: 500 });
+    const { status, body } = handleApiError(error);
+    // augment message for this context
+    body.error = body.error || 'Erro ao gerar relatório';
+    return NextResponse.json(body, { status });
   }
 }

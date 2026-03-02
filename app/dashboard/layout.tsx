@@ -3,7 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import DashboardSidebar from "@/components/dashboard-sidebar";
+import { API_ENDPOINTS } from "@/lib/constants";
+import { DashboardSidebar } from "@/components";
 import { DashboardProvider } from "@/lib/contexts/DashboardContext";
 
 export default function DashboardLayout({
@@ -26,7 +27,7 @@ export default function DashboardLayout({
       const companyId = localStorage.getItem("selectedCompany");
       if (companyId) {
         try {
-          const res = await fetch("/api/user/companies");
+          const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
           const data = await res.json();
           const company = data.companies?.find((c: { id: string }) => c.id === companyId);
           if (company) {

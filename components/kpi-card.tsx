@@ -22,7 +22,7 @@ const colorClasses = {
   red: 'from-red-500 to-red-600',
 };
 
-export default function KPICard({ title, value, previousValue, change, icon: Icon, color = 'blue', delay = 0 }: KPICardProps) {
+export function KPICard({ title, value, previousValue, change, icon: Icon, color = 'blue', delay = 0 }: KPICardProps) {
   const changeValue = change ?? 0;
   
   return (

@@ -94,24 +94,39 @@ export default function DashboardPage() {
     patrimonioLiquido = bp.patrimonioLiquido?.["TOTAL_PATRIMONIO_LIQUIDO"] || 0;
   }
 
-  // Composição de receitas (formato flat)
-  const receitasData = dre?.receitas
+  // Composição até o 2º nível da DRE (com fallback flat)
+  const receitasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["51", "56", "1"]);
+  const custosEstruturaData = montarComposicaoNivel2(estruturaDRE, ["57", "52"]);
+  const despesasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["110", "104"]);
+
+  const receitasFlatData = dre?.receitas
     ? Object.entries(dre.receitas).map(([name, value]) => ({
         name: name.replace(/_/g, " "),
-        value: value as number,
+        value: Math.abs(value as number),
       }))
     : [];
 
-  // Composição de custos (formato flat)
-  const custosData = dre?.custos
+  const custosFlatData = dre?.custos
     ? Object.entries(dre.custos).map(([name, value]) => ({
         name: name.replace(/_/g, " "),
-        value: value as number,
+        value: Math.abs(value as number),
       }))
     : [];
+
+  const despesasFlatData = dre?.despesas
+    ? Object.entries(dre.despesas).map(([name, value]) => ({
+        name: name.replace(/_/g, " "),
+        value: Math.abs(value as number),
+      }))
+    : [];
+
+  const receitasData = receitasEstruturaData.length > 0 ? receitasEstruturaData : receitasFlatData;
+  const custosData = custosEstruturaData.length > 0 ? custosEstruturaData : custosFlatData;
+  const despesasData = despesasEstruturaData.length > 0 ? despesasEstruturaData : despesasFlatData;
 
   const receitasColors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
   const custosColors = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#6366F1"];
+  const despesasColors = ["#F43F5E", "#FB7185", "#E11D48", "#BE123C", "#9F1239"];
 
   // Dados para gráfico de evolução
   const lineChartData = data.months
@@ -219,15 +234,29 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Costs Pie Chart */}
-      {custosData.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-          className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Custos</h2>
-          <div className="h-80">
-            <CustomPieChart data={custosData} colors={custosColors} />
-          </div>
-        </motion.div>
+      {/* Costs / Expenses Pie Charts */}
+      {(custosData.length > 0 || despesasData.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {custosData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+              className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Custos</h2>
+              <div className="h-80">
+                <CustomPieChart data={custosData} colors={custosColors} />
+              </div>
+            </motion.div>
+          )}
+
+          {despesasData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+              className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Despesas</h2>
+              <div className="h-80">
+                <CustomPieChart data={despesasData} colors={despesasColors} />
+              </div>
+            </motion.div>
+          )}
+        </div>
       )}
 
       {/* Alerts */}
@@ -250,4 +279,62 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+function flattenEstrutura(contas: any[]): any[] {
+  const result: any[] = [];
+  const walk = (items: any[]) => {
+    for (const item of items || []) {
+      result.push(item);
+      if (item.children?.length) {
+        walk(item.children);
+      }
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function montarComposicaoNivel2(
+  estruturaDRE: any[] | undefined,
+  rootCodes: string[],
+): Array<{ name: string; value: number }> {
+  if (!estruturaDRE || estruturaDRE.length === 0) return [];
+
+  const flat = flattenEstrutura(estruturaDRE);
+  const parentMap = new Map<string, string | null>();
+  flat.forEach((conta) => {
+    parentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+  });
+
+  const isUnderRoot = (codigo: string): boolean => {
+    let current = codigo;
+    const visited = new Set<string>();
+
+    while (current && !visited.has(current)) {
+      if (rootCodes.includes(current)) return true;
+      visited.add(current);
+      current = parentMap.get(current) || '';
+    }
+
+    return false;
+  };
+
+  const usados = new Set<string>();
+  return flat
+    .filter((conta) => {
+      const nivel = conta.nivelVisualizacao || conta.nivel || 0;
+      return nivel === 2 && isUnderRoot(conta.codigo);
+    })
+    .filter((conta) => {
+      if (usados.has(conta.codigo)) return false;
+      usados.add(conta.codigo);
+      return true;
+    })
+    .map((conta) => ({
+      name: conta.descricao,
+      value: Math.abs(Number(conta.valor || 0)),
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 }

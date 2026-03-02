@@ -5,7 +5,7 @@ import KPICard from "@/components/kpi-card";
 import AlertCard from "@/components/alert-card";
 import CustomLineChart from "@/components/charts/line-chart";
 import CustomPieChart from "@/components/charts/pie-chart";
-import { DollarSign, TrendingUp, PiggyBank, Wallet, AlertCircle, Info } from "lucide-react";
+import { DollarSign, TrendingUp, PiggyBank, Wallet, AlertCircle, Info, Building2 } from "lucide-react";
 import { useFinancialData, useFinancialFormatters } from "@/hooks/useFinancialData";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
 
@@ -67,6 +67,7 @@ export default function DashboardPage() {
   let receitaTotal = 0;
   let resultadoLiquido = 0;
   let ativoTotal = 0;
+  let passivoTotal = 0;
   let patrimonioLiquido = 0;
 
   if (estruturaDRE && estruturaDRE.length > 0) {
@@ -81,9 +82,15 @@ export default function DashboardPage() {
 
   if (estruturaBP && estruturaBP.length > 0) {
     ativoTotal = buscarValorEstrutura(estruturaBP, '1') || 0;
+    const passivoCirculante = buscarValorEstrutura(estruturaBP, '77') || 0;
+    const passivoNaoCirculante = buscarValorEstrutura(estruturaBP, '113') || 0;
+    passivoTotal = passivoCirculante + passivoNaoCirculante;
     patrimonioLiquido = buscarValorEstrutura(estruturaBP, '125') || 0;
   } else if (bp) {
     ativoTotal = bp.totalAtivo || 0;
+    const passivoCirculante = bp.passivoCirculante?.["TOTAL_PASSIVO_CIRCULANTE"] || 0;
+    const passivoNaoCirculante = bp.passivoNaoCirculante?.["TOTAL_PASSIVO_NAO_CIRCULANTE"] || 0;
+    passivoTotal = passivoCirculante + passivoNaoCirculante;
     patrimonioLiquido = bp.patrimonioLiquido?.["TOTAL_PATRIMONIO_LIQUIDO"] || 0;
   }
 
@@ -153,10 +160,11 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <KPICard title="Receita Total" value={formatCurrency(receitaTotal)} change={0} icon={DollarSign} color="blue" />
         <KPICard title="Resultado Líquido" value={formatCurrency(resultadoLiquido)} change={0} icon={TrendingUp} color={resultadoLiquido >= 0 ? "green" : "red"} />
         <KPICard title="Ativo Total" value={formatCurrency(ativoTotal)} change={0} icon={PiggyBank} color="purple" />
+        <KPICard title="Passivo Total" value={formatCurrency(passivoTotal)} change={0} icon={Building2} color="red" />
         <KPICard title="Patrimônio Líquido" value={formatCurrency(patrimonioLiquido)} change={0} icon={Wallet} color="orange" />
       </div>
 

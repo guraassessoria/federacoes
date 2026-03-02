@@ -506,12 +506,16 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     );
 
     // Verificar se API de PDF está configurada
-    const html2pdfUrl = process.env.HTML2PDF_API_URL;
-    const html2pdfKey = process.env.HTML2PDF_API_KEY;
+    const html2pdfUrl = process.env.HTML2PDF_API_URL || process.env.NEXT_PUBLIC_HTML2PDF_API_URL;
+    const html2pdfKey = process.env.HTML2PDF_API_KEY || process.env.NEXT_PUBLIC_HTML2PDF_API_KEY;
 
     if (!html2pdfUrl || !html2pdfKey) {
+      const missingVars = [
+        !html2pdfUrl ? 'HTML2PDF_API_URL (ou NEXT_PUBLIC_HTML2PDF_API_URL)' : null,
+        !html2pdfKey ? 'HTML2PDF_API_KEY (ou NEXT_PUBLIC_HTML2PDF_API_KEY)' : null,
+      ].filter(Boolean);
       return NextResponse.json({
-        error: 'Serviço de geração de PDF não configurado. Defina HTML2PDF_API_URL e HTML2PDF_API_KEY.'
+        error: `Serviço de geração de PDF não configurado. Variáveis ausentes: ${missingVars.join(', ')}.`
       }, { status: 500 });
     }
 

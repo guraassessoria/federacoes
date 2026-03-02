@@ -54,6 +54,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
     setSelectedMonth,
     selectedCompanyId,
     setSelectedCompanyId,
+    selectedCompanyName,
+    setSelectedCompanyName,
     availableYears,
     availableMonths,
     refreshData,
@@ -109,8 +111,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompanyId(company.id);
-    localStorage.setItem("selectedCompany", company.id);
-    localStorage.setItem("selectedCompanyName", company.name);
+    setSelectedCompanyName(company.name);
     setIsDropdownOpen(false);
     refreshData();
   };
@@ -192,7 +193,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
           >
             <div className="flex-1 min-w-0">
               <p className="text-xs text-blue-200">Empresa Selecionada</p>
-              <p className="text-sm font-medium truncate">{companyName || "Selecione uma empresa"}</p>
+              <p className="text-sm font-medium truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
             </div>
             <ChevronDown className={cn(
               "w-4 h-4 text-blue-200 transition-transform flex-shrink-0",

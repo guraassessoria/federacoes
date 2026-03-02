@@ -1030,8 +1030,8 @@ export default function DemonstracoesPage() {
                   {ytdMonths.map((month) => (
                     <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
                   ))}
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
                   <th className="text-right px-3 py-3 font-semibold text-slate-700">{selectedYear}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
                   <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
                 </tr>
               </thead>
@@ -1049,11 +1049,11 @@ export default function DemonstracoesPage() {
                         {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
                       </td>
                     ))}
-                    <td className="text-right px-3 py-2 font-medium text-slate-700">
-                      {formatCurrency(row.previousYTD / 1000)}
-                    </td>
                     <td className="text-right px-3 py-2 font-medium text-slate-900">
                       {formatCurrency(row.currentYTD / 1000)}
+                    </td>
+                    <td className="text-right px-3 py-2 font-medium text-slate-700">
+                      {formatCurrency(row.previousYTD / 1000)}
                     </td>
                     <td className={`text-right px-3 py-2 font-semibold ${row.variationPct > 0 ? 'text-emerald-600' : row.variationPct < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                       {row.variationPct > 0 ? '+' : ''}{row.variationPct.toFixed(2)}%

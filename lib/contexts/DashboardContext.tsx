@@ -16,6 +16,7 @@ interface DashboardContextType {
   selectedCompanyId: string | null;
   setSelectedCompanyId: (id: string | null) => void;
   selectedCompanyName: string;
+  setSelectedCompanyName: (name: string) => void;
   refreshData: () => void;
   dataVersion: number;
   availableYears: string[];
@@ -87,6 +88,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("selectedCompany", id);
     } else {
       localStorage.removeItem("selectedCompany");
+      setSelectedCompanyName("");
+      localStorage.removeItem("selectedCompanyName");
+    }
+  }, []);
+
+  const setSelectedCompanyNameValue = useCallback((name: string) => {
+    setSelectedCompanyName(name);
+    if (name) {
+      localStorage.setItem("selectedCompanyName", name);
+    } else {
+      localStorage.removeItem("selectedCompanyName");
     }
   }, []);
 
@@ -106,6 +118,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         selectedCompanyId,
         setSelectedCompanyId,
         selectedCompanyName,
+        setSelectedCompanyName: setSelectedCompanyNameValue,
         refreshData,
         dataVersion,
         availableYears: YEARS,

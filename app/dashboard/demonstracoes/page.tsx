@@ -237,6 +237,17 @@ const dvaData: Record<string, Record<string, number>> = {
   }
 };
 
+function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): number | undefined {
+  for (const conta of contas) {
+    if (conta.codigo === codigo) return conta.valor;
+    if (conta.children?.length) {
+      const nested = buscarContaPorCodigo(conta.children, codigo);
+      if (nested !== undefined) return nested;
+    }
+  }
+  return undefined;
+}
+
 export default function DemonstracoesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('bp');
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Ativo Circulante', 'Patrimonio Liquido', 'Receitas Operacionais', 'Resultados', 'Atividades Operacionais', 'Variacao do Caixa', 'Capital Social', 'Total Patrimonio Liquido', 'Receitas', 'Distribuicao - Pessoal']);
@@ -669,9 +680,35 @@ export default function DemonstracoesPage() {
 
   const groups = getGroups();
 
+  const getDreChartValue = (year: string, groupTitle: string): number => {
+    const estrutura = financialData[year]?.estruturaDRE;
+    if (!estrutura || estrutura.length === 0) return 0;
+
+    const groupCodes: Record<string, string[]> = {
+      'Receitas Operacionais': ['56', '51'],
+      'Custos': ['57'],
+      'Despesas Operacionais': ['110'],
+      'Resultados': ['229', '227', '225', '210'],
+    };
+
+    const codes = groupCodes[groupTitle];
+    if (!codes) return 0;
+
+    for (const code of codes) {
+      const value = buscarContaPorCodigo(estrutura, code);
+      if (value !== undefined) return value / 1000;
+    }
+
+    return 0;
+  };
+
   const chartData = groups.map(g => ({
     name: g.title.substring(0, 15),
-    [selectedYear]: Math.abs(getValue(selectedYear, g.total))
+    [selectedYear]: Math.abs(
+      activeTab === 'dre'
+        ? (getDreChartValue(selectedYear, g.title) || getValue(selectedYear, g.total))
+        : getValue(selectedYear, g.total)
+    )
   }));
 
   const getTabTitle = () => {

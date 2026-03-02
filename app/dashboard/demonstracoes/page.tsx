@@ -936,34 +936,85 @@ export default function DemonstracoesPage() {
         .find((contas) => Array.isArray(contas) && contas.length > 0) ||
       [];
 
-    const structureOrderMap = new Map<string, number>();
-    flattenContas(templateContas)
+    const canonicalRows = flattenContas(templateContas)
       .filter((conta) => (conta.nivelVisualizacao || 1) <= 2)
-      .forEach((conta) => {
-        if (!structureOrderMap.has(conta.codigo)) {
-          structureOrderMap.set(conta.codigo, structureOrderMap.size);
+      .reduce((acc, conta) => {
+        if (!acc.some((item) => item.codigo === conta.codigo)) {
+          acc.push(conta);
         }
-      });
+        return acc;
+      }, [] as ContaComValor[]);
 
-    const rowMap = new Map<string, { codigo: string; descricao: string; nivel: number; monthlyValues: Record<string, number> }>();
+    if (canonicalRows.length === 0) {
+      return [];
+    }
+
+    const structureOrderMap = new Map<string, number>();
+    canonicalRows.forEach((conta, index) => {
+      structureOrderMap.set(conta.codigo, index);
+    });
+
+    const canonicalParentMap = new Map<string, string | null>();
+    canonicalRows.forEach((conta) => {
+      canonicalParentMap.set(conta.codigo, conta.codigoSuperior);
+    });
+
+    const canonicalLastDescendantOrder = new Map<string, number>();
+    canonicalRows.forEach((conta, index) => {
+      let ancestor = conta.codigoSuperior;
+      const visited = new Set<string>();
+      while (ancestor && !visited.has(ancestor)) {
+        visited.add(ancestor);
+        const previousMax = canonicalLastDescendantOrder.get(ancestor) ?? structureOrderMap.get(ancestor) ?? -1;
+        if (index > previousMax) {
+          canonicalLastDescendantOrder.set(ancestor, index);
+        }
+        ancestor = canonicalParentMap.get(ancestor) ?? null;
+      }
+    });
+
+    const rowMap = new Map<string, {
+      codigo: string;
+      descricao: string;
+      nivel: number;
+      codigoSuperior: string | null;
+      monthlyValues: Record<string, number>;
+    }>();
+    canonicalRows.forEach((conta) => {
+      rowMap.set(conta.codigo, {
+        codigo: conta.codigo,
+        descricao: conta.descricao,
+        nivel: conta.nivelVisualizacao || 1,
+        codigoSuperior: conta.codigoSuperior,
+        monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
+      });
+    });
 
     const ensureRow = (conta: ContaComValor) => {
-      if (!rowMap.has(conta.codigo)) {
-        rowMap.set(conta.codigo, {
-          codigo: conta.codigo,
-          descricao: conta.descricao,
-          nivel: conta.nivelVisualizacao || 1,
-          monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
-        });
+      const existing = rowMap.get(conta.codigo);
+      if (existing) {
+        if (!existing.codigoSuperior && conta.codigoSuperior) {
+          existing.codigoSuperior = conta.codigoSuperior;
+        }
+        return existing;
       }
+
+      const created = {
+        codigo: conta.codigo,
+        descricao: conta.descricao,
+        nivel: conta.nivelVisualizacao || 1,
+        codigoSuperior: conta.codigoSuperior,
+        monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
+      };
+      rowMap.set(conta.codigo, created);
+      return created;
     };
 
     MONTHS.forEach((month) => {
       const contasMes = currentYearMonths[month.value] || [];
       const flat = flattenContas(contasMes).filter((c) => (c.nivelVisualizacao || 1) <= 2);
       flat.forEach((conta) => {
-        ensureRow(conta);
-        const row = rowMap.get(conta.codigo)!;
+        const row = ensureRow(conta);
         row.monthlyValues[month.value] = conta.valor || 0;
       });
     });
@@ -973,6 +1024,30 @@ export default function DemonstracoesPage() {
       const flatPrev = flattenContas(contasMesAnterior).filter((c) => (c.nivelVisualizacao || 1) <= 2);
       flatPrev.forEach((conta) => ensureRow(conta));
     });
+
+    const allParentMap = new Map<string, string | null>();
+    rowMap.forEach((row) => {
+      allParentMap.set(row.codigo, row.codigoSuperior ?? null);
+    });
+
+    const getAnchorOrder = (codigo: string): number | undefined => {
+      if (structureOrderMap.has(codigo)) {
+        return structureOrderMap.get(codigo);
+      }
+
+      let parent = allParentMap.get(codigo) ?? null;
+      const visited = new Set<string>();
+
+      while (parent && !visited.has(parent)) {
+        visited.add(parent);
+        if (structureOrderMap.has(parent)) {
+          return structureOrderMap.get(parent);
+        }
+        parent = allParentMap.get(parent) ?? null;
+      }
+
+      return undefined;
+    };
 
     const getYearMonthValue = (yearMonths: Record<string, ContaComValor[]>, month: string, codigo: string) => {
       const contas = yearMonths[month] || [];
@@ -1012,17 +1087,46 @@ export default function DemonstracoesPage() {
         return hasMonthlyValue || hasYtdValue;
       })
       .sort((a, b) => {
-        const orderA = structureOrderMap.get(a.codigo);
-        const orderB = structureOrderMap.get(b.codigo);
+        const isKnownA = structureOrderMap.has(a.codigo);
+        const isKnownB = structureOrderMap.has(b.codigo);
 
-        if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
-        if (orderA !== undefined) return -1;
-        if (orderB !== undefined) return 1;
+        if (isKnownA && isKnownB) {
+          return (structureOrderMap.get(a.codigo) || 0) - (structureOrderMap.get(b.codigo) || 0);
+        }
+
+        if (isKnownA && !isKnownB) {
+          const anchorB = getAnchorOrder(b.codigo);
+          const baseB = anchorB !== undefined
+            ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+            : Number.MAX_SAFE_INTEGER;
+          return (structureOrderMap.get(a.codigo) || 0) - baseB;
+        }
+
+        if (!isKnownA && isKnownB) {
+          const anchorA = getAnchorOrder(a.codigo);
+          const baseA = anchorA !== undefined
+            ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+            : Number.MAX_SAFE_INTEGER;
+          return baseA - (structureOrderMap.get(b.codigo) || 0);
+        }
+
+        const anchorA = getAnchorOrder(a.codigo);
+        const anchorB = getAnchorOrder(b.codigo);
+
+        const anchorBaseA = anchorA !== undefined
+          ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+          : Number.MAX_SAFE_INTEGER;
+        const anchorBaseB = anchorB !== undefined
+          ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+          : Number.MAX_SAFE_INTEGER;
+
+        if (anchorBaseA !== anchorBaseB) return anchorBaseA - anchorBaseB;
 
         const codeA = parseFloat(a.codigo.replace(',', '.'));
         const codeB = parseFloat(b.codigo.replace(',', '.'));
-        if (Number.isNaN(codeA) || Number.isNaN(codeB)) return a.codigo.localeCompare(b.codigo);
-        return codeA - codeB;
+        if (!Number.isNaN(codeA) && !Number.isNaN(codeB) && codeA !== codeB) return codeA - codeB;
+
+        return a.descricao.localeCompare(b.descricao);
       });
   }, [viewMode, monthlyDreData, selectedYear, previousYear, selectedMonth, ytdMonths, flattenContas, getAccountNature]);
 

@@ -922,6 +922,29 @@ export default function DemonstracoesPage() {
     const currentYearMonths = monthlyDreData[selectedYear] || {};
     const previousYearMonths = monthlyDreData[previousYear] || {};
 
+    const monthPriority = [
+      selectedMonth,
+      ...MONTHS.map((m) => m.value).filter((month) => month !== selectedMonth),
+    ];
+
+    const templateContas =
+      monthPriority
+        .map((month) => currentYearMonths[month])
+        .find((contas) => Array.isArray(contas) && contas.length > 0) ||
+      monthPriority
+        .map((month) => previousYearMonths[month])
+        .find((contas) => Array.isArray(contas) && contas.length > 0) ||
+      [];
+
+    const structureOrderMap = new Map<string, number>();
+    flattenContas(templateContas)
+      .filter((conta) => (conta.nivelVisualizacao || 1) <= 2)
+      .forEach((conta) => {
+        if (!structureOrderMap.has(conta.codigo)) {
+          structureOrderMap.set(conta.codigo, structureOrderMap.size);
+        }
+      });
+
     const rowMap = new Map<string, { codigo: string; descricao: string; nivel: number; monthlyValues: Record<string, number> }>();
 
     const ensureRow = (conta: ContaComValor) => {
@@ -989,12 +1012,19 @@ export default function DemonstracoesPage() {
         return hasMonthlyValue || hasYtdValue;
       })
       .sort((a, b) => {
+        const orderA = structureOrderMap.get(a.codigo);
+        const orderB = structureOrderMap.get(b.codigo);
+
+        if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
+        if (orderA !== undefined) return -1;
+        if (orderB !== undefined) return 1;
+
         const codeA = parseFloat(a.codigo.replace(',', '.'));
         const codeB = parseFloat(b.codigo.replace(',', '.'));
         if (Number.isNaN(codeA) || Number.isNaN(codeB)) return a.codigo.localeCompare(b.codigo);
         return codeA - codeB;
       });
-  }, [viewMode, monthlyDreData, selectedYear, previousYear, ytdMonths, flattenContas, getAccountNature]);
+  }, [viewMode, monthlyDreData, selectedYear, previousYear, selectedMonth, ytdMonths, flattenContas, getAccountNature]);
 
   return (
     <div className="space-y-8">

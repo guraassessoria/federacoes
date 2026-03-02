@@ -19,6 +19,10 @@ import {
   consolidateYearlyData,
 } from "@/lib/services/financialProcessing";
 import {
+  calcularIndices as calcularIndicesEstruturados,
+  IndicesCalculados,
+} from "@/lib/services/indicesFinanceiros";
+import {
   mapBalanceteToEstrutura,
   processarDadosFinanceiros,
   ContaComValor,
@@ -28,6 +32,41 @@ import { FinancialDataQuerySchema } from "@/lib/validators";
 import { handleApiError } from "@/lib/errorHandler";
 
 export const dynamic = "force-dynamic";
+
+function numeroIndice(valor: number | null | undefined, disponivel: boolean | undefined): number {
+  if (!disponivel || valor === null || valor === undefined) return 0;
+  return Number(valor.toFixed(2));
+}
+
+function mapearIndicesEstruturados(indices: IndicesCalculados): FinancialIndices {
+  return {
+    liquidez: {
+      corrente: numeroIndice(indices.liquidez.corrente.valor, indices.liquidez.corrente.disponivel),
+      seca: numeroIndice(indices.liquidez.seca.valor, indices.liquidez.seca.disponivel),
+      imediata: numeroIndice(indices.liquidez.imediata.valor, indices.liquidez.imediata.disponivel),
+      geral: numeroIndice(indices.liquidez.geral.valor, indices.liquidez.geral.disponivel),
+    },
+    rentabilidade: {
+      margemBruta: numeroIndice(indices.rentabilidade.margemBruta.valor, indices.rentabilidade.margemBruta.disponivel),
+      margemOperacional: numeroIndice(indices.rentabilidade.margemOperacional.valor, indices.rentabilidade.margemOperacional.disponivel),
+      margemLiquida: numeroIndice(indices.rentabilidade.margemLiquida.valor, indices.rentabilidade.margemLiquida.disponivel),
+      margemEbitda: numeroIndice(indices.rentabilidade.margemEbitda.valor, indices.rentabilidade.margemEbitda.disponivel),
+      roa: numeroIndice(indices.rentabilidade.roa.valor, indices.rentabilidade.roa.disponivel),
+      roe: numeroIndice(indices.rentabilidade.roe.valor, indices.rentabilidade.roe.disponivel),
+    },
+    endividamento: {
+      endividamentoGeral: numeroIndice(indices.endividamento.endividamentoGeral.valor, indices.endividamento.endividamentoGeral.disponivel),
+      composicaoEndividamento: numeroIndice(indices.endividamento.composicaoEndividamento.valor, indices.endividamento.composicaoEndividamento.disponivel),
+      grauAlavancagem: numeroIndice(indices.endividamento.grauAlavancagem.valor, indices.endividamento.grauAlavancagem.disponivel),
+      imobilizacaoPL: numeroIndice(indices.endividamento.imobilizacaoPL.valor, indices.endividamento.imobilizacaoPL.disponivel),
+    },
+    atividade: {
+      giroAtivo: numeroIndice(indices.atividade.giroAtivo.valor, indices.atividade.giroAtivo.disponivel),
+      prazoMedioRecebimento: numeroIndice(indices.atividade.prazoMedioRecebimento.valor, indices.atividade.prazoMedioRecebimento.disponivel),
+      prazoMedioPagamento: numeroIndice(indices.atividade.prazoMedioPagamento.valor, indices.atividade.prazoMedioPagamento.disponivel),
+    },
+  };
+}
 
 /**
  * GET - Busca dados financeiros processados para uma empresa
@@ -106,6 +145,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const deParaRows = await prisma.deParaMapping.findMany({
+      where: { companyId },
+      select: {
+        contaFederacao: true,
+        padraoBP: true,
+        padraoDRE: true,
+        padraoDFC: true,
+        padraoDMPL: true,
+      },
+    });
+
+    const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
+      contaFederacao: r.contaFederacao,
+      padraoBP: r.padraoBP,
+      padraoDRE: r.padraoDRE,
+      padraoDFC: r.padraoDFC,
+      padraoDMPL: r.padraoDMPL,
+    }));
+
     // Processa dados mensais
     const monthlyDataArray: MonthlyData[] = [];
     // Armazena contas processadas do último período para dados hierárquicos
@@ -124,7 +182,15 @@ export async function GET(request: NextRequest) {
         lastProcessedAccounts = processedAccounts; // Guarda para uso nos hierárquicos
         const bp = groupAccountsForBP(processedAccounts);
         const dre = groupAccountsForDRE(processedAccounts);
-        const indices = calculateFinancialIndices(bp, dre);
+        let indices = calculateFinancialIndices(bp, dre);
+
+        try {
+          const estruturadoMes = await processarDadosFinanceiros(balancetes, deParaRecords);
+          const indicesEstruturados = calcularIndicesEstruturados(estruturadoMes.bp, estruturadoMes.dre);
+          indices = mapearIndicesEstruturados(indicesEstruturados);
+        } catch (error) {
+          console.error(`Erro ao calcular índices estruturados (${period}):`, error);
+        }
 
         monthlyDataArray.push({
           period,
@@ -161,25 +227,6 @@ export async function GET(request: NextRequest) {
           });
 
           if (balanceteMes.length > 0) {
-            // Carrega de-para
-            const deParaRows = await prisma.deParaMapping.findMany({
-              where: { companyId },
-              select: {
-                contaFederacao: true,
-                padraoBP: true,
-                padraoDRE: true,
-                padraoDFC: true,
-                padraoDMPL: true,
-              },
-            });
-            const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
-              contaFederacao: r.contaFederacao,
-              padraoBP: r.padraoBP,
-              padraoDRE: r.padraoDRE,
-              padraoDFC: r.padraoDFC,
-              padraoDMPL: r.padraoDMPL,
-            }));
-
             const processado = await processarDadosFinanceiros(balanceteMes, deParaRecords);
             estruturaDREMensal = processado.dre;
             estruturaBPMensal = processado.bp;
@@ -241,27 +288,10 @@ export async function GET(request: NextRequest) {
         let estruturaBP: ContaComValor[] | null = null;
         let resultadoDRE: number = 0;
         let totalPassivoPL: number = 0;
+        let indicesConsolidados: FinancialIndices = yearlyData.consolidated.indices;
         
         if (allBalancetes.length > 0) {
   try {
-    // Carrega o de-para do banco para a empresa
-    const deParaRows = await prisma.deParaMapping.findMany({
-      where: { companyId },
-      select: {
-        contaFederacao: true,
-        padraoBP: true,
-        padraoDRE: true,
-        padraoDFC: true,
-        padraoDMPL: true,
-      },
-    });
-    const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
-      contaFederacao: r.contaFederacao,
-      padraoBP: r.padraoBP,
-      padraoDRE: r.padraoDRE,
-      padraoDFC: r.padraoDFC,
-      padraoDMPL: r.padraoDMPL,
-    }));
     console.log(`[financial-data] De-para: ${deParaRecords.length} registros`);
     
     const processado = await processarDadosFinanceiros(allBalancetes, deParaRecords);
@@ -269,6 +299,9 @@ export async function GET(request: NextRequest) {
             estruturaBP = processado.bp;
             resultadoDRE = processado.resultadoDRE;
             totalPassivoPL = processado.totalPassivoPL;
+
+            const indicesEstruturadosAnual = calcularIndicesEstruturados(processado.bp, processado.dre);
+            indicesConsolidados = mapearIndicesEstruturados(indicesEstruturadosAnual);
           } catch (error) {
             console.error("Erro ao mapear estrutura:", error);
             // Fallback para dados hierárquicos antigos se o mapeamento falhar
@@ -293,7 +326,7 @@ export async function GET(request: NextRequest) {
           data: {
             bp: yearlyData.consolidated.bp,
             dre: yearlyData.consolidated.dre,
-            indices: yearlyData.consolidated.indices,
+            indices: indicesConsolidados,
             months: yearlyData.months.map((m) => ({
               period: m.period,
               indices: m.indices,

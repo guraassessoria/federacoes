@@ -55,3 +55,5 @@ export function CustomBarChart({ data, bars, layout = 'horizontal', stacked = fa
     </ResponsiveContainer>
   );
 }
+
+export default CustomBarChart;

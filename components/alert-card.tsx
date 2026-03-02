@@ -49,3 +49,5 @@ export function AlertCard({ tipo, categoria, descricao, valor, recomendacao, del
     </motion.div>
   );
 }
+
+export default AlertCard;

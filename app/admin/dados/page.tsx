@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 const MESES = [
   "JAN", "FEV", "MAR", "ABR", "MAI", "JUN",

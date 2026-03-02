@@ -51,3 +51,5 @@ export function CustomLineChart({ data, lines, yAxisLabel }: LineChartProps) {
     </ResponsiveContainer>
   );
 }
+
+export default CustomLineChart;

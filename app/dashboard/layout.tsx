@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_ENDPOINTS } from "@/lib/constants";
-import { DashboardSidebar } from "@/components";
+import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { DashboardProvider } from "@/lib/contexts/DashboardContext";
 
 export default function DashboardLayout({

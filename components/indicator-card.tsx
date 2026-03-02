@@ -109,3 +109,5 @@ export function IndicatorCard({
     </motion.div>
   );
 }
+
+export default IndicatorCard;

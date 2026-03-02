@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { companyId, viewMode, year, month } = params;
+    const monthValue = month ?? "01";
 
     // Verifica acesso à empresa
     const userCompany = await prisma.userCompany.findFirst({
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
         success: true,
         source: "demonstration",
         message: "Dados de demonstração - faça upload de balancetes para ver dados reais",
-        data: generateDemoData(viewMode, year, month),
+        data: generateDemoData(viewMode, year, monthValue),
       });
     }
 
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
         success: true,
         source: "demonstration",
         message: `Sem dados para o ano ${year} - exibindo dados de demonstração`,
-        data: generateDemoData(viewMode, year, month),
+        data: generateDemoData(viewMode, year, monthValue),
       });
     }
 
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
       // Retorna dados do mês específico
       const monthData = monthlyDataArray.find((m) => {
         const parsed = parsePeriod(m.period);
-        return parsed && parsed.month === month.padStart(2, "0");
+        return parsed && parsed.month === monthValue.padStart(2, "0");
       });
 
       if (monthData) {
@@ -182,7 +183,7 @@ export async function GET(request: NextRequest) {
             estruturaDREMensal = processado.dre;
           }
         } catch (error) {
-          console.error(`Erro ao processar estrutura mensal ${month}/${year}:`, error);
+          console.error(`Erro ao processar estrutura mensal ${monthValue}/${year}:`, error);
         }
 
         return NextResponse.json({
@@ -190,7 +191,7 @@ export async function GET(request: NextRequest) {
           source: "database",
           viewMode: "mensal",
           year,
-          month,
+          month: monthValue,
           data: {
             bp: monthData.bp,
             dre: monthData.dre,
@@ -207,8 +208,8 @@ export async function GET(request: NextRequest) {
           source: "database",
           viewMode: "mensal",
           year,
-          month,
-          message: `Sem balancete para ${month}/${year}`,
+          month: monthValue,
+          message: `Sem balancete para ${monthValue}/${year}`,
           data: {
             bp: null,
             dre: null,
@@ -309,7 +310,7 @@ export async function GET(request: NextRequest) {
           success: true,
           source: "demonstration",
           message: "Dados insuficientes para consolidação anual",
-          data: generateDemoData("anual", year, month),
+          data: generateDemoData("anual", year, monthValue),
         });
       }
     }

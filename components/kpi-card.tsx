@@ -68,3 +68,5 @@ export function KPICard({ title, value, previousValue, change, icon: Icon, color
     </motion.div>
   );
 }
+
+export default KPICard;

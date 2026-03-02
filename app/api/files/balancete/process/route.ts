@@ -377,22 +377,7 @@ export async function POST(request: NextRequest) {
         accountNature: nature,
       });
     }
-      
-      if (!accountNumber) continue;
-      
-      dataToInsert.push({
-        companyId,
-        period,
-        accountNumber: accountNumber.trim(),
-        accountDescription: accountDescription.trim(),
-        previousBalance: colMap.previousBalance ? parseDecimal(row[colMap.previousBalance]) : 0,
-        debit: colMap.debit ? parseDecimal(row[colMap.debit]) : 0,
-        credit: colMap.credit ? parseDecimal(row[colMap.credit]) : 0,
-        finalBalance: parseDecimal(row[colMap.finalBalance]),
-        accountNature: colMap.accountNature ? String(row[colMap.accountNature] || 'D').trim() : 'D',
-      });
-    }
-
+    
     if (dataToInsert.length === 0) {
       return NextResponse.json({ error: "Nenhum dado válido encontrado no arquivo" }, { status: 400 });
     }

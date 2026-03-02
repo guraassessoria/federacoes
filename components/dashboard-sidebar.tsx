@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 interface Company {
   id: string;

@@ -13,6 +13,3 @@ export { CustomBarChart } from './charts/bar-chart';
 // providers and theme
 export { Providers } from './providers';
 export { ThemeProvider } from './theme-provider';
-
-// UI utilities
-export * from './ui';

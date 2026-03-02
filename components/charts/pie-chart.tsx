@@ -57,3 +57,5 @@ export function CustomPieChart({ data, colors, showLabels = true }: PieChartProp
     </ResponsiveContainer>
   );
 }
+
+export default CustomPieChart;

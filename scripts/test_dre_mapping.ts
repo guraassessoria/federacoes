@@ -76,37 +76,37 @@ async function main() {
   const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
     select: { accountCode: true, accountDescription: true, closingBalance: true },
-    distinct: ['accountNumber'],
-    orderBy: { accountNumber: 'asc' }
+    distinct: ['accountCode'],
+    orderBy: { accountCode: 'asc' }
   });
   
-  const todosCodigos = [...new Set(contas.map(c => c.accountNumber))];
+  const todosCodigos = [...new Set(contas.map(c => c.accountCode))];
   const folhas = contas.filter(conta => {
     for (const codigo of todosCodigos) {
-      if (codigo === conta.accountNumber) continue;
-      if (eFilho(conta.accountNumber, codigo)) return false;
+      if (codigo === conta.accountCode) continue;
+      if (eFilho(conta.accountCode, codigo)) return false;
     }
     return true;
   });
   
   console.log('=== CONTAS FOLHAS DRE ===');
   console.log('\n--- RECEITAS (3.x) ---');
-  folhas.filter(c => c.accountNumber.startsWith('3')).forEach(c => {
-    const mapping = encontrarCodigoPadrao(c.accountNumber);
-    console.log(`${c.accountNumber.padEnd(20)} | ${c.accountDescription?.substring(0, 35).padEnd(35)} | ${String(c.finalBalance).padStart(15)} | -> ${mapping?.codigo || 'SEM'} (${mapping?.descricao || 'N/A'})`);
+  folhas.filter(c => c.accountCode.startsWith('3')).forEach(c => {
+    const mapping = encontrarCodigoPadrao(c.accountCode);
+    console.log(`${c.accountCode.padEnd(20)} | ${c.accountDescription?.substring(0, 35).padEnd(35)} | ${String(c.closingBalance).padStart(15)} | -> ${mapping?.codigo || 'SEM'} (${mapping?.descricao || 'N/A'})`);
   });
   
   console.log('\n--- CUSTOS/DESPESAS (4.x) ---');
-  folhas.filter(c => c.accountNumber.startsWith('4')).forEach(c => {
-    const mapping = encontrarCodigoPadrao(c.accountNumber);
-    console.log(`${c.accountNumber.padEnd(20)} | ${c.accountDescription?.substring(0, 35).padEnd(35)} | ${String(c.finalBalance).padStart(15)} | -> ${mapping?.codigo || 'SEM'} (${mapping?.descricao || 'N/A'})`);
+  folhas.filter(c => c.accountCode.startsWith('4')).forEach(c => {
+    const mapping = encontrarCodigoPadrao(c.accountCode);
+    console.log(`${c.accountCode.padEnd(20)} | ${c.accountDescription?.substring(0, 35).padEnd(35)} | ${String(c.closingBalance).padStart(15)} | -> ${mapping?.codigo || 'SEM'} (${mapping?.descricao || 'N/A'})`);
   });
   
   // Agrupar por código padrão
   const valoresPorCodigo: Record<string, { total: number; contas: string[] }> = {};
   
-  for (const conta of folhas.filter(c => c.accountNumber.startsWith('3') || c.accountNumber.startsWith('4'))) {
-    const mapping = encontrarCodigoPadrao(conta.accountNumber);
+  for (const conta of folhas.filter(c => c.accountCode.startsWith('3') || c.accountCode.startsWith('4'))) {
+    const mapping = encontrarCodigoPadrao(conta.accountCode);
     const valor = Number(conta.closingBalance);
     
     if (mapping) {
@@ -115,7 +115,7 @@ async function main() {
       }
       valoresPorCodigo[mapping.codigo].total += valor;
       valoresPorCodigo[mapping.codigo].contas.push(
-        `${conta.accountNumber} = ${valor.toLocaleString('pt-BR')}`
+        `${conta.accountCode} = ${valor.toLocaleString('pt-BR')}`
       );
     }
   }

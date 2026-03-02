@@ -14,6 +14,7 @@ import {
   BarChart3,
   Plus,
 } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 interface Company {
   id: string;

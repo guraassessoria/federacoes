@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface KPICardProps {
   title: string;
@@ -46,18 +46,16 @@ export function KPICard({ title, value, previousValue, change, icon: Icon, color
           </div>
         </div>
         
-        {change !== undefined && (
+        {change !== undefined && changeValue !== 0 && (
           <div className="mt-4 flex items-center gap-2">
             {changeValue > 0 ? (
               <TrendingUp className="w-4 h-4 text-emerald-500" />
-            ) : changeValue < 0 ? (
-              <TrendingDown className="w-4 h-4 text-red-500" />
             ) : (
-              <Minus className="w-4 h-4 text-slate-400" />
+              <TrendingDown className="w-4 h-4 text-red-500" />
             )}
             <span className={cn(
               'text-sm font-medium',
-              changeValue > 0 ? 'text-emerald-500' : changeValue < 0 ? 'text-red-500' : 'text-slate-400'
+              changeValue > 0 ? 'text-emerald-500' : 'text-red-500'
             )}>
               {changeValue > 0 ? '+' : ''}{changeValue?.toFixed?.(2) ?? '0.00'}%
             </span>

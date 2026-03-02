@@ -983,6 +983,11 @@ export default function DemonstracoesPage() {
           variationPct,
         };
       })
+      .filter((row) => {
+        const hasMonthlyValue = MONTHS.some((month) => Math.abs(row.monthlyValues[month.value] || 0) > 0);
+        const hasYtdValue = Math.abs(row.previousYTD) > 0 || Math.abs(row.currentYTD) > 0;
+        return hasMonthlyValue || hasYtdValue;
+      })
       .sort((a, b) => {
         const codeA = parseFloat(a.codigo.replace(',', '.'));
         const codeB = parseFloat(b.codigo.replace(',', '.'));

@@ -294,7 +294,8 @@ export function calcularIndices(
     // Se não há custos, a margem bruta é 100%
     margemBruta = indiceDisponivel(100);
   } else {
-    const resultadoBruto = v.receitasTotal - v.custosTotal;
+    const custosNormalizados = Math.abs(v.custosTotal);
+    const resultadoBruto = v.receitasTotal - custosNormalizados;
     margemBruta = indiceDisponivel((resultadoBruto / v.receitasTotal) * 100);
   }
   
@@ -305,7 +306,9 @@ export function calcularIndices(
   } else if (v.resultadoOperacional === null) {
     // Tentar calcular: Receitas - Custos - Despesas
     if (v.custosTotal !== null && v.despesasTotal !== null) {
-      const resOp = v.receitasTotal - v.custosTotal - v.despesasTotal;
+      const custosNormalizados = Math.abs(v.custosTotal);
+      const despesasNormalizadas = Math.abs(v.despesasTotal);
+      const resOp = v.receitasTotal - custosNormalizados - despesasNormalizadas;
       margemOperacional = indiceDisponivel((resOp / v.receitasTotal) * 100);
     } else {
       margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 211) e não foi possível calcular');
@@ -331,8 +334,8 @@ export function calcularIndices(
     margemEbitda = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
   } else {
     // Calcular resultado operacional antes do resultado financeiro
-    const custosTotal = v.custosTotal ?? 0;
-    const despesasTotal = v.despesasTotal ?? 0;
+    const custosTotal = Math.abs(v.custosTotal ?? 0);
+    const despesasTotal = Math.abs(v.despesasTotal ?? 0);
     const ebitdaAproximado = v.receitasTotal - custosTotal - despesasTotal;
     // Nota: Este é um EBITDA aproximado, pois a depreciação está dentro de despesas
     margemEbitda = indiceDisponivel((ebitdaAproximado / v.receitasTotal) * 100);
@@ -431,7 +434,7 @@ export function calcularIndices(
   } else if (v.fornecedores === null) {
     prazoMedioPagamento = indiceIndisponivel('Fornecedores não encontrado no BP (código 78)');
   } else {
-    prazoMedioPagamento = indiceDisponivel((v.fornecedores / v.custosTotal) * 360);
+    prazoMedioPagamento = indiceDisponivel((v.fornecedores / Math.abs(v.custosTotal)) * 360);
   }
   
   return {

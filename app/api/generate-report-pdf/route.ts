@@ -31,33 +31,24 @@ function formatNumber(value: number | null | undefined): string {
 
 // Função para extrair valores principais das demonstrações
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
-  const buscar = (contas: ContaComValor[], codigo: string): number | null => {
-    for (const conta of contas) {
-      if (conta.codigo === codigo) return conta.valor !== 0 ? conta.valor : null;
-      if (conta.children?.length) {
-        const v = buscar(conta.children, codigo);
-        if (v !== null) return v;
-      }
-    }
-    return null;
-  };
+  const valores = extrairValores(bp, dre);
 
   return {
     // BP
-    ativoTotal: buscar(bp, '1'),
-    ativoCirculante: buscar(bp, '2'),
-    disponibilidades: buscar(bp, '3'),
-    ativoNaoCirculante: buscar(bp, '33'),
-    imobilizado: buscar(bp, '43'),
-    passivoCirculante: buscar(bp, '77'),
-    passivoNaoCirculante: buscar(bp, '113'),
-    patrimonioLiquido: buscar(bp, '125'),
+    ativoTotal: valores.ativoTotal,
+    ativoCirculante: valores.ativoCirculante,
+    disponibilidades: valores.disponibilidades,
+    ativoNaoCirculante: valores.ativoNaoCirculante,
+    imobilizado: valores.imobilizado,
+    passivoCirculante: valores.passivoCirculante,
+    passivoNaoCirculante: valores.passivoNaoCirculante,
+    patrimonioLiquido: valores.patrimonioLiquido,
     // DRE
-    receitasTotal: buscar(dre, '1'),
-    custosTotal: buscar(dre, '52'),
-    despesasTotal: buscar(dre, '104'),
-    resultadoFinanceiro: buscar(dre, '190'),
-    resultadoLiquido: buscar(dre, '225')
+    receitasTotal: valores.receitasTotal,
+    custosTotal: valores.custosTotal,
+    despesasTotal: valores.despesasTotal,
+    resultadoFinanceiro: valores.resultadoFinanceiro,
+    resultadoLiquido: valores.resultadoLiquido
   };
 }
 

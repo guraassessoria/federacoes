@@ -57,6 +57,7 @@ export default function DashboardPage() {
   const dre = data.dre;
   const bp = data.bp;
   const indices = data.indices;
+  const indexAvailability = data.indexAvailability;
   
   // Dados da estrutura de-para (quando disponíveis, são mais precisos)
   const estruturaDRE = (data as any).estruturaDRE as any[] | undefined;
@@ -158,6 +159,13 @@ export default function DashboardPage() {
     ? `${getMonthName(selectedMonth)}/${selectedYear}` 
     : selectedYear;
 
+  const renderIndicePrincipal = (value: number, suffix: string, available: boolean | undefined, decimals: number = 1) => {
+    if (available === false) {
+      return <span className="inline-block px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-sm font-semibold">Indisponível</span>;
+    }
+    return <span>{value.toFixed(decimals)}{suffix}</span>;
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -191,19 +199,27 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Liquidez Corrente</p>
-              <p className="text-2xl font-bold text-blue-600">{indices.liquidez.corrente.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {renderIndicePrincipal(indices.liquidez.corrente, '', indexAvailability?.liquidez?.corrente, 2)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Margem Líquida</p>
-              <p className="text-2xl font-bold text-green-600">{indices.rentabilidade.margemLiquida.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-green-600">
+                {renderIndicePrincipal(indices.rentabilidade.margemLiquida, '%', indexAvailability?.rentabilidade?.margemLiquida)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">ROE</p>
-              <p className="text-2xl font-bold text-purple-600">{indices.rentabilidade.roe.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {renderIndicePrincipal(indices.rentabilidade.roe, '%', indexAvailability?.rentabilidade?.roe)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Endividamento</p>
-              <p className="text-2xl font-bold text-orange-600">{indices.endividamento.endividamentoGeral.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {renderIndicePrincipal(indices.endividamento.endividamentoGeral, '%', indexAvailability?.endividamento?.endividamentoGeral)}
+              </p>
             </div>
           </div>
         </motion.div>

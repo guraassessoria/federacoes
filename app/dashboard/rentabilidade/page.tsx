@@ -62,14 +62,15 @@ export default function RentabilidadePage() {
   }
 
   const indices = data.indices;
+  const indexAvailability = data.indexAvailability;
   
   const rentabilidadeData = indices?.rentabilidade ? [
-    { key: 'Margem Bruta', value: indices.rentabilidade.margemBruta },
-    { key: 'Margem Operacional', value: indices.rentabilidade.margemOperacional },
-    { key: 'Margem Líquida', value: indices.rentabilidade.margemLiquida },
-    { key: 'Margem EBITDA', value: indices.rentabilidade.margemEbitda },
-    { key: 'ROA', value: indices.rentabilidade.roa },
-    { key: 'ROE', value: indices.rentabilidade.roe },
+    { key: 'Margem Bruta', value: indices.rentabilidade.margemBruta, unavailable: indexAvailability?.rentabilidade?.margemBruta === false },
+    { key: 'Margem Operacional', value: indices.rentabilidade.margemOperacional, unavailable: indexAvailability?.rentabilidade?.margemOperacional === false },
+    { key: 'Margem Líquida', value: indices.rentabilidade.margemLiquida, unavailable: indexAvailability?.rentabilidade?.margemLiquida === false },
+    { key: 'Margem EBITDA', value: indices.rentabilidade.margemEbitda, unavailable: indexAvailability?.rentabilidade?.margemEbitda === false },
+    { key: 'ROA', value: indices.rentabilidade.roa, unavailable: indexAvailability?.rentabilidade?.roa === false },
+    { key: 'ROE', value: indices.rentabilidade.roe, unavailable: indexAvailability?.rentabilidade?.roe === false },
   ] : [];
 
   // Dados para gráfico de evolução mensal (se disponível)
@@ -138,6 +139,7 @@ export default function RentabilidadePage() {
               benchmark={rentabilidadeBenchmarks[item.key]}
               description={rentabilidadeDescriptions[item.key]}
               type="percent"
+              unavailable={item.unavailable}
             />
           </motion.div>
         ))}

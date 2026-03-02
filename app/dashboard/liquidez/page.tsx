@@ -57,12 +57,13 @@ export default function LiquidezPage() {
   }
 
   const indices = data.indices;
+  const indexAvailability = data.indexAvailability;
   
   const liquidezData = indices?.liquidez ? [
-    { key: 'Liquidez Corrente', value: indices.liquidez.corrente },
-    { key: 'Liquidez Seca', value: indices.liquidez.seca },
-    { key: 'Liquidez Imediata', value: indices.liquidez.imediata },
-    { key: 'Liquidez Geral', value: indices.liquidez.geral },
+    { key: 'Liquidez Corrente', value: indices.liquidez.corrente, unavailable: indexAvailability?.liquidez?.corrente === false },
+    { key: 'Liquidez Seca', value: indices.liquidez.seca, unavailable: indexAvailability?.liquidez?.seca === false },
+    { key: 'Liquidez Imediata', value: indices.liquidez.imediata, unavailable: indexAvailability?.liquidez?.imediata === false },
+    { key: 'Liquidez Geral', value: indices.liquidez.geral, unavailable: indexAvailability?.liquidez?.geral === false },
   ] : [];
 
   // Dados para gráfico de evolução mensal (se disponível)
@@ -126,6 +127,7 @@ export default function LiquidezPage() {
               benchmark={liquidezBenchmarks[item.key]}
               description={liquidezDescriptions[item.key]}
               type="number"
+              unavailable={item.unavailable}
             />
           </motion.div>
         ))}

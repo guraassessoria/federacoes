@@ -10,11 +10,26 @@ import type {
 } from "@/lib/services/financialProcessing";
 
 interface FinancialData {
+  indexAvailability?: {
+    liquidez?: { corrente?: boolean; seca?: boolean; imediata?: boolean; geral?: boolean };
+    rentabilidade?: { margemBruta?: boolean; margemOperacional?: boolean; margemLiquida?: boolean; margemEbitda?: boolean; roa?: boolean; roe?: boolean };
+    endividamento?: { endividamentoGeral?: boolean; composicaoEndividamento?: boolean; grauAlavancagem?: boolean; imobilizacaoPL?: boolean };
+    atividade?: { giroAtivo?: boolean; prazoMedioRecebimento?: boolean; prazoMedioPagamento?: boolean };
+  };
   bp: ProcessedBP | null;
   dre: ProcessedDRE | null;
   indices: FinancialIndices | null;
   period?: string;
-  months?: Array<{ period: string; indices: FinancialIndices }>;
+  months?: Array<{
+    period: string;
+    indices: FinancialIndices;
+    indexAvailability?: {
+      liquidez?: { corrente?: boolean; seca?: boolean; imediata?: boolean; geral?: boolean };
+      rentabilidade?: { margemBruta?: boolean; margemOperacional?: boolean; margemLiquida?: boolean; margemEbitda?: boolean; roa?: boolean; roe?: boolean };
+      endividamento?: { endividamentoGeral?: boolean; composicaoEndividamento?: boolean; grauAlavancagem?: boolean; imobilizacaoPL?: boolean };
+      atividade?: { giroAtivo?: boolean; prazoMedioRecebimento?: boolean; prazoMedioPagamento?: boolean };
+    };
+  }>;
 }
 
 interface UseFinancialDataReturn {

@@ -33,6 +33,13 @@ import { handleApiError } from "@/lib/errorHandler";
 
 export const dynamic = "force-dynamic";
 
+type IndexAvailability = {
+  liquidez: { corrente: boolean; seca: boolean; imediata: boolean; geral: boolean };
+  rentabilidade: { margemBruta: boolean; margemOperacional: boolean; margemLiquida: boolean; margemEbitda: boolean; roa: boolean; roe: boolean };
+  endividamento: { endividamentoGeral: boolean; composicaoEndividamento: boolean; grauAlavancagem: boolean; imobilizacaoPL: boolean };
+  atividade: { giroAtivo: boolean; prazoMedioRecebimento: boolean; prazoMedioPagamento: boolean };
+};
+
 function numeroIndice(valor: number | null | undefined, disponivel: boolean | undefined): number {
   if (!disponivel || valor === null || valor === undefined) return 0;
   return Number(valor.toFixed(2));
@@ -166,6 +173,7 @@ export async function GET(request: NextRequest) {
 
     // Processa dados mensais
     const monthlyDataArray: MonthlyData[] = [];
+    const monthlyIndexAvailabilityByPeriod: Record<string, IndexAvailability> = {};
     // Armazena contas processadas do último período para dados hierárquicos
     let lastProcessedAccounts: ReturnType<typeof processBalanceteData> = [];
 
@@ -188,6 +196,7 @@ export async function GET(request: NextRequest) {
           const estruturadoMes = await processarDadosFinanceiros(balancetes, deParaRecords);
           const indicesEstruturados = calcularIndicesEstruturados(estruturadoMes.bp, estruturadoMes.dre);
           indices = mapearIndicesEstruturados(indicesEstruturados);
+          monthlyIndexAvailabilityByPeriod[period] = mapearDisponibilidadeIndices(indicesEstruturados);
         } catch (error) {
           console.error(`Erro ao calcular índices estruturados (${period}):`, error);
         }
@@ -245,6 +254,7 @@ export async function GET(request: NextRequest) {
             bp: monthData.bp,
             dre: monthData.dre,
             indices: monthData.indices,
+            indexAvailability: monthlyIndexAvailabilityByPeriod[monthData.period],
             period: monthData.period,
             estruturaDRE: estruturaDREMensal,
             estruturaBP: estruturaBPMensal,
@@ -289,6 +299,7 @@ export async function GET(request: NextRequest) {
         let resultadoDRE: number = 0;
         let totalPassivoPL: number = 0;
         let indicesConsolidados: FinancialIndices = yearlyData.consolidated.indices;
+        let indexAvailabilityConsolidada: IndexAvailability | undefined;
         
         if (allBalancetes.length > 0) {
   try {
@@ -302,6 +313,7 @@ export async function GET(request: NextRequest) {
 
             const indicesEstruturadosAnual = calcularIndicesEstruturados(processado.bp, processado.dre);
             indicesConsolidados = mapearIndicesEstruturados(indicesEstruturadosAnual);
+            indexAvailabilityConsolidada = mapearDisponibilidadeIndices(indicesEstruturadosAnual);
           } catch (error) {
             console.error("Erro ao mapear estrutura:", error);
             // Fallback para dados hierárquicos antigos se o mapeamento falhar
@@ -327,9 +339,11 @@ export async function GET(request: NextRequest) {
             bp: yearlyData.consolidated.bp,
             dre: yearlyData.consolidated.dre,
             indices: indicesConsolidados,
+            indexAvailability: indexAvailabilityConsolidada,
             months: yearlyData.months.map((m) => ({
               period: m.period,
               indices: m.indices,
+              indexAvailability: monthlyIndexAvailabilityByPeriod[m.period],
             })),
             // Dados hierárquicos na estrutura base (de-para)
             estruturaDRE,
@@ -695,5 +709,35 @@ function generateDemoData(
     estruturaDRE: gerarEstruturaDRE(1), // Anual: fator 1
     resultadoDRE: resultadoLiquido,
     totalPassivoPL: totalPassivos + totalPL,
+  };
+}
+
+function mapearDisponibilidadeIndices(indices: IndicesCalculados): IndexAvailability {
+  return {
+    liquidez: {
+      corrente: indices.liquidez.corrente.disponivel,
+      seca: indices.liquidez.seca.disponivel,
+      imediata: indices.liquidez.imediata.disponivel,
+      geral: indices.liquidez.geral.disponivel,
+    },
+    rentabilidade: {
+      margemBruta: indices.rentabilidade.margemBruta.disponivel,
+      margemOperacional: indices.rentabilidade.margemOperacional.disponivel,
+      margemLiquida: indices.rentabilidade.margemLiquida.disponivel,
+      margemEbitda: indices.rentabilidade.margemEbitda.disponivel,
+      roa: indices.rentabilidade.roa.disponivel,
+      roe: indices.rentabilidade.roe.disponivel,
+    },
+    endividamento: {
+      endividamentoGeral: indices.endividamento.endividamentoGeral.disponivel,
+      composicaoEndividamento: indices.endividamento.composicaoEndividamento.disponivel,
+      grauAlavancagem: indices.endividamento.grauAlavancagem.disponivel,
+      imobilizacaoPL: indices.endividamento.imobilizacaoPL.disponivel,
+    },
+    atividade: {
+      giroAtivo: indices.atividade.giroAtivo.disponivel,
+      prazoMedioRecebimento: indices.atividade.prazoMedioRecebimento.disponivel,
+      prazoMedioPagamento: indices.atividade.prazoMedioPagamento.disponivel,
+    },
   };
 }

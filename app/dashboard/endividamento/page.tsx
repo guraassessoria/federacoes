@@ -58,13 +58,14 @@ export default function EndividamentoPage() {
   }
 
   const indices = data.indices;
+  const indexAvailability = data.indexAvailability;
   const bp = data.bp;
   
   const endividamentoData = indices?.endividamento ? [
-    { key: 'Endividamento Geral', value: indices.endividamento.endividamentoGeral, type: 'percent' as const },
-    { key: 'Composição do Endividamento', value: indices.endividamento.composicaoEndividamento, type: 'percent' as const },
-    { key: 'Grau de Alavancagem', value: indices.endividamento.grauAlavancagem, type: 'number' as const },
-    { key: 'Imobilização do PL', value: indices.endividamento.imobilizacaoPL, type: 'percent' as const },
+    { key: 'Endividamento Geral', value: indices.endividamento.endividamentoGeral, type: 'percent' as const, unavailable: indexAvailability?.endividamento?.endividamentoGeral === false },
+    { key: 'Composição do Endividamento', value: indices.endividamento.composicaoEndividamento, type: 'percent' as const, unavailable: indexAvailability?.endividamento?.composicaoEndividamento === false },
+    { key: 'Grau de Alavancagem', value: indices.endividamento.grauAlavancagem, type: 'number' as const, unavailable: indexAvailability?.endividamento?.grauAlavancagem === false },
+    { key: 'Imobilização do PL', value: indices.endividamento.imobilizacaoPL, type: 'percent' as const, unavailable: indexAvailability?.endividamento?.imobilizacaoPL === false },
   ] : [];
 
   // Dados para gráfico de evolução mensal (se disponível)
@@ -140,6 +141,7 @@ export default function EndividamentoPage() {
               description={endividamentoDescriptions[item.key]}
               type={item.type}
               invertColors={item.key !== 'Grau de Alavancagem'}
+              unavailable={item.unavailable}
             />
           </motion.div>
         ))}

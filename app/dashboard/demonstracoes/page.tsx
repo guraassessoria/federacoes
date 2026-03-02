@@ -340,14 +340,22 @@ export default function DemonstracoesPage() {
         throw new Error(error.error || 'Erro ao gerar PDF');
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf')) {
+        const text = await response.text();
+        try {
+          const parsed = JSON.parse(text);
+          throw new Error(parsed.error || 'O serviço não retornou um PDF válido');
+        } catch {
+          throw new Error('O serviço não retornou um PDF válido');
+        }
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Detectar se é HTML ou PDF pelo content-type
-      const contentType = response.headers.get('content-type') || '';
-      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
-      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.${ext}`;
+      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -380,14 +388,22 @@ export default function DemonstracoesPage() {
         throw new Error(error.error || 'Erro ao gerar PDF comparativo');
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf')) {
+        const text = await response.text();
+        try {
+          const parsed = JSON.parse(text);
+          throw new Error(parsed.error || 'O serviço não retornou um PDF comparativo válido');
+        } catch {
+          throw new Error('O serviço não retornou um PDF comparativo válido');
+        }
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Detectar se é HTML ou PDF pelo content-type
-      const contentType = response.headers.get('content-type') || '';
-      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
-      link.download = `comparativo_federacoes_${selectedYear}.${ext}`;
+      link.download = `comparativo_federacoes_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -904,17 +920,6 @@ export default function DemonstracoesPage() {
               // PRIORIDADE: Renderiza dados da estrutura base (de-para)
               <>
                 {renderEstruturaRows(getEstruturaData())}
-                {/* Totalizador para Balanço Patrimonial: Total Passivo + PL */}
-                {activeTab === 'bp' && (
-                  <tr className="bg-blue-100 border-t-2 border-blue-300">
-                    <td className="px-4 py-3 font-bold text-blue-900 text-sm">
-                      TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO
-                    </td>
-                    <td className="text-right px-4 py-3 font-bold text-blue-900 text-sm">
-                      {formatCurrency(getTotalPassivoPL() / 1000)}
-                    </td>
-                  </tr>
-                )}
               </>
             ) : hasHierarchicalData(activeTab) ? (
               // FALLBACK 1: Renderiza dados hierárquicos brutos do banco

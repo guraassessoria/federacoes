@@ -623,34 +623,57 @@ export async function POST(request: NextRequest) {
     const html = generateComparativeHTML(federacoes, periodo);
 
     // Verificar se API de PDF está configurada
-    const html2pdfUrl = process.env.HTML2PDF_API_URL || process.env.NEXT_PUBLIC_HTML2PDF_API_URL;
-    const html2pdfKey = process.env.HTML2PDF_API_KEY || process.env.NEXT_PUBLIC_HTML2PDF_API_KEY;
+    const html2pdfUrl =
+      process.env.HTML2PDF_API_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_URL ||
+      process.env.HTML2PDF_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_URL ||
+      process.env.PDF_API_URL ||
+      process.env.NEXT_PUBLIC_PDF_API_URL;
 
-    if (!html2pdfUrl || !html2pdfKey) {
-      const missingVars = [
-        !html2pdfUrl ? 'HTML2PDF_API_URL (ou NEXT_PUBLIC_HTML2PDF_API_URL)' : null,
-        !html2pdfKey ? 'HTML2PDF_API_KEY (ou NEXT_PUBLIC_HTML2PDF_API_KEY)' : null,
-      ].filter(Boolean);
+    const html2pdfKey =
+      process.env.HTML2PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_KEY ||
+      process.env.HTML2PDF_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_KEY ||
+      process.env.PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_PDF_API_KEY;
+
+    if (!html2pdfUrl) {
       return NextResponse.json({
-        error: `Serviço de geração de PDF não configurado. Variáveis ausentes: ${missingVars.join(', ')}.`
+        error: 'Serviço de geração de PDF não configurado. Defina uma URL em HTML2PDF_API_URL (ou HTML2PDF_URL / PDF_API_URL).'
       }, { status: 500 });
     }
 
+    const isHtml2PdfApp = /api\.html2pdf\.app/i.test(html2pdfUrl);
+
     // Gerar PDF via API
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (html2pdfKey && !isHtml2PdfApp) {
+      headers['Authorization'] = `Bearer ${html2pdfKey}`;
+    }
+
+    const payload = isHtml2PdfApp
+      ? {
+          html,
+          apiKey: html2pdfKey,
+          format: 'A4',
+        }
+      : {
+          html,
+          options: {
+            format: 'A4',
+            margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+            printBackground: true,
+          },
+        };
+
     const pdfResponse = await fetch(html2pdfUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${html2pdfKey}`
-      },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: 'A4',
-          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-          printBackground: true
-        }
-      })
+      headers,
+      body: JSON.stringify(payload)
     });
 
     if (!pdfResponse.ok) {
@@ -671,8 +694,13 @@ export async function POST(request: NextRequest) {
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
+        const statusHeaders: Record<string, string> = {};
+        if (html2pdfKey && !isHtml2PdfApp) {
+          statusHeaders['Authorization'] = `Bearer ${html2pdfKey}`;
+        }
+
         const statusResponse = await fetch(`${html2pdfUrl}/status/${jobData.jobId}`, {
-          headers: { 'Authorization': `Bearer ${html2pdfKey}` }
+          headers: statusHeaders
         });
         
         if (statusResponse.ok) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
@@ -86,6 +86,20 @@ interface UserCompany {
 
 // Anos disponíveis
 const anosDisponiveis = ['2023', '2024', '2025'];
+const MONTHS = [
+  { value: '01', label: 'JAN' },
+  { value: '02', label: 'FEV' },
+  { value: '03', label: 'MAR' },
+  { value: '04', label: 'ABR' },
+  { value: '05', label: 'MAI' },
+  { value: '06', label: 'JUN' },
+  { value: '07', label: 'JUL' },
+  { value: '08', label: 'AGO' },
+  { value: '09', label: 'SET' },
+  { value: '10', label: 'OUT' },
+  { value: '11', label: 'NOV' },
+  { value: '12', label: 'DEZ' },
+];
 
 // Todas as federações do sistema (com dados disponíveis na API)
 // Federações derivadas das empresas do usuário (não mais lista estática)
@@ -234,6 +248,7 @@ export default function DemonstracoesPage() {
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
   const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
+  const [monthlyDreData, setMonthlyDreData] = useState<Record<string, Record<string, ContaComValor[]>>>({});
   const [loadingFinancialData, setLoadingFinancialData] = useState(false);
   const {
     selectedCompanyId,
@@ -325,6 +340,36 @@ export default function DemonstracoesPage() {
     }
   }, []);
 
+  const fetchMonthlyDreYear = useCallback(async (companyId: string, year: string) => {
+    const monthsMap: Record<string, ContaComValor[]> = {};
+
+    await Promise.all(
+      MONTHS.map(async (month) => {
+        try {
+          const params = new URLSearchParams({
+            companyId,
+            viewMode: 'mensal',
+            year,
+            month: month.value,
+          });
+          const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params.toString()}`);
+          if (!response.ok) {
+            monthsMap[month.value] = [];
+            return;
+          }
+
+          const result = await response.json();
+          monthsMap[month.value] = result?.data?.estruturaDRE || [];
+        } catch (error) {
+          console.error(`Erro ao buscar DRE mensal ${month.value}/${year}:`, error);
+          monthsMap[month.value] = [];
+        }
+      })
+    );
+
+    return monthsMap;
+  }, []);
+
   // Buscar dados para todos os anos quando a empresa for selecionada
   useEffect(() => {
     if (!selectedCompanyId) return;
@@ -333,11 +378,31 @@ export default function DemonstracoesPage() {
       anosDisponiveis.forEach(year => {
         fetchFinancialData(selectedCompanyId, year, 'anual');
       });
+      setMonthlyDreData({});
       return;
     }
 
-    fetchFinancialData(selectedCompanyId, selectedYear, 'mensal', selectedMonth);
-  }, [selectedCompanyId, viewMode, selectedYear, selectedMonth, fetchFinancialData]);
+    const previousYear = String(Number(selectedYear) - 1);
+
+    const fetchMonthlyMatrix = async () => {
+      setLoadingFinancialData(true);
+      try {
+        const [currentYearData, previousYearData] = await Promise.all([
+          fetchMonthlyDreYear(selectedCompanyId, selectedYear),
+          fetchMonthlyDreYear(selectedCompanyId, previousYear),
+        ]);
+
+        setMonthlyDreData({
+          [selectedYear]: currentYearData,
+          [previousYear]: previousYearData,
+        });
+      } finally {
+        setLoadingFinancialData(false);
+      }
+    };
+
+    fetchMonthlyMatrix();
+  }, [selectedCompanyId, viewMode, selectedYear, selectedMonth, fetchFinancialData, fetchMonthlyDreYear]);
 
   const handleGeneratePdf = async () => {
     if (!selectedCompanyId) {
@@ -808,6 +873,124 @@ export default function DemonstracoesPage() {
     return [];
   };
 
+  const previousYear = String(Number(selectedYear) - 1);
+  const selectedMonthIndex = MONTHS.findIndex((m) => m.value === selectedMonth);
+  const ytdMonths = selectedMonthIndex >= 0 ? MONTHS.slice(0, selectedMonthIndex + 1) : MONTHS;
+
+  const flattenContas = useCallback((contas: ContaComValor[]): ContaComValor[] => {
+    const result: ContaComValor[] = [];
+    const walk = (items: ContaComValor[]) => {
+      for (const item of items) {
+        result.push(item);
+        if (item.children?.length) {
+          walk(item.children);
+        }
+      }
+    };
+    walk(contas);
+    return result;
+  }, []);
+
+  const getAccountNature = useCallback((conta: { codigo: string; descricao: string }): 'receita' | 'despesa' | 'neutro' => {
+    const descricao = conta.descricao?.toLowerCase?.() || '';
+    const codigo = conta.codigo || '';
+
+    if (descricao.includes('receita') || codigo === '51' || codigo === '56') return 'receita';
+    if (
+      descricao.includes('custo') ||
+      descricao.includes('despesa') ||
+      codigo === '57' ||
+      codigo === '110'
+    ) {
+      return 'despesa';
+    }
+
+    return 'neutro';
+  }, []);
+
+  const dreMonthlyRows = useMemo(() => {
+    if (viewMode !== 'mensal') return [] as Array<{
+      codigo: string;
+      descricao: string;
+      nivel: number;
+      monthlyValues: Record<string, number>;
+      previousYTD: number;
+      currentYTD: number;
+      variationPct: number;
+    }>;
+
+    const currentYearMonths = monthlyDreData[selectedYear] || {};
+    const previousYearMonths = monthlyDreData[previousYear] || {};
+
+    const rowMap = new Map<string, { codigo: string; descricao: string; nivel: number; monthlyValues: Record<string, number> }>();
+
+    const ensureRow = (conta: ContaComValor) => {
+      if (!rowMap.has(conta.codigo)) {
+        rowMap.set(conta.codigo, {
+          codigo: conta.codigo,
+          descricao: conta.descricao,
+          nivel: conta.nivelVisualizacao || 1,
+          monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
+        });
+      }
+    };
+
+    MONTHS.forEach((month) => {
+      const contasMes = currentYearMonths[month.value] || [];
+      const flat = flattenContas(contasMes).filter((c) => (c.nivelVisualizacao || 1) <= 2);
+      flat.forEach((conta) => {
+        ensureRow(conta);
+        const row = rowMap.get(conta.codigo)!;
+        row.monthlyValues[month.value] = conta.valor || 0;
+      });
+    });
+
+    MONTHS.forEach((month) => {
+      const contasMesAnterior = previousYearMonths[month.value] || [];
+      const flatPrev = flattenContas(contasMesAnterior).filter((c) => (c.nivelVisualizacao || 1) <= 2);
+      flatPrev.forEach((conta) => ensureRow(conta));
+    });
+
+    const getYearMonthValue = (yearMonths: Record<string, ContaComValor[]>, month: string, codigo: string) => {
+      const contas = yearMonths[month] || [];
+      const flat = flattenContas(contas);
+      return flat.find((c) => c.codigo === codigo)?.valor || 0;
+    };
+
+    return Array.from(rowMap.values())
+      .map((row) => {
+        const previousYTD = ytdMonths.reduce(
+          (sum, month) => sum + getYearMonthValue(previousYearMonths, month.value, row.codigo),
+          0
+        );
+
+        const currentYTD = ytdMonths.reduce(
+          (sum, month) => sum + getYearMonthValue(currentYearMonths, month.value, row.codigo),
+          0
+        );
+
+        const natureza = getAccountNature(row);
+        const rawDiff = currentYTD - previousYTD;
+        const adjustedDiff = natureza === 'despesa' ? -rawDiff : rawDiff;
+        const variationPct = previousYTD === 0
+          ? (adjustedDiff === 0 ? 0 : 100)
+          : (adjustedDiff / Math.abs(previousYTD)) * 100;
+
+        return {
+          ...row,
+          previousYTD,
+          currentYTD,
+          variationPct,
+        };
+      })
+      .sort((a, b) => {
+        const codeA = parseFloat(a.codigo.replace(',', '.'));
+        const codeB = parseFloat(b.codigo.replace(',', '.'));
+        if (Number.isNaN(codeA) || Number.isNaN(codeB)) return a.codigo.localeCompare(b.codigo);
+        return codeA - codeB;
+      });
+  }, [viewMode, monthlyDreData, selectedYear, previousYear, ytdMonths, flattenContas, getAccountNature]);
+
   return (
     <div className="space-y-8">
       <motion.div
@@ -822,6 +1005,62 @@ export default function DemonstracoesPage() {
         <p className="text-blue-100">BP, DRE, DFC, DMPL e DVA</p>
       </motion.div>
 
+      {viewMode === 'mensal' ? (
+        <motion.div
+          key={`dre-mensal-${selectedYear}-${selectedMonth}`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg overflow-hidden"
+        >
+          <div className="bg-indigo-600 px-4 py-3">
+            <h2 className="font-semibold text-white">
+              DRE - Visão Mensal ({selectedYear})
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[1600px]">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-10">Conta</th>
+                  {MONTHS.map((month) => (
+                    <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
+                  ))}
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Total {previousYear} até {selectedMonth}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Total {selectedYear} até {selectedMonth}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dreMonthlyRows.map((row) => (
+                  <tr key={row.codigo} className={`border-b border-slate-100 ${row.nivel === 1 ? 'bg-slate-50' : 'bg-white'}`}>
+                    <td
+                      className={`px-4 py-2 sticky left-0 z-10 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
+                      style={{ paddingLeft: `${16 + row.nivel * 12}px` }}
+                    >
+                      {row.descricao}
+                    </td>
+                    {MONTHS.map((month) => (
+                      <td key={`${row.codigo}-${month.value}`} className="text-right px-3 py-2 text-slate-700">
+                        {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
+                      </td>
+                    ))}
+                    <td className="text-right px-3 py-2 font-medium text-slate-700">
+                      {formatCurrency(row.previousYTD / 1000)}
+                    </td>
+                    <td className="text-right px-3 py-2 font-medium text-slate-900">
+                      {formatCurrency(row.currentYTD / 1000)}
+                    </td>
+                    <td className={`text-right px-3 py-2 font-semibold ${row.variationPct > 0 ? 'text-emerald-600' : row.variationPct < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                      {row.variationPct > 0 ? '+' : ''}{row.variationPct.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      ) : (
+      <>
       {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
@@ -970,6 +1209,8 @@ export default function DemonstracoesPage() {
           ]}
         />
       </motion.div>
+      </>
+      )}
 
       {/* Modal de Seleção de Federações */}
       {showFederacaoModal && (

@@ -292,13 +292,6 @@ function generateReportHTML(
       </tr>
       ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 3)}
     </table>
-
-    <table>
-      <tr class="total-row">
-        <td style="width: 70%;">TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO</td>
-        <td>${formatCurrency(totalPassivoPL)}</td>
-      </tr>
-    </table>
   </div>
 
   <!-- PÁGINA 3: DRE -->
@@ -517,13 +510,9 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     const html2pdfKey = process.env.HTML2PDF_API_KEY;
 
     if (!html2pdfUrl || !html2pdfKey) {
-      // Retornar HTML se API não configurada
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="relatorio_${company.name.replace(/\s+/g, '_')}_${periodo}.html"`
-        }
-      });
+      return NextResponse.json({
+        error: 'Serviço de geração de PDF não configurado. Defina HTML2PDF_API_URL e HTML2PDF_API_KEY.'
+      }, { status: 500 });
     }
 
     // Gerar PDF via API
@@ -546,13 +535,9 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     if (!pdfResponse.ok) {
       const errorText = await pdfResponse.text();
       console.error('Erro ao gerar PDF:', errorText);
-      // Fallback: retornar HTML
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="relatorio_${company.name.replace(/\s+/g, '_')}_${periodo}.html"`
-        }
-      });
+      return NextResponse.json({
+        error: `Falha no serviço de PDF: ${errorText || 'erro desconhecido'}`
+      }, { status: 502 });
     }
 
     // Verificar se é resposta assíncrona (job)
@@ -576,6 +561,11 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
           
           if (statusData.status === 'completed' && statusData.pdfUrl) {
             const pdfDownload = await fetch(statusData.pdfUrl);
+            const downloadType = pdfDownload.headers.get('content-type') || '';
+            if (!downloadType.includes('application/pdf')) {
+              const invalidBody = await pdfDownload.text();
+              throw new Error(`Resposta inválida do serviço de PDF: ${invalidBody.slice(0, 200)}`);
+            }
             const pdfBuffer = await pdfDownload.arrayBuffer();
             
             return new NextResponse(pdfBuffer, {
@@ -596,6 +586,12 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     }
 
     // Resposta direta com PDF
+    if (!contentType?.includes('application/pdf')) {
+      const invalidBody = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Serviço retornou conteúdo não-PDF: ${invalidBody.slice(0, 200)}`
+      }, { status: 502 });
+    }
     const pdfBuffer = await pdfResponse.arrayBuffer();
     return new NextResponse(pdfBuffer, {
       headers: {

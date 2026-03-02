@@ -984,7 +984,7 @@ export default function DemonstracoesPage() {
         };
       })
       .filter((row) => {
-        const hasMonthlyValue = MONTHS.some((month) => Math.abs(row.monthlyValues[month.value] || 0) > 0);
+        const hasMonthlyValue = ytdMonths.some((month) => Math.abs(row.monthlyValues[month.value] || 0) > 0);
         const hasYtdValue = Math.abs(row.previousYTD) > 0 || Math.abs(row.currentYTD) > 0;
         return hasMonthlyValue || hasYtdValue;
       })
@@ -1027,11 +1027,11 @@ export default function DemonstracoesPage() {
               <thead>
                 <tr className="bg-slate-100">
                   <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-10">Conta</th>
-                  {MONTHS.map((month) => (
+                  {ytdMonths.map((month) => (
                     <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
                   ))}
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Total {previousYear} até {selectedMonth}</th>
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Total {selectedYear} até {selectedMonth}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{selectedYear}</th>
                   <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
                 </tr>
               </thead>
@@ -1044,7 +1044,7 @@ export default function DemonstracoesPage() {
                     >
                       {row.descricao}
                     </td>
-                    {MONTHS.map((month) => (
+                    {ytdMonths.map((month) => (
                       <td key={`${row.codigo}-${month.value}`} className="text-right px-3 py-2 text-slate-700">
                         {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
                       </td>

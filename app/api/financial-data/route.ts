@@ -153,6 +153,7 @@ export async function GET(request: NextRequest) {
       if (monthData) {
         // ═══ PROCESSAR estruturaDRE para o mês ═══
         let estruturaDREMensal: ContaComValor[] | null = null;
+        let estruturaBPMensal: ContaComValor[] | null = null;
         try {
           // Busca dados do balancete APENAS deste mês
           const balanceteMes = await prisma.balancete.findMany({
@@ -181,6 +182,7 @@ export async function GET(request: NextRequest) {
 
             const processado = await processarDadosFinanceiros(balanceteMes, deParaRecords);
             estruturaDREMensal = processado.dre;
+            estruturaBPMensal = processado.bp;
           }
         } catch (error) {
           console.error(`Erro ao processar estrutura mensal ${monthValue}/${year}:`, error);
@@ -198,6 +200,7 @@ export async function GET(request: NextRequest) {
             indices: monthData.indices,
             period: monthData.period,
             estruturaDRE: estruturaDREMensal,
+            estruturaBP: estruturaBPMensal,
           },
         });
       } else {
@@ -216,6 +219,7 @@ export async function GET(request: NextRequest) {
             indices: null,
             period: null,
             estruturaDRE: null,
+            estruturaBP: null,
           },
         });
       }

@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
-import { analiseVertical, anos } from '@/lib/data';
+import { analiseVertical } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
 
 export default function AnaliseVerticalPage() {
   const [activeTab, setActiveTab] = useState<'dre' | 'bp'>('dre');
-  const [selectedYear, setSelectedYear] = useState('2025');
+  const { selectedYear } = useDashboard();
+  const effectiveYear = analiseVertical?.DRE?.[selectedYear] ? selectedYear : '2025';
 
   const dreKeys = Object.keys(analiseVertical?.DRE?.['2025'] ?? {}).filter(k => !k.includes('Total'));
   const bpKeys = Object.keys(analiseVertical?.BP?.['2025'] ?? {}).filter(k => !k.includes('Total'));
@@ -63,17 +65,6 @@ export default function AnaliseVerticalPage() {
             Balanco Patrimonial
           </button>
         </div>
-        <div className="flex gap-2 ml-auto">
-          {anos.map(ano => (
-            <button
-              key={ano}
-              onClick={() => setSelectedYear(ano)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${selectedYear === ano ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              {ano}
-            </button>
-          ))}
-        </div>
       </div>
 
       <motion.div
@@ -84,7 +75,7 @@ export default function AnaliseVerticalPage() {
       >
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-bold text-slate-800">
-            {activeTab === 'dre' ? 'DRE' : 'Balanco Patrimonial'} - Analise Vertical {selectedYear}
+            {activeTab === 'dre' ? 'DRE' : 'Balanco Patrimonial'} - Analise Vertical {effectiveYear}
           </h2>
           <p className="text-sm text-gray-600">
             {activeTab === 'dre' ? 'Percentual em relação à Receita Total' : 'Percentual em relação ao Ativo Total'}
@@ -101,7 +92,7 @@ export default function AnaliseVerticalPage() {
             </thead>
             <tbody>
               {currentKeys.map((key, idx) => {
-                const value = currentData?.[selectedYear]?.[key] ?? 0;
+                const value = currentData?.[effectiveYear]?.[key] ?? 0;
                 return (
                   <tr key={key} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="px-4 py-3 text-slate-700">{key}</td>

@@ -6,6 +6,7 @@ import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarC
 import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
 import { API_ENDPOINTS } from '@/lib/constants';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
 
 // Interface para conta hierárquica (dados brutos do balancete)
 interface HierarchicalAccount {
@@ -224,7 +225,6 @@ const dvaData: Record<string, Record<string, number>> = {
 
 export default function DemonstracoesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('bp');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Ativo Circulante', 'Patrimonio Liquido', 'Receitas Operacionais', 'Resultados', 'Atividades Operacionais', 'Variacao do Caixa', 'Capital Social', 'Total Patrimonio Liquido', 'Receitas', 'Distribuicao - Pessoal']);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingComparative, setGeneratingComparative] = useState(false);
@@ -235,7 +235,12 @@ export default function DemonstracoesPage() {
   const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
   const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
   const [loadingFinancialData, setLoadingFinancialData] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const {
+    selectedCompanyId,
+    selectedYear,
+    viewMode,
+    selectedMonth,
+  } = useDashboard();
   
   // Empresas disponíveis para comparação (direto do cadastro do usuário)
   const federacoesDisponiveis = userCompanies.map(uc => ({
@@ -276,9 +281,7 @@ export default function DemonstracoesPage() {
   useEffect(() => {
     const syncFromStorage = () => {
       const stored = localStorage.getItem('selectedCompanyName');
-      const storedId = localStorage.getItem('selectedCompany');
       if (stored) setCompanyName(stored);
-      if (storedId) setSelectedCompanyId(storedId);
     };
     
     // Ler ao montar
@@ -290,12 +293,21 @@ export default function DemonstracoesPage() {
   }, []);
 
   // Buscar dados financeiros da API quando empresa ou ano mudar
-  const fetchFinancialData = useCallback(async (companyId: string, year: string) => {
+  const fetchFinancialData = useCallback(async (companyId: string, year: string, mode: 'anual' | 'mensal', month?: string) => {
     if (!companyId) return;
     
     setLoadingFinancialData(true);
     try {
-      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?companyId=${companyId}&viewMode=anual&year=${year}`);
+      const params = new URLSearchParams({
+        companyId,
+        viewMode: mode,
+        year,
+      });
+      if (mode === 'mensal' && month) {
+        params.set('month', month);
+      }
+
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params.toString()}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
@@ -315,12 +327,17 @@ export default function DemonstracoesPage() {
 
   // Buscar dados para todos os anos quando a empresa for selecionada
   useEffect(() => {
-    if (selectedCompanyId) {
+    if (!selectedCompanyId) return;
+
+    if (viewMode === 'anual') {
       anosDisponiveis.forEach(year => {
-        fetchFinancialData(selectedCompanyId, year);
+        fetchFinancialData(selectedCompanyId, year, 'anual');
       });
+      return;
     }
-  }, [selectedCompanyId, fetchFinancialData]);
+
+    fetchFinancialData(selectedCompanyId, selectedYear, 'mensal', selectedMonth);
+  }, [selectedCompanyId, viewMode, selectedYear, selectedMonth, fetchFinancialData]);
 
   const handleGeneratePdf = async () => {
     if (!selectedCompanyId) {
@@ -804,22 +821,6 @@ export default function DemonstracoesPage() {
         </div>
         <p className="text-blue-100">BP, DRE, DFC, DMPL e DVA</p>
       </motion.div>
-
-      {/* Seletor de Ano */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 bg-white rounded-lg px-4 py-2 shadow">
-          <span className="text-sm font-medium text-slate-600">Exercício:</span>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="px-3 py-1 bg-slate-100 border-0 rounded-lg font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
-          >
-            {anosDisponiveis.map(ano => (
-              <option key={ano} value={ano}>{ano}</option>
-            ))}
-          </select>
-        </div>
-      </div>
 
       {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
       <div className="flex flex-wrap items-center justify-between gap-3">

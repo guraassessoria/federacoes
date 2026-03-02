@@ -36,12 +36,12 @@ const CODIGOS_DRE = {
   RECEITAS_TOTAL: '56',
   CUSTOS_TOTAL: '57',
   DESPESAS_TOTAL: '110',
-  RESULTADO_FINANCEIRO: '190',
-  RECEITAS_FINANCEIRAS: '191',
-  DESPESAS_FINANCEIRAS: '199',
-  RESULTADO: '210',
-  RESULTADO_OPERACIONAL: '211',
-  RESULTADO_LIQUIDO: '225'
+  RESULTADO_FINANCEIRO: '198',
+  RECEITAS_FINANCEIRAS: '199',
+  DESPESAS_FINANCEIRAS: '207',
+  RESULTADO: '227',
+  RESULTADO_OPERACIONAL: '196',
+  RESULTADO_LIQUIDO: '229'
 };
 
 // Interface para índice calculado
@@ -166,11 +166,11 @@ export function extrairValores(
     buscarValorPorDescricao(dre, ['despesas']);
 
   const resultadoOperacional =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_OPERACIONAL, '196']) ??
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_OPERACIONAL, '211']) ??
     buscarValorPorDescricao(dre, ['resultado operacional']);
 
   const resultadoLiquido =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_LIQUIDO, '229']) ??
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_LIQUIDO, '225']) ??
     buscarValorPorDescricao(dre, ['resultado líquido', 'superávit', 'déficit']);
 
   return {
@@ -192,9 +192,15 @@ export function extrairValores(
     receitasTotal,
     custosTotal,
     despesasTotal,
-    resultadoFinanceiro: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_FINANCEIRO),
-    receitasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.RECEITAS_FINANCEIRAS),
-    despesasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.DESPESAS_FINANCEIRAS),
+    resultadoFinanceiro:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_FINANCEIRO, '190']) ??
+      buscarValorPorDescricao(dre, ['resultado financeiro']),
+    receitasFinanceiras:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_FINANCEIRAS, '191']) ??
+      buscarValorPorDescricao(dre, ['receitas financeiras']),
+    despesasFinanceiras:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_FINANCEIRAS]) ??
+      buscarValorPorDescricao(dre, ['despesas financeiras']),
     resultadoOperacional,
     resultadoLiquido
   };
@@ -311,7 +317,7 @@ export function calcularIndices(
       const resOp = v.receitasTotal - custosNormalizados - despesasNormalizadas;
       margemOperacional = indiceDisponivel((resOp / v.receitasTotal) * 100);
     } else {
-      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 211) e não foi possível calcular');
+      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 196) e não foi possível calcular');
     }
   } else {
     margemOperacional = indiceDisponivel((v.resultadoOperacional / v.receitasTotal) * 100);
@@ -322,7 +328,7 @@ export function calcularIndices(
   if (v.receitasTotal === null || v.receitasTotal === 0) {
     margemLiquida = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
   } else if (v.resultadoLiquido === null) {
-    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     margemLiquida = indiceDisponivel((v.resultadoLiquido / v.receitasTotal) * 100);
   }
@@ -346,7 +352,7 @@ export function calcularIndices(
   if (v.ativoTotal === null || v.ativoTotal === 0) {
     roa = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP (código 1)');
   } else if (v.resultadoLiquido === null) {
-    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     roa = indiceDisponivel((v.resultadoLiquido / v.ativoTotal) * 100);
   }
@@ -356,7 +362,7 @@ export function calcularIndices(
   if (v.patrimonioLiquido === null || v.patrimonioLiquido === 0) {
     roe = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP (código 125)');
   } else if (v.resultadoLiquido === null) {
-    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     roe = indiceDisponivel((v.resultadoLiquido / v.patrimonioLiquido) * 100);
   }

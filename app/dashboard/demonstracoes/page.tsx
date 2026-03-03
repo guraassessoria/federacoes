@@ -1216,7 +1216,7 @@ export default function DemonstracoesPage() {
             <table className="w-full text-sm min-w-[1600px]">
               <thead>
                 <tr className="bg-slate-100">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-10">Conta</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-0">Conta</th>
                   {ytdMonths.map((month) => (
                     <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
                   ))}
@@ -1229,7 +1229,7 @@ export default function DemonstracoesPage() {
                 {dreMonthlyRows.map((row) => (
                   <tr key={row.codigo} className={`border-b border-slate-100 ${row.nivel === 1 ? 'bg-slate-50' : 'bg-white'}`}>
                     <td
-                      className={`px-4 py-2 sticky left-0 z-10 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
+                      className={`px-4 py-2 sticky left-0 z-0 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
                       style={{ paddingLeft: `${16 + row.nivel * 12}px` }}
                     >
                       {row.descricao}

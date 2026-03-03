@@ -23,7 +23,6 @@ export const API_ENDPOINTS = {
   FILES_DE_PARA: "/api/files/de-para",
   FILES_BALANCETE_UPLOAD: "/api/files/balancete/upload",
   FILES_DE_PARA_UPLOAD: "/api/files/de-para/upload",
-  CLEAR_DATA: "/api/clear-data",
   
   // Upload
   UPLOAD_PRESIGNED: "/api/upload/presigned",

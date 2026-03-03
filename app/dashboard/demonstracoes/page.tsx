@@ -49,6 +49,33 @@ interface HierarchicalBP {
 
 // Interface para dados financeiros da API
 interface FinancialApiData {
+  indices?: {
+    liquidez?: {
+      corrente?: number;
+      seca?: number;
+      imediata?: number;
+      geral?: number;
+    };
+    rentabilidade?: {
+      margemBruta?: number;
+      margemOperacional?: number;
+      margemLiquida?: number;
+      margemEbitda?: number;
+      roa?: number;
+      roe?: number;
+    };
+    endividamento?: {
+      endividamentoGeral?: number;
+      composicaoEndividamento?: number;
+      grauAlavancagem?: number;
+      imobilizacaoPL?: number;
+    };
+    atividade?: {
+      giroAtivo?: number;
+      prazoMedioRecebimento?: number;
+      prazoMedioPagamento?: number;
+    };
+  };
   bp?: {
     ativoCirculante?: Record<string, number>;
     ativoNaoCirculante?: Record<string, number>;

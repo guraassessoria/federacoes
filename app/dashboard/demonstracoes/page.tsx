@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
+import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
 import { API_ENDPOINTS } from '@/lib/constants';
@@ -77,13 +77,6 @@ interface FinancialApiData {
 }
 
 type TabType = 'bp' | 'dre' | 'dfc' | 'dmpl' | 'dva';
-
-interface UserCompany {
-  id: string;
-  name: string;
-  cnpj: string | null;
-  role: string;
-}
 
 // Anos disponíveis
 const anosDisponiveis = ['2023', '2024', '2025'];
@@ -253,12 +246,8 @@ export default function DemonstracoesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('bp');
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Ativo Circulante', 'Patrimonio Liquido', 'Receitas Operacionais', 'Resultados', 'Atividades Operacionais', 'Variacao do Caixa', 'Capital Social', 'Total Patrimonio Liquido', 'Receitas', 'Distribuicao - Pessoal']);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [generatingComparative, setGeneratingComparative] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [companyName, setCompanyName] = useState('Federação de Futebol');
-  const [showFederacaoModal, setShowFederacaoModal] = useState(false);
-  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
   const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
   const [monthlyDreData, setMonthlyDreData] = useState<Record<string, Record<string, ContaComValor[]>>>({});
   const [loadingFinancialData, setLoadingFinancialData] = useState(false);
@@ -268,42 +257,6 @@ export default function DemonstracoesPage() {
     viewMode,
     selectedMonth,
   } = useDashboard();
-  
-  // Empresas disponíveis para comparação (direto do cadastro do usuário)
-  const federacoesDisponiveis = userCompanies.map(uc => ({
-    id: uc.id,
-    nome: uc.name,
-    sigla: uc.name.split(' ').filter(w => w.length > 2 && !['de', 'do', 'da', 'dos', 'das'].includes(w.toLowerCase())).map(w => w[0].toUpperCase()).join('').substring(0, 4),
-  }));
-
-  // Buscar empresas do usuário
-  useEffect(() => {
-    const fetchUserCompanies = async () => {
-      try {
-        const response = await fetch(API_ENDPOINTS.USER_COMPANIES);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Empresas do usuário:', data.companies);
-          setUserCompanies(data.companies || []);
-        } else {
-          console.error('Erro ao buscar empresas:', response.status);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar empresas:', error);
-      } finally {
-        setLoadingCompanies(false);
-      }
-    };
-    fetchUserCompanies();
-  }, []);
-
-  // Atualizar seleção quando as federações disponíveis mudarem
-  useEffect(() => {
-    console.log('Federações disponíveis:', federacoesDisponiveis);
-    if (federacoesDisponiveis.length > 0) {
-      setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
-    }
-  }, [userCompanies]);
 
   useEffect(() => {
     const syncFromStorage = () => {
@@ -465,66 +418,80 @@ export default function DemonstracoesPage() {
     }
   };
 
-  const handleGenerateComparativePdf = async () => {
-    if (selectedFederacoes.length < 2) {
-      alert('Selecione pelo menos 2 federações para comparar');
+  const handleExportExcel = async () => {
+    const companyIdToUse = selectedCompanyId || localStorage.getItem('selectedCompany');
+
+    if (!companyIdToUse) {
+      alert('Selecione uma empresa no menu lateral');
       return;
     }
-    
-    setShowFederacaoModal(false);
-    setGeneratingComparative(true);
+
+    setExportingExcel(true);
     try {
-      const response = await fetch(API_ENDPOINTS.GENERATE_COMPARATIVE_PDF, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: selectedYear, companyIds: selectedFederacoes }),
+      const params = new URLSearchParams({
+        companyId: companyIdToUse,
+        viewMode,
+        year: selectedYear,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao gerar PDF comparativo');
+      if (viewMode === 'mensal') {
+        params.set('month', selectedMonth);
       }
 
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('application/pdf')) {
-        const text = await response.text();
-        try {
-          const parsed = JSON.parse(text);
-          throw new Error(parsed.error || 'O serviço não retornou um PDF comparativo válido');
-        } catch {
-          throw new Error('O serviço não retornou um PDF comparativo válido');
-        }
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params.toString()}`);
+      const result = await response.json();
+
+      if (!response.ok || !result?.success || !result?.data) {
+        throw new Error(result?.error || 'Não foi possível carregar os dados para exportação.');
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `comparativo_federacoes_${selectedYear}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const data = result.data as FinancialApiData;
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.utils.book_new();
+
+      const bpRows = flattenContas(data.estruturaBP || []).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2);
+      const dreRows = flattenContas(data.estruturaDRE || []).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2);
+
+      const bpSheet = [
+        ['Código', 'Conta', 'Valor'],
+        ...bpRows.map((row) => [row.codigo, row.descricao, row.valor || 0]),
+      ];
+
+      const dreSheet = [
+        ['Código', 'Conta', 'Valor'],
+        ...dreRows.map((row) => [row.codigo, row.descricao, row.valor || 0]),
+      ];
+
+      const indicesRows = [
+        ['Liquidez Corrente', data.indices?.liquidez?.corrente ?? ''],
+        ['Liquidez Seca', data.indices?.liquidez?.seca ?? ''],
+        ['Liquidez Imediata', data.indices?.liquidez?.imediata ?? ''],
+        ['Liquidez Geral', data.indices?.liquidez?.geral ?? ''],
+        ['Margem Bruta', data.indices?.rentabilidade?.margemBruta ?? ''],
+        ['Margem Operacional', data.indices?.rentabilidade?.margemOperacional ?? ''],
+        ['Margem Líquida', data.indices?.rentabilidade?.margemLiquida ?? ''],
+        ['ROA', data.indices?.rentabilidade?.roa ?? ''],
+        ['ROE', data.indices?.rentabilidade?.roe ?? ''],
+        ['Endividamento Geral', data.indices?.endividamento?.endividamentoGeral ?? ''],
+        ['Composição Endividamento', data.indices?.endividamento?.composicaoEndividamento ?? ''],
+        ['Grau Alavancagem', data.indices?.endividamento?.grauAlavancagem ?? ''],
+        ['Giro do Ativo', data.indices?.atividade?.giroAtivo ?? ''],
+        ['Prazo Médio Recebimento', data.indices?.atividade?.prazoMedioRecebimento ?? ''],
+        ['Prazo Médio Pagamento', data.indices?.atividade?.prazoMedioPagamento ?? ''],
+      ];
+
+      const indicesSheet = [['Índice', 'Valor'], ...indicesRows];
+
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(bpSheet), 'BP');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(dreSheet), 'DRE');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(indicesSheet), 'Indices');
+
+      XLSX.writeFile(workbook, `demonstracoes_${selectedYear}.xlsx`);
     } catch (error) {
-      console.error('Erro ao gerar PDF comparativo:', error);
-      alert(error instanceof Error ? error.message : 'Erro ao gerar PDF comparativo');
+      console.error('Erro ao exportar Excel:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao exportar Excel');
     } finally {
-      setGeneratingComparative(false);
+      setExportingExcel(false);
     }
-  };
-
-  const toggleFederacao = (id: string) => {
-    setSelectedFederacoes(prev => 
-      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
-    );
-  };
-
-  const selectAllFederacoes = () => {
-    setSelectedFederacoes(federacoesDisponiveis.map(f => f.id));
-  };
-
-  const deselectAllFederacoes = () => {
-    setSelectedFederacoes([]);
   };
 
   const toggleGroup = (group: string) => {
@@ -1311,30 +1278,27 @@ export default function DemonstracoesPage() {
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                PDF Individual
+                Exportar PDF
               </>
             )}
           </button>
-          {/* Botão PDF Comparativo - só aparece se o usuário tem acesso a 2+ federações */}
-          {!loadingCompanies && federacoesDisponiveis.length >= 2 && (
-            <button
-              onClick={() => setShowFederacaoModal(true)}
-              disabled={generatingComparative}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold shadow-lg hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {generatingComparative ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <FileBarChart className="w-4 h-4" />
-                  PDF Comparativo
-                </>
-              )}
-            </button>
-          )}
+          <button
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg font-semibold shadow-lg hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {exportingExcel ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-4 h-4" />
+                Exportar Excel
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -1413,103 +1377,7 @@ export default function DemonstracoesPage() {
       </>
       )}
 
-      {/* Modal de Seleção de Federações */}
-      {showFederacaoModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
-          >
-            <div className="bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Selecionar Federações para Comparação</h3>
-              <button
-                onClick={() => setShowFederacaoModal(false)}
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-slate-600 mb-4">
-                Selecione as federações que deseja incluir no relatório comparativo (mínimo 2):
-              </p>
-
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={selectAllFederacoes}
-                  className="text-sm px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200 transition-colors"
-                >
-                  Selecionar Todas
-                </button>
-                <button
-                  onClick={deselectAllFederacoes}
-                  className="text-sm px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Limpar Seleção
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {federacoesDisponiveis.map((fed) => (
-                  <label
-                    key={fed.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedFederacoes.includes(fed.id)
-                        ? 'border-violet-500 bg-violet-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded flex items-center justify-center ${
-                        selectedFederacoes.includes(fed.id)
-                          ? 'bg-violet-600'
-                          : 'bg-slate-200'
-                      }`}
-                    >
-                      {selectedFederacoes.includes(fed.id) && (
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      )}
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={selectedFederacoes.includes(fed.id)}
-                      onChange={() => toggleFederacao(fed.id)}
-                      className="sr-only"
-                    />
-                    <div className="flex-1">
-                      <span className="font-medium text-slate-800">{fed.nome}</span>
-                      <span className="ml-2 text-sm text-slate-500">({fed.sigla})</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-6 flex items-center justify-between">
-                <span className="text-sm text-slate-500">
-                  {selectedFederacoes.length} de {federacoesDisponiveis.length} selecionadas
-                </span>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowFederacaoModal(false)}
-                    className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleGenerateComparativePdf}
-                    disabled={selectedFederacoes.length < 2}
-                    className="px-6 py-2 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-lg font-semibold hover:from-violet-700 hover:to-violet-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Gerar PDF
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      
     </div>
   );
 }

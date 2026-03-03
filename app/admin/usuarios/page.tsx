@@ -187,6 +187,8 @@ export default function AdminUsuariosPage() {
     switch (role) {
       case "ADMIN":
         return "bg-red-100 text-red-700";
+      case "GESTOR":
+        return "bg-violet-100 text-violet-700";
       case "EDITOR":
         return "bg-blue-100 text-blue-700";
       default:
@@ -384,6 +386,7 @@ export default function AdminUsuariosPage() {
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="CONSULTA">Consulta</option>
+                    <option value="GESTOR">Gestor</option>
                     <option value="EDITOR">Editor</option>
                     <option value="ADMIN">Administrador</option>
                   </select>

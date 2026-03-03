@@ -470,113 +470,14 @@ export async function mapBalanceteToDRE(
   const superavitDeficitVal = lucroAntesImpostosVal - irCsllVal;
   if (codigosDRE.superavitDeficit) set(codigosDRE.superavitDeficit, superavitDeficitVal);
 
-  // ─── ETAPA 3: Montar árvore interna (para detalhes expandíveis) ───
-  // Cada grupo que tem filhos recebe seus filhos como children
-  estrutura.forEach(c => {
-    if (c.codigoSuperior) {
-      const pai = mapa.get(c.codigoSuperior);
-      const filho = mapa.get(c.codigo);
-      if (pai && filho) pai.children!.push(filho);
-    }
-  });
+  // ─── ETAPA 3: Respeitar a hierarquia da estrutura enviada no upload ───
+  // Monta árvore diretamente pela estrutura, evitando duplicações da montagem sequencial manual.
+  const contas: ContaComValor[] = estrutura.map((c) => ({
+    ...c,
+    valor: mapa.get(c.codigo)?.valor || 0,
+  }));
 
-  // ─── ETAPA 4: Montar apresentação sequencial ───
-  // Retorna lista flat de seções na ordem de apresentação contábil
-  const resultado: ContaComValor[] = [];
-
-  // Helper: cria nó SEM children (totalizador = só exibe valor, não expandível)
-  const node = (cod: string, descOverride?: string): ContaComValor | null => {
-    const c = mapa.get(cod);
-    if (!c) return null;
-    return {
-      ...c,
-      descricao: descOverride || c.descricao,
-      nivelVisualizacao: 1,
-      children: [], // IMPORTANTE: limpar children para não duplicar
-    };
-  };
-
-  // Helper: cria nó com filhos re-nivelados para apresentação
-  const nodeWithChildren = (cod: string, descOverride?: string): ContaComValor | null => {
-    const c = mapa.get(cod);
-    if (!c) return null;
-    return {
-      ...c,
-      descricao: descOverride || c.descricao,
-      nivelVisualizacao: 1,
-      children: reNivelar(c.children || [], 1),
-    };
-  };
-
-  // Re-nivela children para apresentação (nível relativo ao pai)
-  function reNivelar(children: ContaComValor[], parentLevel: number): ContaComValor[] {
-    return children.map(child => ({
-      ...child,
-      nivelVisualizacao: parentLevel + 1,
-      children: child.children?.length ? reNivelar(child.children, parentLevel + 1) : [],
-    }));
-  }
-
-  // ── Ordem de apresentação da DRE ──
-  // Regra: grupos de DADOS são expandíveis (mostram detalhes)
-  //        totalizadores CALCULADOS são apenas linhas de resultado (sem children)
-  
-  // 1. Receita Bruta (expandível → detalhes das receitas)
-  if (codigosDRE.receitaBruta) resultado.push(nodeWithChildren(codigosDRE.receitaBruta, 'Receita Bruta')!);
-  
-  // 2. (-) Deduções da Receita (expandível se houver)
-  if (codigosDRE.deducoes && val(codigosDRE.deducoes) !== 0) resultado.push(nodeWithChildren(codigosDRE.deducoes)!);
-  
-  // 3. Receita Líquida = Receita Bruta - Deduções (SEM children)
-  if (codigosDRE.receitaLiquida) resultado.push(node(codigosDRE.receitaLiquida, 'Receita Líquida')!);
-  
-  // 4. (-) Custos (expandível → detalhes dos custos)
-  if (codigosDRE.custos) resultado.push(nodeWithChildren(codigosDRE.custos, '(-) Custos dos Serviços')!);
-  
-  // 5. Margem Bruta = Receita Líquida - Custos (SEM children)
-  if (codigosDRE.margemBruta) resultado.push(node(codigosDRE.margemBruta, 'Margem Bruta')!);
-  
-  // 6. (-) Despesas (expandível → detalhes das despesas)
-  if (codigosDRE.despesas) resultado.push(nodeWithChildren(codigosDRE.despesas, '(-) Despesas Gerais')!);
-  
-  // 7. Resultado Operacional = Margem - Despesas (SEM children)
-  if (codigosDRE.resultadoOperacional) resultado.push(node(codigosDRE.resultadoOperacional, 'Resultado Operacional')!);
-  
-  // 8. LAREF = Resultado Operacional (SEM children)
-  if (codigosDRE.laref) resultado.push(node(codigosDRE.laref, 'Lucro Antes do Resultado Financeiro')!);
-  
-  // 9. (+/-) Resultado Financeiro (expandível, indentado nível 2)
-  const resFin = codigosDRE.resultadoFinanceiro
-    ? nodeWithChildren(codigosDRE.resultadoFinanceiro, '(+/-) Resultado Financeiro')
-    : null;
-  if (resFin) { resFin.nivelVisualizacao = 2; resultado.push(resFin); }
-  
-  // 10. (+/-) Outras Receitas/Despesas (expandível, indentado nível 2)
-  const resNaoOper = codigosDRE.resultadoNaoOperacional
-    ? nodeWithChildren(codigosDRE.resultadoNaoOperacional, '(+/-) Outras Receitas/Despesas')
-    : null;
-  if (resNaoOper) { resNaoOper.nivelVisualizacao = 2; resultado.push(resNaoOper); }
-  
-  // 11. Lucro Antes dos Impostos (SEM children)
-  if (codigosDRE.lucroAntesImpostos) resultado.push(node(codigosDRE.lucroAntesImpostos, 'Lucro Líquido Antes dos Impostos')!);
-  
-  // 12. IR e CSLL (se houver)
-  if (codigosDRE.irCsll && val(codigosDRE.irCsll) !== 0) resultado.push(node(codigosDRE.irCsll, 'LAIR e LACS')!);
-  
-  // 13. Superávit/Déficit (SEM children)
-  if (codigosDRE.superavitDeficit) resultado.push(node(codigosDRE.superavitDeficit, 'Superávit/Déficit do Exercício')!);
-
-  if (resultado.length === 0) {
-    return estrutura
-      .filter(conta => conta.nivel <= 2)
-      .map(conta => ({
-        ...conta,
-        valor: mapa.get(conta.codigo)?.valor || 0,
-        children: reNivelar(mapa.get(conta.codigo)?.children || [], conta.nivelVisualizacao),
-      }));
-  }
-
-  return resultado.filter(Boolean);
+  return buildTree(contas);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -608,10 +509,11 @@ export async function processarDadosFinanceiros(
   ]);
 
   // Resultado = Superávit/Déficit por descrição (fallback códigos legados)
+  const dreFlat = flattenHierarchy(dre);
   const resultadoConta =
-    dre.find(c => includesAllTerms(c.descricao, ['superavit'])) ||
-    dre.find(c => includesAllTerms(c.descricao, ['deficit', 'exercicio'])) ||
-    dre.find(c => c.codigo === '229');
+    dreFlat.find(c => includesAllTerms(c.descricao, ['superavit'])) ||
+    dreFlat.find(c => includesAllTerms(c.descricao, ['deficit', 'exercicio'])) ||
+    dreFlat.find(c => c.codigo === '229');
   const resultadoDRE = resultadoConta?.valor || 0;
 
   // Inserir resultado no BP

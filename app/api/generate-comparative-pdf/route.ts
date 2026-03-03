@@ -163,9 +163,9 @@ function gerarLinhasTabelaComparativa(
       return conta?.valor ?? 0;
     });
     
-    // Verificar se todos os valores são zero (ocultar se nível > 2)
+    // Verificar se todos os valores são zero (ocultar se nível > 1)
     const todosZero = valores.every(v => v === 0);
-    if (todosZero && nivel > 2) return;
+    if (todosZero && nivel > 1) return;
     
     const indent = '&nbsp;'.repeat(nivel * 4);
     const isTotal = nivel === 1;

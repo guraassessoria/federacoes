@@ -58,8 +58,8 @@ function gerarLinhasTabela(contas: ContaComValor[], maxNivel: number = 3): strin
   function processar(conta: ContaComValor, nivel: number = 0): void {
     if (nivel > maxNivel) return;
     
-    // Ocultar linhas sem valor (exceto totalizadores nível 1 e 2)
-    if (conta.valor === 0 && conta.nivel > 2) return;
+    // Ocultar linhas sem valor (exceto totalizadores principais de nível 1)
+    if (conta.valor === 0 && conta.nivel > 1) return;
     
     const indent = '&nbsp;'.repeat(nivel * 4);
     const isTotal = conta.nivel === 1;

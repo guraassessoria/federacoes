@@ -1,19 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3 } from 'lucide-react';
-import { analiseVertical } from '@/lib/data';
+import { BarChart3, Loader2 } from 'lucide-react';
 import CustomBarChart from '@/components/charts/bar-chart';
 import { useDashboard } from '@/lib/contexts/DashboardContext';
 
+interface AnaliseVerticalData {
+  DRE: Record<string, Record<string, number>>;
+  BP: Record<string, Record<string, number>>;
+}
+
 export default function AnaliseVerticalPage() {
   const [activeTab, setActiveTab] = useState<'dre' | 'bp'>('dre');
-  const { selectedYear } = useDashboard();
+  const { selectedYear, selectedCompanyId } = useDashboard();
+  const [analiseVertical, setAnaliseVertical] = useState<AnaliseVerticalData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setError('Nenhuma empresa selecionada');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/analise-vertical?companyId=${selectedCompanyId}&anos=2023,2024,2025`)
+      .then(res => {
+        if (!res.ok) throw new Error('Erro ao carregar análise vertical');
+        return res.json();
+      })
+      .then(data => {
+        setAnaliseVertical(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [selectedCompanyId]);
+
   const effectiveYear = analiseVertical?.DRE?.[selectedYear] ? selectedYear : '2025';
 
-  const dreKeys = Object.keys(analiseVertical?.DRE?.['2025'] ?? {}).filter(k => !k.includes('Total'));
-  const bpKeys = Object.keys(analiseVertical?.BP?.['2025'] ?? {}).filter(k => !k.includes('Total'));
+  const dreKeys = Object.keys(analiseVertical?.DRE?.[effectiveYear] ?? {}).filter(k => !k.includes('Total') && !k.includes('ATIVO') && !k.includes('PASSIVO'));
+  const bpKeys = Object.keys(analiseVertical?.BP?.[effectiveYear] ?? {}).filter(k => !k.includes('Total') && !k.includes('ATIVO') && !k.includes('PASSIVO'));
 
   const currentData = activeTab === 'dre' ? analiseVertical?.DRE : analiseVertical?.BP;
   const currentKeys = activeTab === 'dre' ? dreKeys : bpKeys;
@@ -35,6 +69,25 @@ export default function AnaliseVerticalPage() {
     { name: 'Passivo Nao Circ.', '2023': 16.48, '2024': 15.43, '2025': 14.49 },
     { name: 'Patrimonio Liquido', '2023': 70.05, '2024': 71.25, '2025': 72.33 },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (error || !analiseVertical) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-800 font-semibold mb-2">Erro ao carregar dados</p>
+          <p className="text-red-600 text-sm">{error || 'Dados não disponíveis'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

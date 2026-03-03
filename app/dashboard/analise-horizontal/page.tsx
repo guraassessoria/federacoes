@@ -1,11 +1,48 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { analiseHorizontal, anos } from '@/lib/data';
+import { ArrowLeftRight, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import CustomBarChart from '@/components/charts/bar-chart';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
+
+interface AnaliseHorizontalData {
+  DRE: Record<string, Record<string, number>>;
+  BP: Record<string, Record<string, number>>;
+}
 
 export default function AnaliseHorizontalPage() {
+  const { selectedCompanyId } = useDashboard();
+  const [analiseHorizontal, setAnaliseHorizontal] = useState<AnaliseHorizontalData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setError('Nenhuma empresa selecionada');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/analise-horizontal?companyId=${selectedCompanyId}&anos=2023,2024,2025`)
+      .then(res => {
+        if (!res.ok) throw new Error('Erro ao carregar análise horizontal');
+        return res.json();
+      })
+      .then(data => {
+        setAnaliseHorizontal(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [selectedCompanyId]);
+
   const dreKeys = Object.keys(analiseHorizontal?.DRE ?? {});
   const bpKeys = Object.keys(analiseHorizontal?.BP ?? {});
 
@@ -34,6 +71,25 @@ export default function AnaliseHorizontalPage() {
       </span>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+      </div>
+    );
+  }
+
+  if (error || !analiseHorizontal) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-800 font-semibold mb-2">Erro ao carregar dados</p>
+          <p className="text-red-600 text-sm">{error || 'Dados não disponíveis'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

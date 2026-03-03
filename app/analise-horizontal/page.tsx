@@ -63,9 +63,9 @@ export default function AnaliseHorizontalPage() {
             <thead>
               <tr className="bg-slate-50">
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2023-2024</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2024-2025</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">2023-2024</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">2024-2025</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
               </tr>
             </thead>
             <tbody>
@@ -117,9 +117,9 @@ export default function AnaliseHorizontalPage() {
             <thead>
               <tr className="bg-slate-50">
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2023-2024</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2024-2025</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">2023-2024</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">2024-2025</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
               </tr>
             </thead>
             <tbody>

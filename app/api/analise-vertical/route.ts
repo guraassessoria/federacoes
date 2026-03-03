@@ -6,7 +6,37 @@ import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/se
 
 export const dynamic = 'force-dynamic';
 
-// Função para buscar conta por código em uma hierarquia
+interface ContaVertical {
+  codigo: string;
+  descricao: string;
+  nivel: number;
+  valor: number;
+  percentual: number;
+}
+
+interface VerticalAno {
+  base: {
+    codigo: string;
+    descricao: string;
+    valor: number;
+  };
+  contas: ContaVertical[];
+}
+
+interface VerticalResponse {
+  meta: {
+    companyId: string;
+    anosSolicitados: string[];
+    anosDisponiveis: string[];
+    parametros: {
+      maxNivel: number;
+      incluirZeros: boolean;
+    };
+  };
+  DRE: Record<string, VerticalAno>;
+  BP: Record<string, VerticalAno>;
+}
+
 function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaComValor | null {
   for (const conta of contas) {
     if (conta.codigo === codigo) return conta;
@@ -18,59 +48,70 @@ function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaCom
   return null;
 }
 
-function flattenContas(contas: ContaComValor[]): ContaComValor[] {
-  const resultado: ContaComValor[] = [];
-
-  const walk = (itens: ContaComValor[]) => {
-    for (const item of itens) {
-      resultado.push(item);
-      if (item.children?.length) walk(item.children);
-    }
-  };
-
-  walk(contas);
-  return resultado;
-}
-
-function escolherBase(contas: ContaComValor[], codigosPreferenciais: string[], termosDescricao: string[]): number | null {
+function encontrarBasePorCodigo(contas: ContaComValor[], codigosPreferenciais: string[]): ContaComValor | null {
   for (const codigo of codigosPreferenciais) {
     const conta = buscarContaPorCodigo(contas, codigo);
-    if (conta && conta.valor !== 0) return conta.valor;
-  }
-
-  const flat = flattenContas(contas);
-  for (const conta of flat) {
-    const descricao = conta.descricao?.toLowerCase?.() || '';
-    if (termosDescricao.some(termo => descricao.includes(termo)) && conta.valor !== 0) {
-      return conta.valor;
+    if (conta && conta.valor !== 0) {
+      return conta;
     }
   }
 
-  const primeiraComValor = flat.find(conta => conta.valor !== 0);
-  return primeiraComValor?.valor ?? null;
+  for (const codigo of codigosPreferenciais) {
+    const conta = buscarContaPorCodigo(contas, codigo);
+    if (conta) {
+      return conta;
+    }
+  }
+
+  return null;
 }
 
-// Função para calcular análise vertical
-function calcularAnaliseVertical(contas: ContaComValor[], totalBase: number, maxNivel: number = 2): Record<string, number> {
-  const resultado: Record<string, number> = {};
+function extrairContasVerticais(
+  contas: ContaComValor[],
+  baseValor: number,
+  maxNivel: number,
+  incluirZeros: boolean
+): ContaVertical[] {
+  const resultado: ContaVertical[] = [];
+  const baseAbs = Math.abs(baseValor);
+  const visitados = new Set<string>();
 
-  function processar(conta: ContaComValor, nivel: number = 0): void {
-    if (nivel > maxNivel) return;
-    
-    // Calcular percentual em relação à base
-    if (totalBase !== 0 && (conta.valor !== 0 || conta.nivel <= 2)) {
-      const percentual = (conta.valor / Math.abs(totalBase)) * 100;
-      resultado[conta.descricao] = percentual;
-    }
-    
-    // Processar filhos
-    if (conta.children?.length) {
-      conta.children.forEach(child => processar(child, nivel + 1));
+  function processar(lista: ContaComValor[], nivelFallback: number = 1): void {
+    for (const conta of lista) {
+      const nivelConta = conta.nivelVisualizacao ?? conta.nivel ?? nivelFallback;
+      if (nivelConta <= maxNivel) {
+        const key = `${conta.codigo}|${conta.descricao}`;
+        if (!visitados.has(key)) {
+          const deveIncluir = incluirZeros || conta.valor !== 0 || nivelConta === 1;
+          if (deveIncluir) {
+            resultado.push({
+              codigo: conta.codigo,
+              descricao: conta.descricao,
+              nivel: nivelConta,
+              valor: conta.valor,
+              percentual: baseAbs === 0 ? 0 : (conta.valor / baseAbs) * 100,
+            });
+          }
+          visitados.add(key);
+        }
+      }
+
+      if (conta.children?.length) {
+        processar(conta.children, nivelConta + 1);
+      }
     }
   }
 
-  contas.forEach(conta => processar(conta, 0));
+  processar(contas);
   return resultado;
+}
+
+function parseAnos(rawAnos: string | null): string[] {
+  if (!rawAnos) return ['2023', '2024', '2025'];
+  return rawAnos
+    .split(',')
+    .map(item => item.trim())
+    .filter(item => /^\d{4}$/.test(item));
 }
 
 async function buscarBalancetesAno(companyId: string, yearShort: string) {
@@ -105,10 +146,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    const anos = searchParams.get('anos')?.split(',') || ['2023', '2024', '2025'];
+    const anos = parseAnos(searchParams.get('anos'));
+    const maxNivel = Math.max(1, Math.min(6, Number(searchParams.get('maxNivel') || 3)));
+    const incluirZeros = searchParams.get('incluirZeros') === 'true';
 
     if (!companyId) {
       return NextResponse.json({ error: 'ID da empresa é obrigatório' }, { status: 400 });
+    }
+
+    if (anos.length === 0) {
+      return NextResponse.json({ error: 'Parâmetro anos inválido. Use formato YYYY,YYYY.' }, { status: 400 });
     }
 
     // Buscar empresa
@@ -133,8 +180,16 @@ export async function GET(request: NextRequest) {
       padraoDMPL: r.padraoDMPL,
     }));
 
-    // Processar dados para cada ano
-    const analiseVertical: { DRE: Record<string, any>; BP: Record<string, any> } = {
+    const analiseVertical: VerticalResponse = {
+      meta: {
+        companyId,
+        anosSolicitados: anos,
+        anosDisponiveis: [],
+        parametros: {
+          maxNivel,
+          incluirZeros,
+        },
+      },
       DRE: {},
       BP: {}
     };
@@ -145,25 +200,32 @@ export async function GET(request: NextRequest) {
 
       if (balancetes.length > 0) {
         const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);
+        analiseVertical.meta.anosDisponiveis.push(ano);
 
-        // Para DRE: base preferencial é Receita Total
-        const baseDRE = escolherBase(
-          dre,
-          ['1', '51', '56'],
-          ['receita total', 'receita líquida', 'receita liquida', 'receita bruta', 'receitas']
-        );
-        if (baseDRE !== null) {
-          analiseVertical.DRE[ano] = calcularAnaliseVertical(dre, baseDRE);
+        // DRE: base contábil principal = Receita Líquida (56), fallback Receita Bruta (51)
+        const baseDRE = encontrarBasePorCodigo(dre, ['56', '51']);
+        if (baseDRE) {
+          analiseVertical.DRE[ano] = {
+            base: {
+              codigo: baseDRE.codigo,
+              descricao: baseDRE.descricao,
+              valor: baseDRE.valor,
+            },
+            contas: extrairContasVerticais(dre, baseDRE.valor, maxNivel, incluirZeros),
+          };
         }
 
-        // Para BP: base preferencial é Ativo Total
-        const baseBP = escolherBase(
-          bp,
-          ['1', '76'],
-          ['ativo total', 'ativo', 'total do ativo']
-        );
-        if (baseBP !== null) {
-          analiseVertical.BP[ano] = calcularAnaliseVertical(bp, baseBP);
+        // BP: base contábil principal = Ativo Total (1), fallback Total Passivo+PL (76)
+        const baseBP = encontrarBasePorCodigo(bp, ['1', '76']);
+        if (baseBP) {
+          analiseVertical.BP[ano] = {
+            base: {
+              codigo: baseBP.codigo,
+              descricao: baseBP.descricao,
+              valor: baseBP.valor,
+            },
+            contas: extrairContasVerticais(bp, baseBP.valor, maxNivel, incluirZeros),
+          };
         }
       }
     }

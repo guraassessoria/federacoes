@@ -6,24 +6,49 @@ import { BarChart3, Loader2 } from 'lucide-react';
 import CustomBarChart from '@/components/charts/bar-chart';
 import { useDashboard } from '@/lib/contexts/DashboardContext';
 
-interface AnaliseVerticalData {
-  DRE: Record<string, Record<string, number>>;
-  BP: Record<string, Record<string, number>>;
+interface ContaVertical {
+  codigo: string;
+  descricao: string;
+  nivel: number;
+  valor: number;
+  percentual: number;
 }
 
-function getVisibleKeys(data: Record<string, number> | undefined): string[] {
-  if (!data) return [];
-  const keys = Object.keys(data);
-  const filtered = keys.filter((k) => {
-    const lower = k.toLowerCase();
-    return !lower.includes('total') && !lower.includes('ativo') && !lower.includes('passivo');
-  });
-  return filtered.length > 0 ? filtered : keys;
+interface VerticalAno {
+  base: {
+    codigo: string;
+    descricao: string;
+    valor: number;
+  };
+  contas: ContaVertical[];
+}
+
+interface AnaliseVerticalData {
+  meta: {
+    companyId: string;
+    anosSolicitados: string[];
+    anosDisponiveis: string[];
+    parametros: {
+      maxNivel: number;
+      incluirZeros: boolean;
+    };
+  };
+  DRE: Record<string, VerticalAno>;
+  BP: Record<string, VerticalAno>;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(2)}%`;
+}
+
+function shortLabel(text: string, limit: number = 34): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}...`;
 }
 
 export default function AnaliseVerticalPage() {
   const [activeTab, setActiveTab] = useState<'dre' | 'bp'>('dre');
-  const { selectedYear, selectedCompanyId } = useDashboard();
+  const { selectedYear, selectedCompanyId, availableYears } = useDashboard();
   const [analiseVertical, setAnaliseVertical] = useState<AnaliseVerticalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +63,8 @@ export default function AnaliseVerticalPage() {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/analise-vertical?companyId=${selectedCompanyId}&anos=2023,2024,2025`)
+    const anos = availableYears.join(',');
+    fetch(`/api/analise-vertical?companyId=${selectedCompanyId}&anos=${anos}&maxNivel=3`)
       .then(res => {
         if (!res.ok) throw new Error('Erro ao carregar análise vertical');
         return res.json();
@@ -52,36 +78,39 @@ export default function AnaliseVerticalPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, availableYears]);
 
-  const availableDREYears = Object.keys(analiseVertical?.DRE ?? {});
-  const effectiveYear = analiseVertical?.DRE?.[selectedYear]
+  const fonteAtual = activeTab === 'dre' ? analiseVertical?.DRE : analiseVertical?.BP;
+  const anosDisponiveis = Object.keys(fonteAtual ?? {});
+  const effectiveYear = fonteAtual?.[selectedYear]
     ? selectedYear
-    : (availableDREYears[availableDREYears.length - 1] ?? '2025');
+    : (anosDisponiveis[anosDisponiveis.length - 1] ?? availableYears[availableYears.length - 1]);
 
-  const dreKeys = getVisibleKeys(analiseVertical?.DRE?.[effectiveYear]);
-  const bpKeys = getVisibleKeys(analiseVertical?.BP?.[effectiveYear]);
+  const dadosAnoAtual = fonteAtual?.[effectiveYear];
+  const contasTabela = (dadosAnoAtual?.contas ?? []).filter(conta => conta.nivel <= 3);
 
-  const currentData = activeTab === 'dre' ? analiseVertical?.DRE : analiseVertical?.BP;
-  const currentKeys = activeTab === 'dre' ? dreKeys : bpKeys;
+  const contasComparativas = (dadosAnoAtual?.contas ?? [])
+    .filter(conta => conta.nivel <= 2 && conta.codigo !== dadosAnoAtual.base.codigo)
+    .sort((a, b) => Math.abs(b.percentual) - Math.abs(a.percentual))
+    .slice(0, 8);
 
-  const composicaoReceitaData = [
-    { name: 'Competicoes', '2023': 34.72, '2024': 34.72, '2025': 34.72 },
-    { name: 'Repasses', '2023': 50.0, '2024': 50.0, '2025': 50.0 },
-    { name: 'Convenios', '2023': 9.72, '2024': 9.72, '2025': 9.72 },
-    { name: 'Outras', '2023': 5.56, '2024': 5.56, '2025': 5.56 },
-  ];
+  const comparativoData = contasComparativas.map(conta => {
+    const item: Record<string, string | number> = {
+      name: shortLabel(conta.descricao),
+    };
+    anosDisponiveis.forEach(ano => {
+      const contaAno = fonteAtual?.[ano]?.contas.find(c => c.codigo === conta.codigo);
+      item[ano] = contaAno?.percentual ?? 0;
+    });
+    return item;
+  });
 
-  const composicaoAtivoData = [
-    { name: 'Ativo Circulante', '2023': 43.04, '2024': 46.64, '2025': 50.15 },
-    { name: 'Ativo Nao Circulante', '2023': 56.96, '2024': 53.36, '2025': 49.85 },
-  ];
-
-  const composicaoPassivoData = [
-    { name: 'Passivo Circulante', '2023': 13.46, '2024': 13.32, '2025': 13.18 },
-    { name: 'Passivo Nao Circ.', '2023': 16.48, '2024': 15.43, '2025': 14.49 },
-    { name: 'Patrimonio Liquido', '2023': 70.05, '2024': 71.25, '2025': 72.33 },
-  ];
+  const chartColors = ['#60B5FF', '#FF9149', '#80D8C3', '#A19AD3', '#FF90BB', '#72BF78'];
+  const chartBars = anosDisponiveis.map((ano, idx) => ({
+    dataKey: ano,
+    color: chartColors[idx % chartColors.length],
+    name: ano,
+  }));
 
   if (loading) {
     return (
@@ -111,9 +140,9 @@ export default function AnaliseVerticalPage() {
       >
         <div className="flex items-center gap-3 mb-2">
           <BarChart3 className="w-8 h-8" />
-          <h1 className="text-3xl font-bold">Analise Vertical</h1>
+          <h1 className="text-3xl font-bold">Análise Vertical</h1>
         </div>
-        <p className="text-indigo-100">Composicao percentual das demonstracoes financeiras</p>
+        <p className="text-indigo-100">Composição percentual por modelo contábil (DRE e BP)</p>
       </motion.div>
 
       <div className="flex flex-wrap gap-4">
@@ -128,8 +157,25 @@ export default function AnaliseVerticalPage() {
             onClick={() => setActiveTab('bp')}
             className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
-            Balanco Patrimonial
+            Balanço Patrimonial
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Ano de referência</p>
+          <p className="text-lg font-semibold text-slate-800">{effectiveYear}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Base contábil</p>
+          <p className="text-sm font-semibold text-slate-800">
+            {dadosAnoAtual?.base.codigo} - {dadosAnoAtual?.base.descricao}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Contas consideradas</p>
+          <p className="text-lg font-semibold text-slate-800">{contasTabela.length}</p>
         </div>
       </div>
 
@@ -141,33 +187,38 @@ export default function AnaliseVerticalPage() {
       >
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-bold text-slate-800">
-            {activeTab === 'dre' ? 'DRE' : 'Balanco Patrimonial'} - Analise Vertical {effectiveYear}
+            {activeTab === 'dre' ? 'DRE' : 'Balanço Patrimonial'} - Análise Vertical {effectiveYear}
           </h2>
           <p className="text-sm text-gray-600">
-            {activeTab === 'dre' ? 'Percentual em relação à Receita Total' : 'Percentual em relação ao Ativo Total'}
+            Percentual em relação à conta base {dadosAnoAtual?.base.codigo} ({dadosAnoAtual?.base.descricao})
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50">
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-700">Valor</th>
                 <th className="text-right px-4 py-3 font-semibold text-slate-700">Percentual</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700 w-1/2">Composicao</th>
               </tr>
             </thead>
             <tbody>
-              {currentKeys.map((key, idx) => {
-                const value = currentData?.[effectiveYear]?.[key] ?? 0;
+              {contasTabela.map((conta, idx) => {
+                const offset = Math.max(0, (conta.nivel - 1) * 16);
+                const value = conta.percentual ?? 0;
                 return (
-                  <tr key={key} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                    <td className="px-4 py-3 text-slate-700">{key}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-800">{value?.toFixed?.(2) ?? '0.00'}%</td>
+                  <tr key={`${conta.codigo}-${idx}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                    <td className="px-4 py-3 text-slate-700 font-mono">{conta.codigo}</td>
+                    <td className="px-4 py-3 text-slate-700" style={{ paddingLeft: `${offset + 16}px` }}>{conta.descricao}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatPercent(value)}</td>
                     <td className="px-4 py-3">
                       <div className="w-full bg-slate-200 rounded-full h-4">
                         <div 
                           className="bg-indigo-500 h-4 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(value ?? 0, 100)}%` }}
+                          style={{ width: `${Math.min(Math.abs(value), 100)}%` }}
                         />
                       </div>
                     </td>
@@ -179,68 +230,28 @@ export default function AnaliseVerticalPage() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="bg-white rounded-xl shadow-lg p-6"
         >
-          <h2 className="text-lg font-bold text-slate-800 mb-4">
-            {activeTab === 'dre' ? 'Composicao da Receita' : 'Composicao do Ativo'}
-          </h2>
-          <CustomBarChart
-            data={activeTab === 'dre' ? composicaoReceitaData : composicaoAtivoData}
-            bars={[
-              { dataKey: '2023', color: '#60B5FF', name: '2023' },
-              { dataKey: '2024', color: '#FF9149', name: '2024' },
-              { dataKey: '2025', color: '#80D8C3', name: '2025' }
-            ]}
-            showPercent={true}
-          />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-xl shadow-lg p-6"
-        >
-          <h2 className="text-lg font-bold text-slate-800 mb-4">
-            {activeTab === 'dre' ? 'Evolucao da Estrutura DRE' : 'Estrutura de Capital'}
-          </h2>
-          <CustomBarChart
-            data={activeTab === 'dre' ? composicaoReceitaData : composicaoPassivoData}
-            bars={[
-              { dataKey: '2023', color: '#A19AD3', name: '2023' },
-              { dataKey: '2024', color: '#FF90BB', name: '2024' },
-              { dataKey: '2025', color: '#72BF78', name: '2025' }
-            ]}
-            showPercent={true}
-          />
+          <h2 className="text-lg font-bold text-slate-800 mb-4">Contas relevantes por ano (%)</h2>
+          {comparativoData.length > 0 ? (
+            <CustomBarChart
+              data={comparativoData}
+              bars={chartBars}
+              layout="vertical"
+              showPercent={true}
+            />
+          ) : (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-600">
+              Não há contas suficientes para montar o comparativo multianual.
+            </div>
+          )}
         </motion.div>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="bg-indigo-50 border border-indigo-200 rounded-xl p-6"
-      >
-        <h3 className="font-semibold text-indigo-900 mb-3">Principais Observações</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-indigo-100 rounded-lg p-4">
-            <p className="text-sm text-gray-700 mb-1">Receitas de Repasses</p>
-            <p className="text-lg font-bold text-indigo-800">50% da Receita Total</p>
-            <p className="text-xs text-gray-600 mt-1">Principal fonte de recursos</p>
-          </div>
-          <div className="bg-indigo-100 rounded-lg p-4">
-            <p className="text-sm text-gray-700 mb-1">Patrimônio Líquido</p>
-            <p className="text-lg font-bold text-indigo-800">72.33% do Passivo Total</p>
-            <p className="text-xs text-gray-600 mt-1">Estrutura de capital sólida</p>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 }

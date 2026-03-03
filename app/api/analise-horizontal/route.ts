@@ -6,16 +6,26 @@ import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/se
 
 export const dynamic = 'force-dynamic';
 
-// Função para buscar conta por código em uma hierarquia
-function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaComValor | null {
-  for (const conta of contas) {
-    if (conta.codigo === codigo) return conta;
-    if (conta.children?.length) {
-      const encontrada = buscarContaPorCodigo(conta.children, codigo);
-      if (encontrada) return encontrada;
-    }
-  }
-  return null;
+interface ContaHorizontal {
+  codigo: string;
+  descricao: string;
+  nivel: number;
+  valores: Record<string, number>;
+  variacoes: Record<string, number>;
+}
+
+interface HorizontalResponse {
+  meta: {
+    companyId: string;
+    anosSolicitados: string[];
+    anosDisponiveis: string[];
+    parametros: {
+      maxNivel: number;
+      incluirZeros: boolean;
+    };
+  };
+  DRE: Record<string, ContaHorizontal>;
+  BP: Record<string, ContaHorizontal>;
 }
 
 // Função para calcular análise horizontal entre dois períodos
@@ -24,26 +34,68 @@ function calcularVariacao(valorAnterior: number, valorAtual: number): number {
   return ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
 }
 
-// Função para extrair contas principais de uma demonstração
-function extrairContasPrincipais(contas: ContaComValor[], maxNivel: number = 2): Record<string, number> {
-  const resultado: Record<string, number> = {};
+function extrairContasModelo(
+  contas: ContaComValor[],
+  maxNivel: number,
+  incluirZeros: boolean
+): Record<string, { codigo: string; descricao: string; nivel: number; valor: number }> {
+  const resultado: Record<string, { codigo: string; descricao: string; nivel: number; valor: number }> = {};
 
-  function processar(conta: ContaComValor, nivel: number = 0): void {
-    if (nivel > maxNivel) return;
-    
-    // Adicionar conta se tiver valor ou for totalizador importante
-    if (conta.valor !== 0 || conta.nivel <= 2) {
-      resultado[conta.descricao] = conta.valor;
-    }
-    
-    // Processar filhos
-    if (conta.children?.length) {
-      conta.children.forEach(child => processar(child, nivel + 1));
+  function processar(lista: ContaComValor[], nivelFallback: number = 1): void {
+    for (const conta of lista) {
+      const nivelConta = conta.nivelVisualizacao ?? conta.nivel ?? nivelFallback;
+      if (nivelConta <= maxNivel) {
+        const deveIncluir = incluirZeros || conta.valor !== 0 || nivelConta === 1;
+        if (deveIncluir && !resultado[conta.codigo]) {
+          resultado[conta.codigo] = {
+            codigo: conta.codigo,
+            descricao: conta.descricao,
+            nivel: nivelConta,
+            valor: conta.valor,
+          };
+        }
+      }
+
+      if (conta.children?.length) {
+        processar(conta.children, nivelConta + 1);
+      }
     }
   }
 
-  contas.forEach(conta => processar(conta, 0));
+  processar(contas);
   return resultado;
+}
+
+function parseAnos(rawAnos: string | null): string[] {
+  if (!rawAnos) return ['2023', '2024', '2025'];
+  return rawAnos
+    .split(',')
+    .map(item => item.trim())
+    .filter(item => /^\d{4}$/.test(item));
+}
+
+function compareCodigoContabil(a: string, b: string): number {
+  const pa = a.split('.');
+  const pb = b.split('.');
+  const maxLen = Math.max(pa.length, pb.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const sa = pa[i] ?? '';
+    const sb = pb[i] ?? '';
+    const na = Number(sa);
+    const nb = Number(sb);
+
+    const ambosNumericos = Number.isFinite(na) && Number.isFinite(nb) && sa !== '' && sb !== '';
+    if (ambosNumericos) {
+      if (na !== nb) return na - nb;
+      continue;
+    }
+
+    const cmp = sa.localeCompare(sb, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return cmp;
+  }
+
+  return 0;
 }
 
 async function buscarBalancetesAno(companyId: string, yearShort: string) {
@@ -78,10 +130,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    const anos = searchParams.get('anos')?.split(',') || ['2023', '2024', '2025'];
+    const anos = parseAnos(searchParams.get('anos'));
+    const maxNivel = Math.max(1, Math.min(6, Number(searchParams.get('maxNivel') || 3)));
+    const incluirZeros = searchParams.get('incluirZeros') === 'true';
 
     if (!companyId) {
       return NextResponse.json({ error: 'ID da empresa é obrigatório' }, { status: 400 });
+    }
+
+    if (anos.length === 0) {
+      return NextResponse.json({ error: 'Parâmetro anos inválido. Use formato YYYY,YYYY.' }, { status: 400 });
     }
 
     // Buscar empresa
@@ -106,8 +164,13 @@ export async function GET(request: NextRequest) {
       padraoDMPL: r.padraoDMPL,
     }));
 
-    // Processar dados para cada ano
-    const dadosPorAno: Record<string, { dre: ContaComValor[]; bp: ContaComValor[] }> = {};
+    const dadosPorAno: Record<
+      string,
+      {
+        dre: Record<string, { codigo: string; descricao: string; nivel: number; valor: number }>;
+        bp: Record<string, { codigo: string; descricao: string; nivel: number; valor: number }>;
+      }
+    > = {};
 
     for (const ano of anos) {
       const yearShort = ano.slice(-2);
@@ -115,102 +178,87 @@ export async function GET(request: NextRequest) {
 
       if (balancetes.length > 0) {
         const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);
-        dadosPorAno[ano] = { dre, bp };
+        dadosPorAno[ano] = {
+          dre: extrairContasModelo(dre, maxNivel, incluirZeros),
+          bp: extrairContasModelo(bp, maxNivel, incluirZeros),
+        };
       }
     }
 
-    // Calcular análise horizontal
-    const analiseHorizontal: { DRE: Record<string, any>; BP: Record<string, any> } = {
+    const anosDisponiveis = anos.filter(ano => !!dadosPorAno[ano]);
+
+    const analiseHorizontal: HorizontalResponse = {
+      meta: {
+        companyId,
+        anosSolicitados: anos,
+        anosDisponiveis,
+        parametros: {
+          maxNivel,
+          incluirZeros,
+        },
+      },
       DRE: {},
       BP: {}
     };
 
-    // Extrair contas principais de cada ano
-    const dreContasPorAno: Record<string, Record<string, number>> = {};
-    const bpContasPorAno: Record<string, Record<string, number>> = {};
+    const dreCodigos = new Set<string>();
+    const bpCodigos = new Set<string>();
 
-    for (const ano of anos) {
-      if (dadosPorAno[ano]) {
-        dreContasPorAno[ano] = extrairContasPrincipais(dadosPorAno[ano].dre);
-        bpContasPorAno[ano] = extrairContasPrincipais(dadosPorAno[ano].bp);
-      }
+    for (const ano of anosDisponiveis) {
+      Object.keys(dadosPorAno[ano].dre).forEach(codigo => dreCodigos.add(codigo));
+      Object.keys(dadosPorAno[ano].bp).forEach(codigo => bpCodigos.add(codigo));
     }
 
-    // Obter todas as contas únicas
-    const dreContasUnicas = new Set<string>();
-    const bpContasUnicas = new Set<string>();
+    const construirSerie = (
+      codigo: string,
+      tipo: 'dre' | 'bp'
+    ): ContaHorizontal => {
+      const primeiraConta = anosDisponiveis
+        .map(ano => dadosPorAno[ano][tipo][codigo])
+        .find(Boolean);
 
-    Object.values(dreContasPorAno).forEach(contas => {
-      Object.keys(contas).forEach(conta => dreContasUnicas.add(conta));
-    });
-
-    Object.values(bpContasPorAno).forEach(contas => {
-      Object.keys(contas).forEach(conta => bpContasUnicas.add(conta));
-    });
-
-    // Calcular variações para DRE
-    dreContasUnicas.forEach(conta => {
       const valores: Record<string, number> = {};
       const variacoes: Record<string, number> = {};
 
-      anos.forEach(ano => {
-        valores[ano] = dreContasPorAno[ano]?.[conta] || 0;
-      });
-
-      // Calcular variações entre anos consecutivos
-      if (anos.length >= 2) {
-        for (let i = 1; i < anos.length; i++) {
-          const anoAnterior = anos[i - 1];
-          const anoAtual = anos[i];
-          const variacaoKey = `Variacao ${anoAnterior}-${anoAtual} (%)`;
-          variacoes[variacaoKey] = calcularVariacao(valores[anoAnterior], valores[anoAtual]);
-        }
-
-        // Variação acumulada
-        if (anos.length >= 2) {
-          const primeiroAno = anos[0];
-          const ultimoAno = anos[anos.length - 1];
-          variacoes[`Variacao ${primeiroAno}-${ultimoAno} (%)`] = calcularVariacao(
-            valores[primeiroAno],
-            valores[ultimoAno]
-          );
-        }
+      for (const ano of anosDisponiveis) {
+        valores[ano] = dadosPorAno[ano][tipo][codigo]?.valor ?? 0;
       }
 
-      analiseHorizontal.DRE[conta] = { ...valores, ...variacoes };
-    });
-
-    // Calcular variações para BP
-    bpContasUnicas.forEach(conta => {
-      const valores: Record<string, number> = {}; 
-      const variacoes: Record<string, number> = {};
-
-      anos.forEach(ano => {
-        valores[ano] = bpContasPorAno[ano]?.[conta] || 0;
-      });
-
-      // Calcular variações entre anos consecutivos
-      if (anos.length >= 2) {
-        for (let i = 1; i < anos.length; i++) {
-          const anoAnterior = anos[i - 1];
-          const anoAtual = anos[i];
-          const variacaoKey = `Variacao ${anoAnterior}-${anoAtual} (%)`;
-          variacoes[variacaoKey] = calcularVariacao(valores[anoAnterior], valores[anoAtual]);
-        }
-
-        // Variação acumulada
-        if (anos.length >= 2) {
-          const primeiroAno = anos[0];
-          const ultimoAno = anos[anos.length - 1];
-          variacoes[`Variacao ${primeiroAno}-${ultimoAno} (%)`] = calcularVariacao(
-            valores[primeiroAno],
-            valores[ultimoAno]
-          );
-        }
+      for (let i = 1; i < anosDisponiveis.length; i++) {
+        const anoAnterior = anosDisponiveis[i - 1];
+        const anoAtual = anosDisponiveis[i];
+        const key = `Variacao ${anoAnterior}-${anoAtual} (%)`;
+        variacoes[key] = calcularVariacao(valores[anoAnterior], valores[anoAtual]);
       }
 
-      analiseHorizontal.BP[conta] = { ...valores, ...variacoes };
-    });
+      if (anosDisponiveis.length >= 2) {
+        const primeiroAno = anosDisponiveis[0];
+        const ultimoAno = anosDisponiveis[anosDisponiveis.length - 1];
+        variacoes[`Variacao ${primeiroAno}-${ultimoAno} (%)`] = calcularVariacao(
+          valores[primeiroAno],
+          valores[ultimoAno]
+        );
+      }
+
+      return {
+        codigo,
+        descricao: primeiraConta?.descricao || codigo,
+        nivel: primeiraConta?.nivel || 1,
+        valores,
+        variacoes,
+      };
+    };
+
+    const dreOrdenados = Array.from(dreCodigos).sort(compareCodigoContabil);
+    const bpOrdenados = Array.from(bpCodigos).sort(compareCodigoContabil);
+
+    for (const codigo of dreOrdenados) {
+      analiseHorizontal.DRE[codigo] = construirSerie(codigo, 'dre');
+    }
+
+    for (const codigo of bpOrdenados) {
+      analiseHorizontal.BP[codigo] = construirSerie(codigo, 'bp');
+    }
 
     return NextResponse.json(analiseHorizontal);
 

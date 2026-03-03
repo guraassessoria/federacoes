@@ -53,6 +53,10 @@ export default function SelecionarEmpresaPage() {
     setSelectedCompany(companyId);
     setIsOpen(false);
     localStorage.setItem("selectedCompany", companyId);
+    const company = companies.find((c) => c.id === companyId);
+    if (company?.name) {
+      localStorage.setItem("selectedCompanyName", company.name);
+    }
   };
 
   const handleContinue = () => {
@@ -97,7 +101,7 @@ export default function SelecionarEmpresaPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-2xl overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl overflow-visible"
         >
           <div className="p-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
@@ -136,7 +140,7 @@ export default function SelecionarEmpresaPage() {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                      className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
                     >
                       {companies.map((company) => (
                         <button

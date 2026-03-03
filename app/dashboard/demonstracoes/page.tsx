@@ -416,7 +416,10 @@ export default function DemonstracoesPage() {
   }, [selectedCompanyId, viewMode, selectedYear, selectedMonth, fetchFinancialData, fetchMonthlyDreYear]);
 
   const handleGeneratePdf = async () => {
-    if (!selectedCompanyId) {
+    const companyIdToUse = selectedCompanyId || localStorage.getItem('selectedCompany');
+    const companyNameToUse = companyName || localStorage.getItem('selectedCompanyName') || 'empresa';
+
+    if (!companyIdToUse) {
       alert('Selecione uma empresa no menu lateral');
       return;
     }
@@ -425,7 +428,7 @@ export default function DemonstracoesPage() {
       const response = await fetch(API_ENDPOINTS.GENERATE_REPORT_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: selectedCompanyId, companyName, year: selectedYear }),
+        body: JSON.stringify({ companyId: companyIdToUse, companyName: companyNameToUse, year: selectedYear }),
       });
 
       if (!response.ok) {
@@ -448,7 +451,7 @@ export default function DemonstracoesPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
+      link.download = `relatorio_financeiro_${companyNameToUse.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

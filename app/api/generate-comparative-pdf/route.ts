@@ -107,15 +107,32 @@ function flattenEstrutura(contas: ContaComValor[]): ContaComValor[] {
 function encontrarCodigoPorDescricao(
   contas: ContaComValor[],
   termosPreferenciais: string[][],
-  fallbackCodigo: string
+  fallbackCodigo: string,
+  exclusoesPorTermo: string[][][] = []
 ): string {
   const flat = flattenEstrutura(contas);
-  for (const termos of termosPreferenciais) {
-    const match = flat.find((conta) => {
+  for (let i = 0; i < termosPreferenciais.length; i++) {
+    const termos = termosPreferenciais[i];
+    const exclusoes = exclusoesPorTermo[i] || [];
+    const matches = flat.filter((conta) => {
       const desc = normalizarTexto(conta.descricao || '');
-      return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+      const matchPrincipal = termos.every((termo) => desc.includes(normalizarTexto(termo)));
+      if (!matchPrincipal) return false;
+      if (!exclusoes.length) return true;
+      return !exclusoes.some((exclusao) => exclusao.every((termo) => desc.includes(normalizarTexto(termo))));
     });
-    if (match) return match.codigo;
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        const na = Number(a.nivel ?? Number.MAX_SAFE_INTEGER);
+        const nb = Number(b.nivel ?? Number.MAX_SAFE_INTEGER);
+        if (na !== nb) return na - nb;
+        const oa = Number((a as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        const ob = Number((b as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        if (oa !== ob) return oa - ob;
+        return String(a.codigo).localeCompare(String(b.codigo));
+      });
+      return matches[0].codigo;
+    }
   }
   return fallbackCodigo;
 }
@@ -197,11 +214,21 @@ function generateComparativeHTML(
   const codigoPassivo = encontrarCodigoPorDescricao(bpRef, [['passivo']], '76');
   const codigoPL = encontrarCodigoPorDescricao(bpRef, [['patrimonio', 'liquido']], '125');
 
-  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'liquida'], ['receita', 'bruta'], ['receita']], '1');
+  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']], '1');
   const codigoCustos = encontrarCodigoPorDescricao(dreRef, [['custo']], '52');
   const codigoDespesas = encontrarCodigoPorDescricao(dreRef, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], '104');
-  const codigoResultadoFinanceiro = encontrarCodigoPorDescricao(dreRef, [['resultado', 'financeiro']], '190');
-  const codigoResultadoOperacional = encontrarCodigoPorDescricao(dreRef, [['resultado', 'operacional']], '211');
+  const codigoResultadoFinanceiro = encontrarCodigoPorDescricao(
+    dreRef,
+    [['resultado', 'financeiro']],
+    '190',
+    [[['antes', 'resultado', 'financeiro']]]
+  );
+  const codigoResultadoOperacional = encontrarCodigoPorDescricao(
+    dreRef,
+    [['resultado', 'operacional']],
+    '211',
+    [[['nao', 'operacional']]]
+  );
 
   // Função para gerar linha de comparação
   const gerarLinhaComparacao = (

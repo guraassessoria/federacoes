@@ -55,30 +55,6 @@ function flattenContas(contas: ContaComValor[]): ContaComValor[] {
   return result;
 }
 
-function compareCodigoContabil(a: string, b: string): number {
-  const pa = a.split('.');
-  const pb = b.split('.');
-  const maxLen = Math.max(pa.length, pb.length);
-
-  for (let i = 0; i < maxLen; i++) {
-    const sa = pa[i] ?? '';
-    const sb = pb[i] ?? '';
-    const na = Number(sa);
-    const nb = Number(sb);
-
-    const ambosNumericos = Number.isFinite(na) && Number.isFinite(nb) && sa !== '' && sb !== '';
-    if (ambosNumericos) {
-      if (na !== nb) return na - nb;
-      continue;
-    }
-
-    const cmp = sa.localeCompare(sb, 'pt-BR', { numeric: true, sensitivity: 'base' });
-    if (cmp !== 0) return cmp;
-  }
-
-  return 0;
-}
-
 export default function ComparativoPage() {
   const { data: session } = useSession();
   const { selectedYear, selectedMonth, viewMode } = useDashboard();
@@ -163,58 +139,70 @@ export default function ComparativoPage() {
   );
 
   const buildComparativeRows = useCallback(
-    (type: 'bp' | 'dre'): LinhaComparativa[] => {
+    (type: 'bp' | 'dre', maxNivel: number = 4): LinhaComparativa[] => {
       if (selectedCompanies.length === 0) return [];
 
       const getEstrutura = (companyId: string) =>
         type === 'bp' ? comparativeData[companyId]?.estruturaBP || [] : comparativeData[companyId]?.estruturaDRE || [];
 
-      const baseCompany = selectedCompanies.find((company) => getEstrutura(company.id).length > 0);
-      const baseRows = baseCompany
-        ? flattenContas(getEstrutura(baseCompany.id)).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2)
-        : [];
+      const templateCompany = selectedCompanies.find((company) => getEstrutura(company.id).length > 0);
+      const templateTree = templateCompany ? getEstrutura(templateCompany.id) : [];
+      if (templateTree.length === 0) return [];
 
-      const orderMap = new Map<string, number>();
-      baseRows.forEach((row, idx) => orderMap.set(row.codigo, idx));
-
-      const rowMap = new Map<string, LinhaComparativa>();
-
+      const lookupByCompany = new Map<string, Map<string, ContaComValor>>();
       selectedCompanies.forEach((company) => {
-        const flatRows = flattenContas(getEstrutura(company.id)).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2);
+        const map = new Map<string, ContaComValor>();
+        flattenContas(getEstrutura(company.id)).forEach((conta) => {
+          map.set(conta.codigo, conta);
+        });
+        lookupByCompany.set(company.id, map);
+      });
 
-        flatRows.forEach((row) => {
-          if (!rowMap.has(row.codigo)) {
-            rowMap.set(row.codigo, {
-              codigo: row.codigo,
-              descricao: row.descricao,
-              nivel: row.nivelVisualizacao || row.nivel || 1,
-              valores: {},
+      const hasValueRecursive = (node: ContaComValor): boolean => {
+        const hasOwnValue = selectedCompanies.some((company) => {
+          const row = lookupByCompany.get(company.id)?.get(node.codigo);
+          return Math.abs(row?.valor || 0) > 0;
+        });
+        if (hasOwnValue) return true;
+        return (node.children || []).some((child) => hasValueRecursive(child));
+      };
+
+      const rows: LinhaComparativa[] = [];
+
+      const walk = (nodes: ContaComValor[], fallbackNivel: number = 1) => {
+        nodes.forEach((node) => {
+          const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
+          const visible = hasValueRecursive(node);
+
+          if (visible && nivel <= maxNivel) {
+            const valores: Record<string, number> = {};
+            selectedCompanies.forEach((company) => {
+              const row = lookupByCompany.get(company.id)?.get(node.codigo);
+              valores[company.id] = row?.valor || 0;
+            });
+
+            rows.push({
+              codigo: node.codigo,
+              descricao: node.descricao,
+              nivel,
+              valores,
             });
           }
 
-          const target = rowMap.get(row.codigo)!;
-          target.valores[company.id] = row.valor || 0;
+          if (node.children?.length) {
+            walk(node.children, nivel + 1);
+          }
         });
-      });
+      };
 
-      const rows = Array.from(rowMap.values())
-        .filter((row) => selectedCompanies.some((company) => Math.abs(row.valores[company.id] || 0) > 0))
-        .sort((a, b) => {
-          const hasA = orderMap.has(a.codigo);
-          const hasB = orderMap.has(b.codigo);
-          if (hasA && hasB) return (orderMap.get(a.codigo) || 0) - (orderMap.get(b.codigo) || 0);
-          if (hasA) return -1;
-          if (hasB) return 1;
-          return compareCodigoContabil(a.codigo, b.codigo);
-        });
-
+      walk(templateTree);
       return rows;
     },
     [comparativeData, selectedCompanies]
   );
 
-  const bpRows = useMemo(() => buildComparativeRows('bp'), [buildComparativeRows]);
-  const dreRows = useMemo(() => buildComparativeRows('dre'), [buildComparativeRows]);
+  const bpRows = useMemo(() => buildComparativeRows('bp', 3), [buildComparativeRows]);
+  const dreRows = useMemo(() => buildComparativeRows('dre', 3), [buildComparativeRows]);
 
   const indicesRows = useMemo(() => {
     const labels: Array<{ key: string; label: string; group: 'liquidez' | 'rentabilidade' | 'endividamento' | 'atividade' }> = [

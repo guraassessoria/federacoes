@@ -49,5 +49,6 @@ export const config = {
     "/endividamento/:path*",
     "/analise-horizontal/:path*",
     "/analise-vertical/:path*",
+    "/comparativo/:path*",
   ],
 };

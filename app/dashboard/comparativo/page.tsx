@@ -154,27 +154,18 @@ export default function ComparativoPage() {
       if (type === 'dre') {
         const normalizeCode = (code: string | null | undefined) =>
           (code || '').toString().trim().replace(',', '.');
-        const normalizeText = (text: string | null | undefined) =>
-          (text || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .replace(/\s+/g, ' ')
-            .trim();
 
         const lookupByCompany = new Map<
           string,
           {
             byCode: Map<string, ContaComValor>;
             byNormalizedCode: Map<string, ContaComValor>;
-            byDescricao: Map<string, ContaComValor[]>;
           }
         >();
 
         selectedCompanies.forEach((company) => {
           const byCode = new Map<string, ContaComValor>();
           const byNormalizedCode = new Map<string, ContaComValor>();
-          const byDescricao = new Map<string, ContaComValor[]>();
 
           flattenContas(getEstrutura(company.id)).forEach((conta) => {
             byCode.set(conta.codigo, conta);
@@ -183,21 +174,14 @@ export default function ComparativoPage() {
             if (!byNormalizedCode.has(normalized)) {
               byNormalizedCode.set(normalized, conta);
             }
-
-            const descKey = normalizeText(conta.descricao);
-            if (!byDescricao.has(descKey)) {
-              byDescricao.set(descKey, []);
-            }
-            byDescricao.get(descKey)!.push(conta);
           });
 
-          lookupByCompany.set(company.id, { byCode, byNormalizedCode, byDescricao });
+          lookupByCompany.set(company.id, { byCode, byNormalizedCode });
         });
 
         const resolveConta = (
           companyId: string,
-          node: ContaComValor,
-          parentResolved?: ContaComValor
+          node: ContaComValor
         ): ContaComValor | undefined => {
           const lookup = lookupByCompany.get(companyId);
           if (!lookup) return undefined;
@@ -208,25 +192,7 @@ export default function ComparativoPage() {
           const normalized = lookup.byNormalizedCode.get(normalizeCode(node.codigo));
           if (normalized) return normalized;
 
-          const descCandidates = lookup.byDescricao.get(normalizeText(node.descricao)) || [];
-          if (descCandidates.length === 0) return undefined;
-          if (descCandidates.length === 1) return descCandidates[0];
-
-          if (parentResolved) {
-            const parentCode = normalizeCode(parentResolved.codigo);
-            const withSameParent = descCandidates.find(
-              (candidate) => normalizeCode(candidate.codigoSuperior) === parentCode
-            );
-            if (withSameParent) return withSameParent;
-          }
-
-          const nodeNivel = node.nivelVisualizacao || node.nivel || 1;
-          const withSameLevel = descCandidates.find(
-            (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === nodeNivel
-          );
-          if (withSameLevel) return withSameLevel;
-
-          return descCandidates[0];
+          return undefined;
         };
 
         const hasValueRecursive = (node: ContaComValor, resolvedByCompany: Record<string, ContaComValor | undefined>): boolean => {
@@ -239,7 +205,7 @@ export default function ComparativoPage() {
             const childResolved = Object.fromEntries(
               selectedCompanies.map((company) => [
                 company.id,
-                resolveConta(company.id, child, resolvedByCompany[company.id]),
+                resolveConta(company.id, child),
               ])
             ) as Record<string, ContaComValor | undefined>;
             return hasValueRecursive(child, childResolved);
@@ -249,15 +215,14 @@ export default function ComparativoPage() {
         const rows: LinhaComparativa[] = [];
         const walk = (
           nodes: ContaComValor[],
-          fallbackNivel: number = 1,
-          parentResolvedByCompany?: Record<string, ContaComValor | undefined>
+          fallbackNivel: number = 1
         ) => {
           nodes.forEach((node) => {
             const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
             const resolvedByCompany = Object.fromEntries(
               selectedCompanies.map((company) => [
                 company.id,
-                resolveConta(company.id, node, parentResolvedByCompany?.[company.id]),
+                resolveConta(company.id, node),
               ])
             ) as Record<string, ContaComValor | undefined>;
 
@@ -280,7 +245,7 @@ export default function ComparativoPage() {
             }
 
             if (node.children?.length) {
-              walk(node.children, nivel + 1, resolvedByCompany);
+              walk(node.children, nivel + 1);
             }
           });
         };

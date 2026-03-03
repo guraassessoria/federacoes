@@ -1,15 +1,21 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Scale, Info } from 'lucide-react';
-import { indicesFinanceiros, anos, formatPercent } from '@/lib/data';
-import IndicatorCard from '@/components/indicator-card';
-import CustomLineChart from '@/components/charts/line-chart';
-import CustomBarChart from '@/components/charts/bar-chart';
-import CustomPieChart from '@/components/charts/pie-chart';
-import { resumoExecutivo } from '@/lib/data';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const endividamentoDescriptions: Record<string, string> = {
+export default function EndividamentoPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/endividamento');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <p className="text-slate-600">Redirecionando...</p>
+    </div>
+  );
+}
   'Endividamento Geral (%)': 'Percentual do ativo financiado por terceiros',
   'Composicao do Endividamento (%)': 'Percentual da divida que vence no curto prazo',
   'Grau de Alavancagem': 'Relacao entre passivo total e patrimonio liquido',

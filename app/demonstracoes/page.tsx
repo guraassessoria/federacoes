@@ -1,12 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FileSpreadsheet, ChevronDown, ChevronRight } from 'lucide-react';
-import { demonstracoesFinanceiras, analiseVertical, formatCurrency, formatPercent, anos } from '@/lib/data';
-import CustomBarChart from '@/components/charts/bar-chart';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const dreGroups = [
+export default function DemonstracoesPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/demonstracoes');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <p className="text-slate-600">Redirecionando...</p>
+    </div>
+  );
+}
   { title: 'Receitas Operacionais', keys: ['Receitas de Competicoes', 'Receitas de Repasses', 'Receitas de Convenios e Parcerias', 'Outras Receitas Operacionais', 'Total Receitas Operacionais'], total: 'Total Receitas Operacionais' },
   { title: 'Custos', keys: ['Custos com Competicoes', 'Custos com Desenvolvimento do Futebol', 'Custos com Infraestrutura Esportiva', 'Total Custos'], total: 'Total Custos' },
   { title: 'Despesas Operacionais', keys: ['Despesas com Pessoal', 'Despesas Administrativas', 'Despesas Comerciais e Marketing', 'Outras Despesas Operacionais', 'Total Despesas Operacionais'], total: 'Total Despesas Operacionais' },

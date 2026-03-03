@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { BarChart3 } from 'lucide-react';
-import { analiseVertical, anos } from '@/lib/data';
-import CustomBarChart from '@/components/charts/bar-chart';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AnaliseVerticalPage() {
-  const [activeTab, setActiveTab] = useState<'dre' | 'bp'>('dre');
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/analise-vertical');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <p className="text-slate-600">Redirecionando...</p>
+    </div>
+  );
+}
   const [selectedYear, setSelectedYear] = useState('2025');
 
   const dreKeys = Object.keys(analiseVertical?.DRE?.['2025'] ?? {}).filter(k => !k.includes('Total'));

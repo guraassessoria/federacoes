@@ -1,12 +1,21 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Droplets, Info } from 'lucide-react';
-import { indicesFinanceiros, anos } from '@/lib/data';
-import IndicatorCard from '@/components/indicator-card';
-import CustomLineChart from '@/components/charts/line-chart';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const liquidezDescriptions: Record<string, string> = {
+export default function LiquidezPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/liquidez');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <p className="text-slate-600">Redirecionando...</p>
+    </div>
+  );
+}
   'Liquidez Corrente': 'Capacidade de pagar dividas de curto prazo com ativos circulantes. Ideal: > 1.5',
   'Liquidez Seca': 'Similar a corrente, mas exclui estoques. Ideal: > 1.0',
   'Liquidez Imediata': 'Capacidade de pagar dividas imediatamente com caixa. Ideal: > 0.5'

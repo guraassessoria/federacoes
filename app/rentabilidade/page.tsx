@@ -1,13 +1,21 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { TrendingUp, Info } from 'lucide-react';
-import { indicesFinanceiros, anos, formatPercent, formatCurrency } from '@/lib/data';
-import IndicatorCard from '@/components/indicator-card';
-import CustomLineChart from '@/components/charts/line-chart';
-import CustomBarChart from '@/components/charts/bar-chart';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const rentabilidadeDescriptions: Record<string, string> = {
+export default function RentabilidadePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/rentabilidade');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <p className="text-slate-600">Redirecionando...</p>
+    </div>
+  );
+}
   'Margem Bruta (%)': 'Percentual da receita que sobra apos custos diretos',
   'Margem Operacional (%)': 'Percentual da receita que sobra apos custos e despesas operacionais',
   'Margem Liquida (%)': 'Percentual da receita que se converte em lucro liquido',

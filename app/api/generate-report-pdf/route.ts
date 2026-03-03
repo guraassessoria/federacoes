@@ -457,7 +457,10 @@ export async function POST(request: NextRequest) {
     // Buscar dados do balancete
     // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
     const yearShort = year ? year.slice(-2) : '25';
-    const balancetes = await prisma.balancete.findMany({
+    
+    // Compatibilidade: tentar balancete ou balanceteRow
+    const balanceteModel = (prisma as any).balancete ?? (prisma as any).balanceteRow;
+    const balancetes = await balanceteModel.findMany({
       where: {
         companyId,
         period: { contains: `/${yearShort}` }

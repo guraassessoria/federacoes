@@ -18,6 +18,38 @@ function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaCom
   return null;
 }
 
+function flattenContas(contas: ContaComValor[]): ContaComValor[] {
+  const resultado: ContaComValor[] = [];
+
+  const walk = (itens: ContaComValor[]) => {
+    for (const item of itens) {
+      resultado.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+
+  walk(contas);
+  return resultado;
+}
+
+function escolherBase(contas: ContaComValor[], codigosPreferenciais: string[], termosDescricao: string[]): number | null {
+  for (const codigo of codigosPreferenciais) {
+    const conta = buscarContaPorCodigo(contas, codigo);
+    if (conta && conta.valor !== 0) return conta.valor;
+  }
+
+  const flat = flattenContas(contas);
+  for (const conta of flat) {
+    const descricao = conta.descricao?.toLowerCase?.() || '';
+    if (termosDescricao.some(termo => descricao.includes(termo)) && conta.valor !== 0) {
+      return conta.valor;
+    }
+  }
+
+  const primeiraComValor = flat.find(conta => conta.valor !== 0);
+  return primeiraComValor?.valor ?? null;
+}
+
 // Função para calcular análise vertical
 function calcularAnaliseVertical(contas: ContaComValor[], totalBase: number, maxNivel: number = 2): Record<string, number> {
   const resultado: Record<string, number> = {};
@@ -39,6 +71,29 @@ function calcularAnaliseVertical(contas: ContaComValor[], totalBase: number, max
 
   contas.forEach(conta => processar(conta, 0));
   return resultado;
+}
+
+async function buscarBalancetesAno(companyId: string, yearShort: string) {
+  const model = (prisma as any).balancete ?? (prisma as any).balanceteRow;
+  if (!model) return [];
+
+  try {
+    return await model.findMany({
+      where: {
+        companyId,
+        period: { contains: `/${yearShort}` }
+      },
+      orderBy: { accountCode: 'asc' }
+    });
+  } catch {
+    return await model.findMany({
+      where: {
+        companyId,
+        period: { contains: `/${yearShort}` }
+      },
+      orderBy: { accountNumber: 'asc' }
+    });
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -86,27 +141,29 @@ export async function GET(request: NextRequest) {
 
     for (const ano of anos) {
       const yearShort = ano.slice(-2);
-      const balancetes = await prisma.balancete.findMany({
-        where: {
-          companyId,
-          period: { contains: `/${yearShort}` }
-        },
-        orderBy: { accountCode: 'asc' }
-      });
+      const balancetes = await buscarBalancetesAno(companyId, yearShort);
 
       if (balancetes.length > 0) {
         const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);
 
-        // Para DRE: base é a Receita Total (código '1')
-        const receitaTotal = buscarContaPorCodigo(dre, '1');
-        if (receitaTotal && receitaTotal.valor !== 0) {
-          analiseVertical.DRE[ano] = calcularAnaliseVertical(dre, receitaTotal.valor);
+        // Para DRE: base preferencial é Receita Total
+        const baseDRE = escolherBase(
+          dre,
+          ['1', '51', '56'],
+          ['receita total', 'receita líquida', 'receita liquida', 'receita bruta', 'receitas']
+        );
+        if (baseDRE !== null) {
+          analiseVertical.DRE[ano] = calcularAnaliseVertical(dre, baseDRE);
         }
 
-        // Para BP: base é o Ativo Total (código '1')
-        const ativoTotal = buscarContaPorCodigo(bp, '1');
-        if (ativoTotal && ativoTotal.valor !== 0) {
-          analiseVertical.BP[ano] = calcularAnaliseVertical(bp, ativoTotal.valor);
+        // Para BP: base preferencial é Ativo Total
+        const baseBP = escolherBase(
+          bp,
+          ['1', '76'],
+          ['ativo total', 'ativo', 'total do ativo']
+        );
+        if (baseBP !== null) {
+          analiseVertical.BP[ano] = calcularAnaliseVertical(bp, baseBP);
         }
       }
     }

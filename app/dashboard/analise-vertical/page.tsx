@@ -11,6 +11,16 @@ interface AnaliseVerticalData {
   BP: Record<string, Record<string, number>>;
 }
 
+function getVisibleKeys(data: Record<string, number> | undefined): string[] {
+  if (!data) return [];
+  const keys = Object.keys(data);
+  const filtered = keys.filter((k) => {
+    const lower = k.toLowerCase();
+    return !lower.includes('total') && !lower.includes('ativo') && !lower.includes('passivo');
+  });
+  return filtered.length > 0 ? filtered : keys;
+}
+
 export default function AnaliseVerticalPage() {
   const [activeTab, setActiveTab] = useState<'dre' | 'bp'>('dre');
   const { selectedYear, selectedCompanyId } = useDashboard();
@@ -44,10 +54,13 @@ export default function AnaliseVerticalPage() {
       });
   }, [selectedCompanyId]);
 
-  const effectiveYear = analiseVertical?.DRE?.[selectedYear] ? selectedYear : '2025';
+  const availableDREYears = Object.keys(analiseVertical?.DRE ?? {});
+  const effectiveYear = analiseVertical?.DRE?.[selectedYear]
+    ? selectedYear
+    : (availableDREYears[availableDREYears.length - 1] ?? '2025');
 
-  const dreKeys = Object.keys(analiseVertical?.DRE?.[effectiveYear] ?? {}).filter(k => !k.includes('Total') && !k.includes('ATIVO') && !k.includes('PASSIVO'));
-  const bpKeys = Object.keys(analiseVertical?.BP?.[effectiveYear] ?? {}).filter(k => !k.includes('Total') && !k.includes('ATIVO') && !k.includes('PASSIVO'));
+  const dreKeys = getVisibleKeys(analiseVertical?.DRE?.[effectiveYear]);
+  const bpKeys = getVisibleKeys(analiseVertical?.BP?.[effectiveYear]);
 
   const currentData = activeTab === 'dre' ? analiseVertical?.DRE : analiseVertical?.BP;
   const currentKeys = activeTab === 'dre' ? dreKeys : bpKeys;

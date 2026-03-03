@@ -46,6 +46,29 @@ function extrairContasPrincipais(contas: ContaComValor[], maxNivel: number = 2):
   return resultado;
 }
 
+async function buscarBalancetesAno(companyId: string, yearShort: string) {
+  const model = (prisma as any).balancete ?? (prisma as any).balanceteRow;
+  if (!model) return [];
+
+  try {
+    return await model.findMany({
+      where: {
+        companyId,
+        period: { contains: `/${yearShort}` }
+      },
+      orderBy: { accountCode: 'asc' }
+    });
+  } catch {
+    return await model.findMany({
+      where: {
+        companyId,
+        period: { contains: `/${yearShort}` }
+      },
+      orderBy: { accountNumber: 'asc' }
+    });
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -88,13 +111,7 @@ export async function GET(request: NextRequest) {
 
     for (const ano of anos) {
       const yearShort = ano.slice(-2);
-      const balancetes = await prisma.balancete.findMany({
-        where: {
-          companyId,
-          period: { contains: `/${yearShort}` }
-        },
-        orderBy: { accountCode: 'asc' }
-      });
+      const balancetes = await buscarBalancetesAno(companyId, yearShort);
 
       if (balancetes.length > 0) {
         const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);

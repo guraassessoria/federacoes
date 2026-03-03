@@ -37,6 +37,11 @@ interface AnaliseVerticalData {
   BP: Record<string, VerticalAno>;
 }
 
+interface ChartDataPoint {
+  name: string;
+  [key: string]: string | number;
+}
+
 function formatPercent(value: number): string {
   return `${value.toFixed(2)}%`;
 }
@@ -95,8 +100,8 @@ export default function AnaliseVerticalPage() {
     .sort((a, b) => Math.abs(b.percentual) - Math.abs(a.percentual))
     .slice(0, 8);
 
-  const comparativoData = contasComparativas.map(conta => {
-    const item: Record<string, string | number> = {
+  const comparativoData: ChartDataPoint[] = contasComparativas.map(conta => {
+    const item: ChartDataPoint = {
       name: shortLabel(conta.descricao),
     };
     anosDisponiveis.forEach(ano => {

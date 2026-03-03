@@ -29,6 +29,13 @@ function formatNumber(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 // Interface para dados processados de uma federação
 interface DadosFederacao {
   id: string;
@@ -53,69 +60,17 @@ interface DadosFederacao {
 
 // Função para extrair valores principais
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
-  const buscar = (contas: ContaComValor[], codigo: string): number | null => {
-    for (const conta of contas) {
-      if (conta.codigo === codigo) return conta.valor !== 0 ? conta.valor : null;
-      if (conta.children?.length) {
-        const v = buscar(conta.children, codigo);
-        if (v !== null) return v;
-      }
-    }
-    return null;
-  };
-
-  const flatten = (contas: ContaComValor[]): ContaComValor[] => {
-    const result: ContaComValor[] = [];
-    const walk = (items: ContaComValor[]) => {
-      for (const item of items) {
-        result.push(item);
-        if (item.children?.length) walk(item.children);
-      }
-    };
-    walk(contas);
-    return result;
-  };
-
-  const buscarPorCodigos = (contas: ContaComValor[], codigos: string[]): number | null => {
-    for (const codigo of codigos) {
-      const valor = buscar(contas, codigo);
-      if (valor !== null) return valor;
-    }
-    return null;
-  };
-
-  const buscarPorDescricao = (contas: ContaComValor[], termos: string[]): number | null => {
-    const flat = flatten(contas);
-    for (const conta of flat) {
-      const descricao = conta.descricao?.toLowerCase?.() || '';
-      if (termos.some((termo) => descricao.includes(termo))) {
-        return conta.valor !== 0 ? conta.valor : null;
-      }
-    }
-    return null;
-  };
-
-  const receitasTotal =
-    buscarPorCodigos(dre, ['1', '51', '56']) ??
-    buscarPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
-
-  const custosTotal =
-    buscarPorCodigos(dre, ['52', '57']) ??
-    buscarPorDescricao(dre, ['custos']);
-
-  const despesasTotal =
-    buscarPorCodigos(dre, ['104', '110']) ??
-    buscarPorDescricao(dre, ['despesas']);
+  const valores = extrairValores(bp, dre);
 
   return {
-    ativoTotal: buscar(bp, '1'),
-    ativoCirculante: buscar(bp, '2'),
-    passivoCirculante: buscar(bp, '77'),
-    passivoNaoCirculante: buscar(bp, '113'),
-    patrimonioLiquido: buscar(bp, '125'),
-    receitasTotal,
-    custosTotal,
-    despesasTotal
+    ativoTotal: valores.ativoTotal,
+    ativoCirculante: valores.ativoCirculante,
+    passivoCirculante: valores.passivoCirculante,
+    passivoNaoCirculante: valores.passivoNaoCirculante,
+    patrimonioLiquido: valores.patrimonioLiquido,
+    receitasTotal: valores.receitasTotal,
+    custosTotal: valores.custosTotal,
+    despesasTotal: valores.despesasTotal
   };
 }
 
@@ -123,6 +78,119 @@ function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
 function gerarSigla(nome: string): string {
   const palavras = nome.split(' ').filter(p => p.length > 2 && !['de', 'do', 'da', 'dos', 'das'].includes(p.toLowerCase()));
   return palavras.map(p => p[0].toUpperCase()).join('').slice(0, 4);
+}
+
+// Função para buscar conta por código em uma hierarquia
+function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaComValor | null {
+  for (const conta of contas) {
+    if (conta.codigo === codigo) return conta;
+    if (conta.children?.length) {
+      const encontrada = buscarContaPorCodigo(conta.children, codigo);
+      if (encontrada) return encontrada;
+    }
+  }
+  return null;
+}
+
+function flattenEstrutura(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function encontrarCodigoPorDescricao(
+  contas: ContaComValor[],
+  termosPreferenciais: string[][],
+  fallbackCodigo: string,
+  exclusoesPorTermo: string[][][] = []
+): string {
+  const flat = flattenEstrutura(contas);
+  for (let i = 0; i < termosPreferenciais.length; i++) {
+    const termos = termosPreferenciais[i];
+    const exclusoes = exclusoesPorTermo[i] || [];
+    const matches = flat.filter((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      const matchPrincipal = termos.every((termo) => desc.includes(normalizarTexto(termo)));
+      if (!matchPrincipal) return false;
+      if (!exclusoes.length) return true;
+      return !exclusoes.some((exclusao) => exclusao.every((termo) => desc.includes(normalizarTexto(termo))));
+    });
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        const na = Number(a.nivel ?? Number.MAX_SAFE_INTEGER);
+        const nb = Number(b.nivel ?? Number.MAX_SAFE_INTEGER);
+        if (na !== nb) return na - nb;
+        const oa = Number((a as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        const ob = Number((b as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        if (oa !== ob) return oa - ob;
+        return String(a.codigo).localeCompare(String(b.codigo));
+      });
+      return matches[0].codigo;
+    }
+  }
+  return fallbackCodigo;
+}
+
+// Função para gerar linhas de tabela comparativa com hierarquia
+function gerarLinhasTabelaComparativa(
+  federacoes: DadosFederacao[],
+  codigoRaiz: string,
+  tipo: 'bp' | 'dre',
+  maxNivel: number = 3
+): string {
+  let html = '';
+  
+  // Buscar a conta raiz na primeira federação para ter a estrutura
+  const primeiraFed = federacoes[0];
+  const contas = tipo === 'bp' ? primeiraFed.bp : primeiraFed.dre;
+  const raiz = buscarContaPorCodigo(contas, codigoRaiz);
+  
+  if (!raiz) return '';
+  
+  function processar(codigo: string, descricao: string, nivel: number): void {
+    if (nivel > maxNivel) return;
+    
+    // Buscar valores em todas as federações
+    const valores = federacoes.map(fed => {
+      const contasFed = tipo === 'bp' ? fed.bp : fed.dre;
+      const conta = buscarContaPorCodigo(contasFed, codigo);
+      return conta?.valor ?? 0;
+    });
+    
+    // Verificar se todos os valores são zero (ocultar se nível > 1)
+    const todosZero = valores.every(v => v === 0);
+    if (todosZero && nivel > 1) return;
+    
+    const indent = '&nbsp;'.repeat(nivel * 4);
+    const isTotal = nivel === 1;
+    const isSubtotal = nivel === 2;
+    
+    let rowClass = '';
+    if (isTotal) rowClass = 'class="total-row"';
+    else if (isSubtotal) rowClass = 'class="subtotal-row"';
+    
+    const celulasValores = valores.map(v => `<td>${v !== 0 ? formatCurrency(v) : '-'}</td>`).join('');
+    html += `<tr ${rowClass}><td>${indent}${descricao}</td>${celulasValores}</tr>`;
+    
+    // Processar filhos recursivamente
+    const contaReferencia = buscarContaPorCodigo(tipo === 'bp' ? primeiraFed.bp : primeiraFed.dre, codigo);
+    if (contaReferencia?.children?.length) {
+      contaReferencia.children.forEach(child => {
+        processar(child.codigo, child.descricao, nivel + 1);
+      });
+    }
+  }
+  
+  // Iniciar processamento a partir da raiz
+  processar(raiz.codigo, raiz.descricao, 0);
+  
+  return html;
 }
 
 function generateComparativeHTML(
@@ -137,6 +205,30 @@ function generateComparativeHTML(
 
   // Função para gerar cabeçalho da tabela com federações
   const headerFederacoes = federacoes.map(f => `<th>${f.sigla}</th>`).join('');
+
+  const primeiraFederacao = federacoes[0];
+  const bpRef = primeiraFederacao?.bp || [];
+  const dreRef = primeiraFederacao?.dre || [];
+
+  const codigoAtivo = encontrarCodigoPorDescricao(bpRef, [['ativo']], '1');
+  const codigoPassivo = encontrarCodigoPorDescricao(bpRef, [['passivo']], '76');
+  const codigoPL = encontrarCodigoPorDescricao(bpRef, [['patrimonio', 'liquido']], '125');
+
+  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']], '1');
+  const codigoCustos = encontrarCodigoPorDescricao(dreRef, [['custo']], '52');
+  const codigoDespesas = encontrarCodigoPorDescricao(dreRef, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], '104');
+  const codigoResultadoFinanceiro = encontrarCodigoPorDescricao(
+    dreRef,
+    [['resultado', 'financeiro']],
+    '190',
+    [[['antes', 'resultado', 'financeiro']]]
+  );
+  const codigoResultadoOperacional = encontrarCodigoPorDescricao(
+    dreRef,
+    [['resultado', 'operacional']],
+    '211',
+    [[['nao', 'operacional']]]
+  );
 
   // Função para gerar linha de comparação
   const gerarLinhaComparacao = (
@@ -284,19 +376,36 @@ function generateComparativeHTML(
       <div class="date">Comparação ${periodo} | ${currentDate}</div>
     </div>
 
-    <div class="section-title">Estrutura Patrimonial</div>
+    <div class="section-title">ATIVO</div>
     <table>
       <tr>
-        <th style="width: 25%;">Conta</th>
+        <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhaComparacao('Ativo Total', f => f.valores.ativoTotal)}
-      ${gerarLinhaComparacao('Ativo Circulante', f => f.valores.ativoCirculante)}
-      ${gerarLinhaComparacao('Passivo Circulante', f => f.valores.passivoCirculante)}
-      ${gerarLinhaComparacao('Passivo Não Circulante', f => f.valores.passivoNaoCirculante)}
-      ${gerarLinhaComparacao('Patrimônio Líquido', f => f.valores.patrimonioLiquido)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoAtivo, 'bp', 3)}
+    </table>
+
+    <div class="section-title">PASSIVO</div>
+    <table>
+      <tr>
+        <th style="width: 30%;">Conta</th>
+        ${headerFederacoes}
+      </tr>
+      ${gerarLinhasTabelaComparativa(federacoes, codigoPassivo, 'bp', 3)}
+    </table>
+
+    <div class="section-title">PATRIMÔNIO LÍQUIDO</div>
+    <table>
+      <tr>
+        <th style="width: 30%;">Conta</th>
+        ${headerFederacoes}
+      </tr>
+      ${gerarLinhasTabelaComparativa(federacoes, codigoPL, 'bp', 3)}
+    </table>
+
+    <table>
       <tr class="total-row">
-        <td>Total Passivo + PL</td>
+        <td style="width: 30%;">TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO</td>
         ${federacoes.map(f => `<td>${formatCurrency(f.totalPassivoPL)}</td>`).join('')}
       </tr>
     </table>
@@ -311,28 +420,27 @@ function generateComparativeHTML(
 
     <table>
       <tr>
-        <th style="width: 25%;">Conta</th>
+        <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhaComparacao('Receitas Totais', f => f.valores.receitasTotal)}
-      ${gerarLinhaComparacao('(-) Custos Totais', f => f.valores.custosTotal)}
-      ${gerarLinhaComparacao('(-) Despesas Totais', f => f.valores.despesasTotal)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoReceita, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoCustos, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoDespesas, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoResultadoFinanceiro, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoResultadoOperacional, 'dre', 3)}
+    </table>
+
+    <table>
       <tr class="total-row">
-        <td>= Resultado Líquido</td>
+        <td style="width: 30%;">RESULTADO LÍQUIDO DO EXERCÍCIO</td>
         ${federacoes.map(f => `<td>${formatCurrency(f.resultadoDRE)}</td>`).join('')}
       </tr>
     </table>
 
-    <div class="section-title">Margens (%)</div>
-    <table>
-      <tr>
-        <th style="width: 25%;">Margem</th>
-        ${headerFederacoes}
-      </tr>
-      ${gerarLinhaComparacao('Margem Bruta', f => f.indices.rentabilidade.margemBruta, 'percentual')}
-      ${gerarLinhaComparacao('Margem Operacional', f => f.indices.rentabilidade.margemOp, 'percentual')}
-      ${gerarLinhaComparacao('Margem Líquida', f => f.indices.rentabilidade.margemLiq, 'percentual')}
-    </table>
+    <div class="analysis-box">
+      <strong>Análise comparativa:</strong> Este quadro apresenta a Demonstração do Resultado do Exercício 
+      completa de cada federação, facilitando a comparação de receitas, custos, despesas e resultados.
+    </div>
   </div>
 
   <!-- PÁGINA 4: ÍNDICES DE LIQUIDEZ -->

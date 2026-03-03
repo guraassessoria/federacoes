@@ -21,6 +21,34 @@ function buscarValorEstrutura(contas: any[], codigo: string): number | null {
   return null;
 }
 
+function normalizarTexto(value: string): string {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function buscarValorEstruturaPorDescricao(contas: any[], termosPreferenciais: string[][]): number | null {
+  const flat = flattenEstrutura(contas || []);
+  for (const termos of termosPreferenciais) {
+    const encontrada = flat.find((conta) => {
+      const desc = normalizarTexto(conta?.descricao || "");
+      return termos.every((termo) => desc.includes(normalizarTexto(termo))) && Number(conta?.valor || 0) !== 0;
+    });
+    if (encontrada) return Number(encontrada.valor || 0);
+  }
+  return null;
+}
+
+function buscarValorContabil(contas: any[] | undefined, codigos: string[], termos: string[][]): number {
+  if (!contas || contas.length === 0) return 0;
+  for (const codigo of codigos) {
+    const valor = buscarValorEstrutura(contas, codigo);
+    if (valor !== null) return valor;
+  }
+  return buscarValorEstruturaPorDescricao(contas, termos) || 0;
+}
+
 export default function DashboardPage() {
   const { data, loading, error, source, message } = useFinancialData();
   const { formatCurrency } = useFinancialFormatters();
@@ -72,9 +100,22 @@ export default function DashboardPage() {
   let patrimonioLiquido = 0;
 
   if (estruturaDRE && estruturaDRE.length > 0) {
-    // Fonte primária: estrutura de-para (códigos da estrutura padrão)
-    receitaTotal = buscarValorEstrutura(estruturaDRE, '1') || buscarValorEstrutura(estruturaDRE, '51') || 0;
-    resultadoLiquido = resultadoDREVal ?? (buscarValorEstrutura(estruturaDRE, '225') || buscarValorEstrutura(estruturaDRE, '229') || buscarValorEstrutura(estruturaDRE, '210') || 0);
+    // Fonte primária: estrutura de-para (estrutura contábil consolidada)
+    receitaTotal =
+      buscarValorEstruturaPorDescricao(
+        estruturaDRE,
+        [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']]
+      ) ?? 0;
+
+    if (!receitaTotal && dre?.resultados?.totalReceitas) {
+      receitaTotal = dre.resultados.totalReceitas || 0;
+    }
+
+    resultadoLiquido = resultadoDREVal ?? buscarValorContabil(
+      estruturaDRE,
+      ['229', '225', '210'],
+      [['superavit'], ['deficit', 'exercicio'], ['resultado', 'liquido']]
+    );
   } else if (dre?.resultados) {
     // Fallback: formato flat antigo
     receitaTotal = dre.resultados.totalReceitas || 0;
@@ -82,11 +123,11 @@ export default function DashboardPage() {
   }
 
   if (estruturaBP && estruturaBP.length > 0) {
-    ativoTotal = buscarValorEstrutura(estruturaBP, '1') || 0;
-    const passivoCirculante = buscarValorEstrutura(estruturaBP, '77') || 0;
-    const passivoNaoCirculante = buscarValorEstrutura(estruturaBP, '113') || 0;
+    ativoTotal = buscarValorContabil(estruturaBP, ['1'], [['ativo']]);
+    const passivoCirculante = buscarValorContabil(estruturaBP, ['77'], [['passivo', 'circulante']]);
+    const passivoNaoCirculante = buscarValorContabil(estruturaBP, ['113'], [['passivo', 'nao', 'circulante']]);
     passivoTotal = passivoCirculante + passivoNaoCirculante;
-    patrimonioLiquido = buscarValorEstrutura(estruturaBP, '125') || 0;
+    patrimonioLiquido = buscarValorContabil(estruturaBP, ['125'], [['patrimonio', 'liquido']]);
   } else if (bp) {
     ativoTotal = bp.totalAtivo || 0;
     const passivoCirculante = bp.passivoCirculante?.["TOTAL_PASSIVO_CIRCULANTE"] || 0;
@@ -96,9 +137,18 @@ export default function DashboardPage() {
   }
 
   // Composição até o 2º nível da DRE (com fallback flat)
-  const receitasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["51", "56", "1"]);
-  const custosEstruturaData = montarComposicaoNivel2(estruturaDRE, ["57", "52"]);
-  const despesasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["110", "104"]);
+  const receitasEstruturaData = montarComposicaoNivel2(
+    estruturaDRE,
+    encontrarCodigosRaizPorDescricao(estruturaDRE, [["receita", "bruta"], ["receita", "liquida"], ["receita"]], ["51", "56", "1"])
+  );
+  const custosEstruturaData = montarComposicaoNivel2(
+    estruturaDRE,
+    encontrarCodigosRaizPorDescricao(estruturaDRE, [["custo"]], ["57", "52"])
+  );
+  const despesasEstruturaData = montarComposicaoNivel2(
+    estruturaDRE,
+    encontrarCodigosRaizPorDescricao(estruturaDRE, [["despesa", "ger"], ["despesa", "operacional"], ["despesa"]], ["110", "104"])
+  );
 
   const receitasFlatData = dre?.receitas
     ? Object.entries(dre.receitas).map(([name, value]) => ({
@@ -353,4 +403,25 @@ function montarComposicaoNivel2(
     }))
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
+}
+
+function encontrarCodigosRaizPorDescricao(
+  estrutura: any[] | undefined,
+  termosPreferenciais: string[][],
+  fallbackCodigos: string[]
+): string[] {
+  if (!estrutura || estrutura.length === 0) return fallbackCodigos;
+
+  const flat = flattenEstrutura(estrutura);
+  for (const termos of termosPreferenciais) {
+    const matches = flat.filter((conta) => {
+      const desc = normalizarTexto(conta?.descricao || "");
+      return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+    });
+    if (matches.length > 0) {
+      return matches.map((m) => String(m.codigo));
+    }
+  }
+
+  return fallbackCodigos;
 }

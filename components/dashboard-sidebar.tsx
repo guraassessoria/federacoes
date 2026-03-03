@@ -12,13 +12,11 @@ import {
   Percent,
   ArrowLeftRight,
   PieChart,
-  Upload,
   Users,
   Building2,
   Settings,
   LogOut,
   Home,
-  FileSpreadsheet,
   Calendar,
   CalendarDays,
   ChevronDown,
@@ -125,12 +123,6 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
     { href: "/dashboard/endividamento", label: "Endividamento", icon: Percent },
     { href: "/dashboard/analise-horizontal", label: "Análise Horizontal", icon: ArrowLeftRight },
     { href: "/dashboard/analise-vertical", label: "Análise Vertical", icon: PieChart },
-  ];
-
-  // Menu items for Editor and Admin
-  const uploadItems = [
-    { href: "/upload/balancete", label: "Upload Balancete", icon: FileSpreadsheet },
-    { href: "/upload/de-para", label: "Upload De x Para", icon: Upload },
   ];
 
   // Menu items for Editor and Admin - Dados
@@ -364,35 +356,6 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
             })}
           </ul>
         </div>
-
-        {/* Upload Section (Editor & Admin) */}
-        {isEditor && (
-          <div className="px-4 mb-4">
-            <p className="text-xs text-blue-300 uppercase font-medium mb-2 px-2">Upload</p>
-            <ul className="space-y-1">
-              {uploadItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-all",
-                        isActive
-                          ? "bg-white/20 text-white"
-                          : "text-blue-100 hover:bg-white/10 hover:text-white"
-                      )}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
 
         {/* Data Management Section (Editor & Admin) */}
         {isEditor && (

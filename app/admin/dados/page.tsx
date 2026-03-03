@@ -1,29 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Database,
-  FileSpreadsheet,
   ArrowLeft,
-  Trash2,
-  AlertTriangle,
-  X,
+  Upload,
+  FileSpreadsheet,
   CheckCircle,
   AlertCircle,
-  RefreshCw,
-  Upload,
+  AlertTriangle,
+  Info,
+  Download,
 } from "lucide-react";
 import { API_ENDPOINTS } from "@/lib/constants";
 
-const MESES = [
-  "JAN", "FEV", "MAR", "ABR", "MAI", "JUN",
-  "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"
-];
-
-const ANOS = ["23", "24", "25", "26"];
+type UploadStatus = "idle" | "success" | "warning" | "error";
 
 interface CompanyFile {
   id: string;
@@ -33,27 +27,68 @@ interface CompanyFile {
   updatedAt: string;
 }
 
+function monthOptions() {
+  return [
+    { label: "JAN", value: "JAN" },
+    { label: "FEV", value: "FEV" },
+    { label: "MAR", value: "MAR" },
+    { label: "ABR", value: "ABR" },
+    { label: "MAI", value: "MAI" },
+    { label: "JUN", value: "JUN" },
+    { label: "JUL", value: "JUL" },
+    { label: "AGO", value: "AGO" },
+    { label: "SET", value: "SET" },
+    { label: "OUT", value: "OUT" },
+    { label: "NOV", value: "NOV" },
+    { label: "DEZ", value: "DEZ" },
+  ];
+}
+
+function yearOptions() {
+  const now = new Date();
+  const y = now.getFullYear();
+  return [y - 2, y - 1, y, y + 1].map((n) => String(n));
+}
+
+function formatPeriod(mon: string, year: string) {
+  const yy = year.slice(-2);
+  return `${mon}/${yy}`;
+}
+
 export default function GerenciamentoDadosPage() {
   const { data: session } = useSession() || {};
+  const role = (session?.user as any)?.role as string | undefined;
   const router = useRouter();
+
+  const balanceteInputRef = useRef<HTMLInputElement>(null);
+  const deParaInputRef = useRef<HTMLInputElement>(null);
+
   const [companyId, setCompanyId] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
-  
-  // Estado para arquivos
+
   const [balancetes, setBalancetes] = useState<CompanyFile[]>([]);
   const [deParaFiles, setDeParaFiles] = useState<CompanyFile[]>([]);
-  const [loadingFiles, setLoadingFiles] = useState(true);
 
-  // Estado para limpeza
-  const [showClearModal, setShowClearModal] = useState(false);
-  const [clearType, setClearType] = useState<"balancetes" | "dePara" | "all">("all");
-  const [clearStartMonth, setClearStartMonth] = useState<string>("JAN");
-  const [clearStartYear, setClearStartYear] = useState<string>("23");
-  const [clearEndMonth, setClearEndMonth] = useState<string>("DEZ");
-  const [clearEndYear, setClearEndYear] = useState<string>("25");
-  const [clearing, setClearing] = useState(false);
-  const [clearStatus, setClearStatus] = useState<"idle" | "success" | "error">("idle");
-  const [clearMessage, setClearMessage] = useState("");
+  const [month, setMonth] = useState<string>("JAN");
+  const [year, setYear] = useState<string>(String(new Date().getFullYear()));
+  const period = useMemo(() => formatPeriod(month, year), [month, year]);
+
+  const [selectedBalanceteFile, setSelectedBalanceteFile] = useState<File | null>(null);
+  const [selectedDeParaFile, setSelectedDeParaFile] = useState<File | null>(null);
+
+  const [uploadingBalancete, setUploadingBalancete] = useState(false);
+  const [uploadingDePara, setUploadingDePara] = useState(false);
+
+  const [balanceteStatus, setBalanceteStatus] = useState<UploadStatus>("idle");
+  const [balanceteMessage, setBalanceteMessage] = useState("");
+
+  const [deParaStatus, setDeParaStatus] = useState<UploadStatus>("idle");
+  const [deParaMessage, setDeParaMessage] = useState("");
+
+  const canUpload = useMemo(() => {
+    if (!session?.user) return false;
+    return role === "ADMIN" || role === "EDITOR";
+  }, [session?.user, role]);
 
   useEffect(() => {
     const stored = localStorage.getItem("selectedCompany");
@@ -64,113 +99,193 @@ export default function GerenciamentoDadosPage() {
     }
   }, []);
 
-  const fetchCompanyInfo = async (companyId: string) => {
+  const fetchCompanyInfo = async (cid: string) => {
     try {
       const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
       const data = await res.json();
-      const company = data.companies?.find((c: { id: string }) => c.id === companyId);
-      if (company) {
-        setCompanyName(company.name);
-      }
+      const company = data.companies?.find((c: { id: string }) => c.id === cid);
+      if (company) setCompanyName(company.name);
     } catch (error) {
       console.error("Error fetching company:", error);
     }
   };
 
-  const fetchFiles = async (companyId: string) => {
-    setLoadingFiles(true);
+  const fetchFiles = async (cid: string) => {
     try {
-      // Buscar balancetes
-      const balRes = await fetch(`${API_ENDPOINTS.FILES_BALANCETE}?companyId=${companyId}`);
+      const balRes = await fetch(`${API_ENDPOINTS.FILES_BALANCETE}?companyId=${cid}`);
       const balData = await balRes.json();
       setBalancetes(balData.files || []);
 
-      // Buscar De x Para
-      const deParaRes = await fetch(`${API_ENDPOINTS.FILES_DE_PARA}?companyId=${companyId}`);
+      const deParaRes = await fetch(`${API_ENDPOINTS.FILES_DE_PARA}?companyId=${cid}`);
       const deParaData = await deParaRes.json();
       setDeParaFiles(deParaData.files || []);
     } catch (error) {
       console.error("Error fetching files:", error);
-    } finally {
-      setLoadingFiles(false);
     }
   };
 
-  const getClearPeriodRange = () => {
-    return `${clearStartMonth}/${clearStartYear} a ${clearEndMonth}/${clearEndYear}`;
+  const handleBalanceteSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
+    ];
+
+    const okExt = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".csv");
+    const okType = validTypes.includes(file.type);
+
+    if (!okType && !okExt) {
+      setBalanceteStatus("error");
+      setBalanceteMessage("Formato inválido. Envie Excel (.xlsx) ou CSV (.csv).");
+      setSelectedBalanceteFile(null);
+      if (balanceteInputRef.current) balanceteInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedBalanceteFile(file);
+    setBalanceteStatus("idle");
+    setBalanceteMessage("");
   };
 
-  const handleClearData = async () => {
-    if (!companyId) return;
+  const handleDeParaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setClearing(true);
-    setClearStatus("idle");
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
+    ];
+
+    const okExt = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".csv");
+    const okType = validTypes.includes(file.type);
+
+    if (!okType && !okExt) {
+      setDeParaStatus("error");
+      setDeParaMessage("Formato inválido. Envie Excel (.xlsx) ou CSV (.csv).");
+      setSelectedDeParaFile(null);
+      if (deParaInputRef.current) deParaInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedDeParaFile(file);
+    setDeParaStatus("idle");
+    setDeParaMessage("");
+  };
+
+  const handleUploadBalancete = async () => {
+    if (!canUpload) {
+      setBalanceteStatus("error");
+      setBalanceteMessage("Sem permissão para upload. Apenas ADMIN/EDITOR.");
+      return;
+    }
+    if (!selectedBalanceteFile || !companyId) return;
+
+    setUploadingBalancete(true);
+    setBalanceteStatus("idle");
+    setBalanceteMessage("");
 
     try {
-      const dataTypes: string[] = [];
-      if (clearType === "balancetes" || clearType === "all") {
-        dataTypes.push("balancetes");
-      }
-      if (clearType === "dePara" || clearType === "all") {
-        dataTypes.push("dePara");
-      }
+      const form = new FormData();
+      form.append("companyId", companyId);
+      form.append("period", period);
+      form.append("file", selectedBalanceteFile);
 
-      const res = await fetch(API_ENDPOINTS.CLEAR_DATA, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          startPeriod: `${clearStartMonth}/${clearStartYear}`,
-          endPeriod: `${clearEndMonth}/${clearEndYear}`,
-          dataTypes,
-        }),
+      const res = await fetch(API_ENDPOINTS.FILES_BALANCETE_UPLOAD, {
+        method: "POST",
+        body: form,
       });
 
-      const data = await res.json();
-
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data.error || "Erro ao limpar dados");
+        throw new Error(data?.error || "Erro ao enviar/validar balancete.");
       }
 
-      // Montar mensagem de sucesso
-      const messages: string[] = [];
-      if (data.results?.balancetes) {
-        messages.push(`Balancetes: ${data.results.balancetes.deletedFiles} arquivo(s) e ${data.results.balancetes.deletedRecords} registro(s)`);
-      }
-      if (data.results?.dePara) {
-        messages.push(`De x Para: ${data.results.dePara.deletedFiles} arquivo(s)`);
-      }
+      setBalanceteStatus("success");
+      setBalanceteMessage(
+        `${data.message || `Balancete ${period} salvo no banco.`} Linhas inseridas: ${data.inserted ?? "-"}; removidas no replace: ${data.deleted ?? "-"}`
+      );
 
-      setClearStatus("success");
-      setClearMessage(`Dados removidos: ${messages.join(", ")}`);
+      setSelectedBalanceteFile(null);
+      if (balanceteInputRef.current) balanceteInputRef.current.value = "";
       fetchFiles(companyId);
-      
-      setTimeout(() => {
-        setShowClearModal(false);
-        setClearStatus("idle");
-        setClearMessage("");
-      }, 3000);
-    } catch (error) {
-      console.error("Clear error:", error);
-      setClearStatus("error");
-      setClearMessage(error instanceof Error ? error.message : "Erro desconhecido");
+    } catch (err: any) {
+      console.error("Upload Balancete error:", err);
+      setBalanceteStatus("error");
+      setBalanceteMessage(err?.message || "Erro desconhecido.");
     } finally {
-      setClearing(false);
+      setUploadingBalancete(false);
     }
   };
 
-  const getTypeLabel = () => {
-    switch (clearType) {
-      case "balancetes": return "Balancetes";
-      case "dePara": return "De x Para";
-      case "all": return "Todos os Dados";
+  const handleUploadDePara = async () => {
+    if (!canUpload) {
+      setDeParaStatus("error");
+      setDeParaMessage("Sem permissão para upload. Apenas ADMIN/EDITOR.");
+      return;
     }
+    if (!selectedDeParaFile || !companyId) return;
+
+    setUploadingDePara(true);
+    setDeParaStatus("idle");
+    setDeParaMessage("");
+
+    try {
+      const form = new FormData();
+      form.append("companyId", companyId);
+      form.append("file", selectedDeParaFile);
+
+      const res = await fetch(API_ENDPOINTS.FILES_DE_PARA_UPLOAD, {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "Erro ao enviar/validar De x Para.");
+      }
+
+      setDeParaStatus(deParaFiles.length > 0 ? "warning" : "success");
+      setDeParaMessage(
+        deParaFiles.length > 0
+          ? `De x Para atualizado no banco. Linhas inseridas: ${data.inserted}.`
+          : `De x Para salvo no banco com sucesso. Linhas inseridas: ${data.inserted}.`
+      );
+
+      setSelectedDeParaFile(null);
+      if (deParaInputRef.current) deParaInputRef.current.value = "";
+      fetchFiles(companyId);
+    } catch (err: any) {
+      console.error("Upload De-Para error:", err);
+      setDeParaStatus("error");
+      setDeParaMessage(err?.message || "Erro desconhecido.");
+    } finally {
+      setUploadingDePara(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const headers = "Conta Federação;Descrição Conta Federação;Padrão_BP;Padrão_DRE;Padrão_DFC;Padrão_DMPL";
+    const example1 = "1.1.01;Caixa e Equivalentes;0001;;;";
+    const example2 = "4.1.01;Receitas de Competições;;0001;;";
+    const example3 = "3.1.01;Custos com Competições;;0050;;";
+
+    const content = `${headers}\n${example1}\n${example2}\n${example3}`;
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "modelo_de_para.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => router.back()}
@@ -191,295 +306,283 @@ export default function GerenciamentoDadosPage() {
           </div>
         </div>
 
-        {/* Resumo dos Dados */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Balancetes */}
+        {!canUpload && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-6"
+            className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <FileSpreadsheet className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">Balancetes</h3>
-                  <p className="text-sm text-gray-500">Arquivos de balancete mensal</p>
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-green-600">{balancetes.length}</span>
-            </div>
-            {loadingFiles ? (
-              <div className="flex items-center gap-2 text-gray-400">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Carregando...</span>
-              </div>
-            ) : balancetes.length > 0 ? (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {balancetes.slice(0, 5).map((file) => (
-                  <div key={file.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{file.period || "Sem período"}</span>
-                    <span className="text-gray-400">{new Date(file.updatedAt).toLocaleDateString("pt-BR")}</span>
-                  </div>
-                ))}
-                {balancetes.length > 5 && (
-                  <p className="text-xs text-gray-400">+{balancetes.length - 5} arquivo(s)</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Nenhum arquivo encontrado</p>
-            )}
-          </motion.div>
-
-          {/* De x Para */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl shadow-lg p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Upload className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">De x Para</h3>
-                  <p className="text-sm text-gray-500">Arquivos de mapeamento contábil</p>
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-purple-600">{deParaFiles.length}</span>
-            </div>
-            {loadingFiles ? (
-              <div className="flex items-center gap-2 text-gray-400">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Carregando...</span>
-              </div>
-            ) : deParaFiles.length > 0 ? (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {deParaFiles.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 truncate">{file.name}</span>
-                    <span className="text-gray-400">{new Date(file.updatedAt).toLocaleDateString("pt-BR")}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Nenhum arquivo encontrado</p>
-            )}
-          </motion.div>
-        </div>
-
-        {/* Seção de Limpeza */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <Trash2 className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800">Limpar Base de Dados</h3>
-              <p className="text-sm text-gray-500">Remova balancetes, arquivos De x Para e dados financeiros</p>
-            </div>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-amber-800">Atenção</p>
-                <p className="text-sm text-amber-700">
-                  Esta ação é irreversível. Todos os dados selecionados serão permanentemente removidos.
+                <h3 className="font-medium text-red-800 mb-1">Acesso restrito</h3>
+                <p className="text-sm text-red-700">
+                  Seu perfil é <strong>{role || "desconhecido"}</strong>. Apenas <strong>ADMIN</strong> e <strong>EDITOR</strong> podem enviar arquivos.
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
+        )}
 
-          {/* Tipo de Dados */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Dados para Limpar</label>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setClearType("balancetes")}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
-                  clearType === "balancetes"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <FileSpreadsheet className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm font-medium">Balancetes</span>
-              </button>
-              <button
-                onClick={() => setClearType("dePara")}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
-                  clearType === "dePara"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <Upload className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm font-medium">De x Para</span>
-              </button>
-              <button
-                onClick={() => setClearType("all")}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
-                  clearType === "all"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <Database className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm font-medium">Todos</span>
-              </button>
-            </div>
-          </div>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6 mb-6"
+        >
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div className="w-full">
+              <h3 className="font-semibold text-gray-800 mb-2">Upload de Balancete</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                O balancete é salvo por <strong>empresa + período</strong>. Ao reenviar, o sistema substitui os dados do período.
+              </p>
 
-          {/* Período para Balancetes */}
-          {(clearType === "balancetes" || clearType === "all") && (
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Período Inicial</label>
-                <div className="flex gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500">Mês</label>
                   <select
-                    value={clearStartMonth}
-                    onChange={(e) => setClearStartMonth(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-white"
                   >
-                    {MESES.map((mes) => (
-                      <option key={mes} value={mes}>{mes}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={clearStartYear}
-                    onChange={(e) => setClearStartYear(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
-                  >
-                    {ANOS.map((ano) => (
-                      <option key={ano} value={ano}>20{ano}</option>
+                    {monthOptions().map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
                     ))}
                   </select>
                 </div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Período Final</label>
-                <div className="flex gap-2">
+
+                <div>
+                  <label className="text-xs text-gray-500">Ano</label>
                   <select
-                    value={clearEndMonth}
-                    onChange={(e) => setClearEndMonth(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-white"
                   >
-                    {MESES.map((mes) => (
-                      <option key={mes} value={mes}>{mes}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={clearEndYear}
-                    onChange={(e) => setClearEndYear(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
-                  >
-                    {ANOS.map((ano) => (
-                      <option key={ano} value={ano}>20{ano}</option>
+                    {yearOptions().map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
                   </select>
                 </div>
+
+                <div className="flex items-end">
+                  <div className="w-full border rounded-lg px-3 py-2 bg-gray-50">
+                    <div className="text-xs text-gray-500">Período</div>
+                    <div className="font-semibold text-gray-800">{period}</div>
+                  </div>
+                </div>
               </div>
+
+              {selectedBalanceteFile && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <p className="text-amber-800 text-sm">
+                    Atenção: ao enviar, o sistema irá <strong>substituir</strong> os dados do período <strong>{period}</strong> para esta empresa.
+                  </p>
+                </div>
+              )}
             </div>
+          </div>
+
+          <div
+            onClick={() => balanceteInputRef.current?.click()}
+            className={`mt-6 border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+              selectedBalanceteFile
+                ? "border-green-500 bg-green-50"
+                : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+            }`}
+          >
+            <input
+              type="file"
+              ref={balanceteInputRef}
+              onChange={handleBalanceteSelect}
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={!canUpload}
+            />
+
+            {selectedBalanceteFile ? (
+              <>
+                <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-lg font-medium text-gray-800">{selectedBalanceteFile.name}</p>
+                <p className="text-sm text-gray-500 mt-1">{(selectedBalanceteFile.size / 1024).toFixed(2)} KB</p>
+                <p className="text-sm text-green-600 mt-2">Clique para trocar o arquivo</p>
+              </>
+            ) : (
+              <>
+                <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg font-medium text-gray-600">Clique para selecionar o balancete</p>
+                <p className="text-sm text-gray-400 mt-1">Formatos aceitos: Excel (.xlsx) ou CSV</p>
+              </>
+            )}
+          </div>
+
+          {balanceteStatus === "success" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3"
+            >
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <p className="text-green-700">{balanceteMessage}</p>
+            </motion.div>
+          )}
+
+          {balanceteStatus === "error" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3"
+            >
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-red-700">{balanceteMessage}</p>
+            </motion.div>
           )}
 
           <button
-            onClick={() => setShowClearModal(true)}
-            disabled={balancetes.length === 0 && deParaFiles.length === 0}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={handleUploadBalancete}
+            disabled={!selectedBalanceteFile || uploadingBalancete || !canUpload}
+            className="mt-6 w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <Trash2 className="w-5 h-5" />
-            Limpar {getTypeLabel()}
+            {uploadingBalancete ? (
+              <>Enviando...</>
+            ) : (
+              <>
+                <Upload className="w-5 h-5" />
+                Salvar Balancete no Banco
+              </>
+            )}
           </button>
         </motion.div>
 
-        {/* Modal de Confirmação */}
-        <AnimatePresence>
-          {showClearModal && (
+        {deParaFiles.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-amber-800 mb-1">De x Para existente será substituído no banco</h3>
+                <p className="text-sm text-amber-700">
+                  Arquivo atual: <strong>{deParaFiles[0].name}</strong>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6"
+        >
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-800 mb-2">Upload de De x Para</h3>
+                <p className="text-sm text-blue-700 mb-3">Colunas obrigatórias (com variações aceitas):</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  <span className="bg-blue-100 px-2 py-1 rounded">Conta Federação</span>
+                  <span className="bg-blue-100 px-2 py-1 rounded">Descrição Conta</span>
+                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_BP</span>
+                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DRE</span>
+                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DFC</span>
+                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DMPL</span>
+                </div>
+
+                <button onClick={downloadTemplate} className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium">
+                  <Download className="w-4 h-4" />
+                  Baixar modelo de exemplo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            onClick={() => deParaInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+              selectedDeParaFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+            }`}
+          >
+            <input
+              type="file"
+              ref={deParaInputRef}
+              onChange={handleDeParaSelect}
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={!canUpload}
+            />
+
+            {selectedDeParaFile ? (
+              <>
+                <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-lg font-medium text-gray-800">{selectedDeParaFile.name}</p>
+                <p className="text-sm text-gray-500 mt-1">{(selectedDeParaFile.size / 1024).toFixed(2)} KB</p>
+                <p className="text-sm text-green-600 mt-2">Clique para trocar o arquivo</p>
+              </>
+            ) : (
+              <>
+                <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg font-medium text-gray-600">Clique para selecionar o De x Para</p>
+                <p className="text-sm text-gray-400 mt-1">Formatos aceitos: Excel (.xlsx) ou CSV</p>
+              </>
+            )}
+          </div>
+
+          {deParaStatus === "success" && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3"
             >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <h3 className="font-bold text-lg text-gray-800">Confirmar Exclusão</h3>
-                  </div>
-                  <button
-                    onClick={() => setShowClearModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-gray-600 mb-4">
-                    Você está prestes a excluir <strong>{getTypeLabel()}</strong> da empresa <strong>{companyName}</strong>.
-                  </p>
-                  {(clearType === "balancetes" || clearType === "all") && (
-                    <p className="text-sm text-gray-500">
-                      Período: <strong>{getClearPeriodRange()}</strong>
-                    </p>
-                  )}
-                </div>
-
-                {clearStatus === "success" ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <p className="text-green-700">{clearMessage}</p>
-                  </div>
-                ) : clearStatus === "error" ? (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <p className="text-red-700">{clearMessage}</p>
-                  </div>
-                ) : (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowClearModal(false)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleClearData}
-                      disabled={clearing}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {clearing ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                      {clearing ? "Excluindo..." : "Confirmar Exclusão"}
-                    </button>
-                  </div>
-                )}
-              </motion.div>
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <p className="text-green-700">{deParaMessage}</p>
             </motion.div>
           )}
-        </AnimatePresence>
+
+          {deParaStatus === "warning" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3"
+            >
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <p className="text-amber-700">{deParaMessage}</p>
+            </motion.div>
+          )}
+
+          {deParaStatus === "error" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3"
+            >
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-red-700">{deParaMessage}</p>
+            </motion.div>
+          )}
+
+          <button
+            onClick={handleUploadDePara}
+            disabled={!selectedDeParaFile || uploadingDePara || !canUpload}
+            className="mt-6 w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {uploadingDePara ? (
+              <>Enviando...</>
+            ) : (
+              <>
+                <Upload className="w-5 h-5" />
+                Salvar De x Para no Banco
+              </>
+            )}
+          </button>
+        </motion.div>
       </div>
     </div>
   );

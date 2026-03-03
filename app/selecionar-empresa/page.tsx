@@ -187,14 +187,14 @@ export default function SelecionarEmpresaPage() {
                 {isEditor && (
                   <>
                     <button
-                      onClick={() => router.push("/upload/balancete")}
+                      onClick={() => router.push("/admin/dados")}
                       className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
                     >
                       <FileSpreadsheet className="w-6 h-6 text-green-600" />
                       <span className="text-sm text-gray-600">Upload Balancete</span>
                     </button>
                     <button
-                      onClick={() => router.push("/upload/de-para")}
+                      onClick={() => router.push("/admin/dados")}
                       className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
                     >
                       <FileSpreadsheet className="w-6 h-6 text-blue-600" />

@@ -29,6 +29,58 @@ function formatNumber(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function flattenContas(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function encontrarCodigoPorDescricao(
+  contas: ContaComValor[],
+  termosPreferenciais: string[][],
+  fallbackCodigo: string,
+  exclusoesPorTermo: string[][][] = []
+): string {
+  const flat = flattenContas(contas);
+  for (let i = 0; i < termosPreferenciais.length; i++) {
+    const termos = termosPreferenciais[i];
+    const exclusoes = exclusoesPorTermo[i] || [];
+    const matches = flat.filter((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      const matchPrincipal = termos.every((termo) => desc.includes(normalizarTexto(termo)));
+      if (!matchPrincipal) return false;
+      if (!exclusoes.length) return true;
+      return !exclusoes.some((exclusao) => exclusao.every((termo) => desc.includes(normalizarTexto(termo))));
+    });
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        const na = Number(a.nivel ?? Number.MAX_SAFE_INTEGER);
+        const nb = Number(b.nivel ?? Number.MAX_SAFE_INTEGER);
+        if (na !== nb) return na - nb;
+        const oa = Number((a as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        const ob = Number((b as any).ordem ?? Number.MAX_SAFE_INTEGER);
+        if (oa !== ob) return oa - ob;
+        return String(a.codigo).localeCompare(String(b.codigo));
+      });
+      return matches[0].codigo;
+    }
+  }
+  return fallbackCodigo;
+}
+
 // Função para extrair valores principais das demonstrações
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
   const valores = extrairValores(bp, dre);
@@ -58,8 +110,8 @@ function gerarLinhasTabela(contas: ContaComValor[], maxNivel: number = 3): strin
   function processar(conta: ContaComValor, nivel: number = 0): void {
     if (nivel > maxNivel) return;
     
-    // Ocultar linhas sem valor (exceto totalizadores nível 1 e 2)
-    if (conta.valor === 0 && conta.nivel > 2) return;
+    // Ocultar linhas sem valor (exceto totalizadores principais de nível 1)
+    if (conta.valor === 0 && conta.nivel > 1) return;
     
     const indent = '&nbsp;'.repeat(nivel * 4);
     const isTotal = conta.nivel === 1;
@@ -99,6 +151,10 @@ function generateReportHTML(
   const indices = calcularIndices(bp, dre);
   const indicesPDF = indicesParaPDF(indices);
   const valores = extrairValoresPrincipais(dre, bp);
+
+  const codigoAtivo = encontrarCodigoPorDescricao(bp, [['ativo']], '1');
+  const codigoPassivo = encontrarCodigoPorDescricao(bp, [['passivo']], '76');
+  const codigoPL = encontrarCodigoPorDescricao(bp, [['patrimonio', 'liquido']], '125');
 
   // Função para gerar card de índice apenas se disponível
   const gerarCardIndice = (nome: string, valor: number | undefined, formato: 'numero' | 'percentual' = 'numero'): string => {
@@ -263,7 +319,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '1'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoAtivo), 3)}
     </table>
 
     <div class="subsection-title">PASSIVO</div>
@@ -272,7 +328,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '76'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoPassivo), 3)}
     </table>
 
     <div class="subsection-title">PATRIMÔNIO LÍQUIDO</div>
@@ -281,7 +337,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoPL), 3)}
     </table>
   </div>
 
@@ -457,7 +513,10 @@ export async function POST(request: NextRequest) {
     // Buscar dados do balancete
     // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
     const yearShort = year ? year.slice(-2) : '25';
-    const balancetes = await prisma.balancete.findMany({
+    
+    // Compatibilidade: tentar balancete ou balanceteRow
+    const balanceteModel = (prisma as any).balancete ?? (prisma as any).balanceteRow;
+    const balancetes = await balanceteModel.findMany({
       where: {
         companyId,
         period: { contains: `/${yearShort}` }

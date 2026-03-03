@@ -1,26 +1,100 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { analiseHorizontal, anos } from '@/lib/data';
+import { ArrowLeftRight, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import CustomBarChart from '@/components/charts/bar-chart';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
+
+interface ContaHorizontal {
+  codigo: string;
+  descricao: string;
+  nivel: number;
+  valores: Record<string, number>;
+  variacoes: Record<string, number>;
+}
+
+interface AnaliseHorizontalData {
+  meta: {
+    companyId: string;
+    anosSolicitados: string[];
+    anosDisponiveis: string[];
+    parametros: {
+      maxNivel: number;
+      incluirZeros: boolean;
+    };
+  };
+  DRE: Record<string, ContaHorizontal>;
+  BP: Record<string, ContaHorizontal>;
+}
 
 export default function AnaliseHorizontalPage() {
-  const dreKeys = Object.keys(analiseHorizontal?.DRE ?? {});
-  const bpKeys = Object.keys(analiseHorizontal?.BP ?? {});
+  const { selectedCompanyId, availableYears } = useDashboard();
+  const [analiseHorizontal, setAnaliseHorizontal] = useState<AnaliseHorizontalData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const dreData = dreKeys.map(key => ({
-    name: key.length > 25 ? key.substring(0, 25) + '...' : key,
-    '2023-2024': analiseHorizontal?.DRE?.[key]?.['Variacao 2023-2024 (%)'] ?? 0,
-    '2024-2025': analiseHorizontal?.DRE?.[key]?.['Variacao 2024-2025 (%)'] ?? 0,
-    'Acumulada': analiseHorizontal?.DRE?.[key]?.['Variacao 2023-2025 (%)'] ?? 0
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setError('Nenhuma empresa selecionada');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const anos = availableYears.join(',');
+    fetch(`/api/analise-horizontal?companyId=${selectedCompanyId}&anos=${anos}&maxNivel=3`)
+      .then(res => {
+        if (!res.ok) throw new Error('Erro ao carregar análise horizontal');
+        return res.json();
+      })
+      .then(data => {
+        setAnaliseHorizontal(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [selectedCompanyId, availableYears]);
+
+  const anosDisponiveis = analiseHorizontal?.meta.anosDisponiveis ?? [];
+  const paresAnos = anosDisponiveis.slice(1).map((ano, idx) => {
+    const anterior = anosDisponiveis[idx];
+    return {
+      from: anterior,
+      to: ano,
+      key: `Variacao ${anterior}-${ano} (%)`,
+      label: `${anterior}-${ano}`,
+    };
+  });
+  const variacaoAcumuladaKey =
+    anosDisponiveis.length >= 2
+      ? `Variacao ${anosDisponiveis[0]}-${anosDisponiveis[anosDisponiveis.length - 1]} (%)`
+      : null;
+
+  const dreItems = Object.values(analiseHorizontal?.DRE ?? {});
+  const bpItems = Object.values(analiseHorizontal?.BP ?? {});
+
+  const topDre = [...dreItems]
+    .sort((a, b) => Math.abs((b.variacoes[variacaoAcumuladaKey || ''] ?? 0)) - Math.abs((a.variacoes[variacaoAcumuladaKey || ''] ?? 0)))
+    .slice(0, 10);
+
+  const topBp = [...bpItems]
+    .sort((a, b) => Math.abs((b.variacoes[variacaoAcumuladaKey || ''] ?? 0)) - Math.abs((a.variacoes[variacaoAcumuladaKey || ''] ?? 0)))
+    .slice(0, 10);
+
+  const dreData = topDre.map(item => ({
+    name: item.descricao.length > 28 ? `${item.descricao.slice(0, 28)}...` : item.descricao,
+    Acumulada: variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0,
   }));
 
-  const bpData = bpKeys.map(key => ({
-    name: key.length > 25 ? key.substring(0, 25) + '...' : key,
-    '2023-2024': analiseHorizontal?.BP?.[key]?.['Variacao 2023-2024 (%)'] ?? 0,
-    '2024-2025': analiseHorizontal?.BP?.[key]?.['Variacao 2024-2025 (%)'] ?? 0,
-    'Acumulada': analiseHorizontal?.BP?.[key]?.['Variacao 2023-2025 (%)'] ?? 0
+  const bpData = topBp.map(item => ({
+    name: item.descricao.length > 28 ? `${item.descricao.slice(0, 28)}...` : item.descricao,
+    Acumulada: variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0,
   }));
 
   const renderVariation = (value: number) => {
@@ -35,6 +109,25 @@ export default function AnaliseHorizontalPage() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+      </div>
+    );
+  }
+
+  if (error || !analiseHorizontal) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-800 font-semibold mb-2">Erro ao carregar dados</p>
+          <p className="text-red-600 text-sm">{error || 'Dados não disponíveis'}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <motion.div
@@ -44,10 +137,25 @@ export default function AnaliseHorizontalPage() {
       >
         <div className="flex items-center gap-3 mb-2">
           <ArrowLeftRight className="w-8 h-8" />
-          <h1 className="text-3xl font-bold">Analise Horizontal</h1>
+          <h1 className="text-3xl font-bold">Análise Horizontal</h1>
         </div>
-        <p className="text-orange-100">Variacao percentual das contas entre os periodos</p>
+        <p className="text-orange-100">Variação percentual por código contábil (modelo DRE/BP)</p>
       </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Anos com dados</p>
+          <p className="text-lg font-semibold text-slate-800">{anosDisponiveis.join(', ') || 'N/D'}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Contas DRE analisadas</p>
+          <p className="text-lg font-semibold text-slate-800">{dreItems.length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500 mb-1">Contas BP analisadas</p>
+          <p className="text-lg font-semibold text-slate-800">{bpItems.length}</p>
+        </div>
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -56,30 +164,34 @@ export default function AnaliseHorizontalPage() {
         className="bg-white rounded-xl shadow-lg overflow-hidden"
       >
         <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">DRE - Variacao entre Periodos</h2>
+          <h2 className="text-lg font-bold text-slate-800">DRE - Variação entre períodos</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50">
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2023-2024</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2024-2025</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
+                {paresAnos.map(par => (
+                  <th key={par.key} className="text-left px-4 py-3 font-semibold text-slate-700">{par.label}</th>
+                ))}
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                  {variacaoAcumuladaKey ? `Acumulada ${anosDisponiveis[0]}-${anosDisponiveis[anosDisponiveis.length - 1]}` : 'Acumulada'}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {dreKeys.map((key, idx) => (
-                <tr key={key} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                  <td className="px-4 py-3 text-slate-700 font-medium">{key}</td>
-                  <td className="px-4 py-3 text-right">
-                    {renderVariation(analiseHorizontal?.DRE?.[key]?.['Variacao 2023-2024 (%)'] ?? 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {renderVariation(analiseHorizontal?.DRE?.[key]?.['Variacao 2024-2025 (%)'] ?? 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {renderVariation(analiseHorizontal?.DRE?.[key]?.['Variacao 2023-2025 (%)'] ?? 0)}
+              {dreItems.map((item, idx) => (
+                <tr key={`dre-${item.codigo}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                  <td className="px-4 py-3 text-slate-700 font-mono">{item.codigo}</td>
+                  <td className="px-4 py-3 text-slate-700 font-medium">{item.descricao}</td>
+                  {paresAnos.map(par => (
+                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-left">
+                      {renderVariation(item.variacoes[par.key] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-left font-semibold">
+                    {renderVariation(variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0)}
                   </td>
                 </tr>
               ))}
@@ -94,7 +206,7 @@ export default function AnaliseHorizontalPage() {
         transition={{ delay: 0.3 }}
         className="bg-white rounded-xl shadow-lg p-6"
       >
-        <h2 className="text-lg font-bold text-slate-800 mb-4">DRE - Variacao Acumulada 2023-2025</h2>
+        <h2 className="text-lg font-bold text-slate-800 mb-4">DRE - Top variações acumuladas</h2>
         <CustomBarChart
           data={dreData}
           bars={[{ dataKey: 'Acumulada', color: '#FF9149', name: 'Variacao %' }]}
@@ -110,30 +222,34 @@ export default function AnaliseHorizontalPage() {
         className="bg-white rounded-xl shadow-lg overflow-hidden"
       >
         <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">Balanco Patrimonial - Variacao entre Periodos</h2>
+          <h2 className="text-lg font-bold text-slate-800">Balanço Patrimonial - Variação entre períodos</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50">
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2023-2024</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">2024-2025</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Acumulada 2023-2025</th>
+                {paresAnos.map(par => (
+                  <th key={par.key} className="text-left px-4 py-3 font-semibold text-slate-700">{par.label}</th>
+                ))}
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                  {variacaoAcumuladaKey ? `Acumulada ${anosDisponiveis[0]}-${anosDisponiveis[anosDisponiveis.length - 1]}` : 'Acumulada'}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {bpKeys.map((key, idx) => (
-                <tr key={key} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                  <td className="px-4 py-3 text-slate-700 font-medium">{key}</td>
-                  <td className="px-4 py-3 text-right">
-                    {renderVariation(analiseHorizontal?.BP?.[key]?.['Variacao 2023-2024 (%)'] ?? 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {renderVariation(analiseHorizontal?.BP?.[key]?.['Variacao 2024-2025 (%)'] ?? 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {renderVariation(analiseHorizontal?.BP?.[key]?.['Variacao 2023-2025 (%)'] ?? 0)}
+              {bpItems.map((item, idx) => (
+                <tr key={`bp-${item.codigo}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                  <td className="px-4 py-3 text-slate-700 font-mono">{item.codigo}</td>
+                  <td className="px-4 py-3 text-slate-700 font-medium">{item.descricao}</td>
+                  {paresAnos.map(par => (
+                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-left">
+                      {renderVariation(item.variacoes[par.key] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-left font-semibold">
+                    {renderVariation(variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0)}
                   </td>
                 </tr>
               ))}
@@ -148,7 +264,7 @@ export default function AnaliseHorizontalPage() {
         transition={{ delay: 0.5 }}
         className="bg-white rounded-xl shadow-lg p-6"
       >
-        <h2 className="text-lg font-bold text-slate-800 mb-4">BP - Variacao Acumulada 2023-2025</h2>
+        <h2 className="text-lg font-bold text-slate-800 mb-4">BP - Top variações acumuladas</h2>
         <CustomBarChart
           data={bpData}
           bars={[{ dataKey: 'Acumulada', color: '#60B5FF', name: 'Variacao %' }]}

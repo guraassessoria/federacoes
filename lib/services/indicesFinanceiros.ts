@@ -113,7 +113,7 @@ export interface ValoresExtraidos {
 function buscarValorPorCodigo(contas: ContaComValor[], codigo: string): number | null {
   for (const conta of contas) {
     if (conta.codigo === codigo) {
-      return conta.valor !== 0 ? conta.valor : null;
+      return Number(conta.valor || 0);
     }
     if (conta.children && conta.children.length > 0) {
       const valor = buscarValorPorCodigo(conta.children, codigo);
@@ -138,34 +138,56 @@ function normalizarTexto(value: string): string {
     .toLowerCase();
 }
 
-function buscarValorPorDescricaoComposta(contas: ContaComValor[], termos: string[]): number | null {
-  const stack = [...contas];
-  while (stack.length > 0) {
-    const conta = stack.shift()!;
+function flattenContas(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items || []) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function buscarValorPorDescricaoComposta(
+  contas: ContaComValor[],
+  termos: string[],
+  exclusoes: string[][] = []
+): number | null {
+  const flat = flattenContas(contas);
+
+  const matchesExclusion = (descricaoNormalizada: string): boolean => {
+    if (!exclusoes.length) return false;
+    return exclusoes.some((ex) => ex.every((termo) => descricaoNormalizada.includes(normalizarTexto(termo))));
+  };
+
+  for (const conta of flat) {
     const descricao = normalizarTexto(conta.descricao || '');
     const match = termos.every((termo) => descricao.includes(normalizarTexto(termo)));
-    if (match) {
-      return conta.valor !== 0 ? conta.valor : null;
-    }
-    if (conta.children?.length) {
-      stack.push(...conta.children);
-    }
+    if (!match) continue;
+    if (matchesExclusion(descricao)) continue;
+    return Number(conta.valor || 0);
   }
+
   return null;
 }
 
 function buscarValorSemantico(
   contas: ContaComValor[],
   codigosFallback: string[],
-  termosPreferenciais: string[][]
+  termosPreferenciais: string[][],
+  exclusoesPorTermo: string[][][] = []
 ): number | null {
-  const byCodigo = buscarValorPorCodigos(contas, codigosFallback);
-  if (byCodigo !== null) return byCodigo;
-
-  for (const termos of termosPreferenciais) {
-    const byDesc = buscarValorPorDescricaoComposta(contas, termos);
+  for (let i = 0; i < termosPreferenciais.length; i++) {
+    const termos = termosPreferenciais[i];
+    const exclusoes = exclusoesPorTermo[i] || [];
+    const byDesc = buscarValorPorDescricaoComposta(contas, termos, exclusoes);
     if (byDesc !== null) return byDesc;
   }
+
+  const byCodigo = buscarValorPorCodigos(contas, codigosFallback);
+  if (byCodigo !== null) return byCodigo;
 
   return null;
 }
@@ -176,7 +198,7 @@ function buscarValorPorDescricao(contas: ContaComValor[], termos: string[]): num
     const conta = stack.shift()!;
     const descricao = conta.descricao?.toLowerCase?.() || '';
     if (termos.some((termo) => descricao.includes(termo))) {
-      return conta.valor !== 0 ? conta.valor : null;
+      return Number(conta.valor || 0);
     }
     if (conta.children?.length) {
       stack.push(...conta.children);
@@ -195,7 +217,7 @@ export function extrairValores(
   const receitasTotal = buscarValorSemantico(
     dre,
     [CODIGOS_DRE.RECEITAS_TOTAL, '51', '1'],
-    [['receita', 'liquida'], ['receita', 'bruta'], ['receita']]
+    [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']]
   );
 
   const custosTotal = buscarValorSemantico(
@@ -225,14 +247,24 @@ export function extrairValores(
   return {
     // BP
     ativoTotal: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_TOTAL], [['ativo']]),
-    ativoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_CIRCULANTE], [['ativo', 'circulante']]),
+    ativoCirculante: buscarValorSemantico(
+      bp,
+      [CODIGOS_BP.ATIVO_CIRCULANTE],
+      [['ativo', 'circulante']],
+      [[['nao', 'circulante']]]
+    ),
     disponibilidades: buscarValorSemantico(bp, [CODIGOS_BP.DISPONIBILIDADES], [['disponibilidade'], ['caixa']]),
     contasReceber: buscarValorSemantico(bp, [CODIGOS_BP.CONTAS_A_RECEBER], [['contas', 'receber']]),
     estoques: buscarValorSemantico(bp, [CODIGOS_BP.ESTOQUES], [['estoque']]),
     ativoNaoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_NAO_CIRCULANTE], [['ativo', 'nao', 'circulante']]),
     realizavelLP: buscarValorSemantico(bp, [CODIGOS_BP.REALIZAVEL_LONGO_PRAZO], [['realizavel', 'longo', 'prazo']]),
     imobilizado: buscarValorSemantico(bp, [CODIGOS_BP.IMOBILIZADO], [['imobilizado']]),
-    passivoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.PASSIVO_CIRCULANTE], [['passivo', 'circulante']]),
+    passivoCirculante: buscarValorSemantico(
+      bp,
+      [CODIGOS_BP.PASSIVO_CIRCULANTE],
+      [['passivo', 'circulante']],
+      [[['nao', 'circulante']]]
+    ),
     fornecedores: buscarValorSemantico(bp, [CODIGOS_BP.FORNECEDORES], [['fornecedor']]),
     passivoNaoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.PASSIVO_NAO_CIRCULANTE], [['passivo', 'nao', 'circulante']]),
     patrimonioLiquido: buscarValorSemantico(bp, [CODIGOS_BP.PATRIMONIO_LIQUIDO], [['patrimonio', 'liquido']]),
@@ -244,7 +276,8 @@ export function extrairValores(
     resultadoFinanceiro: buscarValorSemantico(
       dre,
       [CODIGOS_DRE.RESULTADO_FINANCEIRO, '190'],
-      [['resultado', 'financeiro']]
+      [['resultado', 'financeiro']],
+      [[['antes', 'resultado', 'financeiro']]]
     ),
     receitasFinanceiras: buscarValorSemantico(
       dre,

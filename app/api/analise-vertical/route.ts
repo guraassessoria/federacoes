@@ -12,6 +12,7 @@ interface ContaVertical {
   nivel: number;
   valor: number;
   percentual: number;
+  analitica: boolean;
 }
 
 interface VerticalAno {
@@ -79,6 +80,7 @@ function extrairContasVerticais(
   function processar(lista: ContaComValor[], nivelFallback: number = 1): void {
     for (const conta of lista) {
       const nivelConta = conta.nivelVisualizacao ?? conta.nivel ?? nivelFallback;
+      const analitica = !conta.children?.length && nivelConta > 1;
       if (nivelConta <= maxNivel) {
         const key = `${conta.codigo}|${conta.descricao}`;
         if (!visitados.has(key)) {
@@ -89,7 +91,8 @@ function extrairContasVerticais(
               descricao: conta.descricao,
               nivel: nivelConta,
               valor: conta.valor,
-              percentual: baseAbs === 0 ? 0 : (conta.valor / baseAbs) * 100,
+              percentual: analitica && baseAbs !== 0 ? (conta.valor / baseAbs) * 100 : 0,
+              analitica,
             });
           }
           visitados.add(key);

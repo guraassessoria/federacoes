@@ -12,6 +12,7 @@ interface ContaVertical {
   nivel: number;
   valor: number;
   percentual: number;
+  analitica: boolean;
 }
 
 interface VerticalAno {
@@ -96,7 +97,7 @@ export default function AnaliseVerticalPage() {
   const contasTabela = (dadosAnoAtual?.contas ?? []).filter(conta => conta.nivel <= 3);
 
   const contasComparativas = (dadosAnoAtual?.contas ?? [])
-    .filter(conta => conta.nivel <= 2 && (!codigoBaseAtual || conta.codigo !== codigoBaseAtual))
+    .filter(conta => conta.analitica && conta.nivel <= 3 && (!codigoBaseAtual || conta.codigo !== codigoBaseAtual))
     .sort((a, b) => Math.abs(b.percentual) - Math.abs(a.percentual))
     .slice(0, 8);
 
@@ -214,19 +215,24 @@ export default function AnaliseVerticalPage() {
               {contasTabela.map((conta, idx) => {
                 const offset = Math.max(0, (conta.nivel - 1) * 16);
                 const value = conta.percentual ?? 0;
+                const percentualDisplay = conta.analitica ? formatPercent(value) : '-';
                 return (
                   <tr key={`${conta.codigo}-${idx}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="px-4 py-3 text-slate-700 font-mono">{conta.codigo}</td>
                     <td className="px-4 py-3 text-slate-700" style={{ paddingLeft: `${offset + 16}px` }}>{conta.descricao}</td>
                     <td className="px-4 py-3 text-left text-slate-700">{conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-left font-semibold text-slate-800">{formatPercent(value)}</td>
+                    <td className="px-4 py-3 text-left font-semibold text-slate-800">{percentualDisplay}</td>
                     <td className="px-4 py-3">
-                      <div className="w-full bg-slate-200 rounded-full h-4">
-                        <div 
-                          className="bg-indigo-500 h-4 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(Math.abs(value), 100)}%` }}
-                        />
-                      </div>
+                      {conta.analitica ? (
+                        <div className="w-full bg-slate-200 rounded-full h-4">
+                          <div 
+                            className="bg-indigo-500 h-4 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(Math.abs(value), 100)}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
                   </tr>
                 );

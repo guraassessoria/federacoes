@@ -195,9 +195,6 @@ export default function ComparativoPage() {
           if (!parentResolved) {
             const byCodeAtRoot = roots.find((root) => normalizeCode(root.codigo) === codigo);
             if (byCodeAtRoot) return byCodeAtRoot;
-
-            const byDescAtRoot = roots.find((root) => normalizeText(root.descricao) === descricao);
-            if (byDescAtRoot) return byDescAtRoot;
           }
 
           const flat = flatPorEmpresa.get(companyId) || [];
@@ -217,18 +214,6 @@ export default function ComparativoPage() {
             if (byDesc) return byDesc;
 
             return codeMatches[0];
-          }
-
-          const descMatches = flat.filter(
-            (conta) => normalizeText(conta.descricao) === descricao
-          );
-          if (descMatches.length === 1) return descMatches[0];
-          if (descMatches.length > 1) {
-            const byLevel = descMatches.find(
-              (conta) => (conta.nivelVisualizacao || conta.nivel || 1) === expectedNivel
-            );
-            if (byLevel) return byLevel;
-            return descMatches[0];
           }
 
           return undefined;
@@ -257,6 +242,8 @@ export default function ComparativoPage() {
               (company) => Math.abs(resolvedByCompany[company.id]?.valor || 0) > 0
             );
             const visible = ownHasValue || childRows.length > 0;
+            const codigoEstrutura = normalizeCode(node.codigo);
+            const descricaoEstrutura = (node.descricao || '').trim();
 
             if (nivel <= maxNivel && (!onlyVisible || visible)) {
               const valores: Record<string, number> = {};
@@ -265,8 +252,8 @@ export default function ComparativoPage() {
               });
 
               rows.push({
-                codigo: node.codigo,
-                descricao: node.descricao,
+                codigo: codigoEstrutura,
+                descricao: descricaoEstrutura,
                 nivel,
                 isSintetica: !!node.children?.length,
                 valores,
@@ -428,11 +415,12 @@ export default function ComparativoPage() {
       const bpRowsForExcel = buildComparativeRows('bp', Number.MAX_SAFE_INTEGER, false);
       const dreRowsForExcel = buildComparativeRows('dre', Number.MAX_SAFE_INTEGER, false);
       const formatDescricao = (descricao: string, nivel: number) => `${'  '.repeat(Math.max(0, nivel - 1))}${descricao}`;
+      const normalizeCode = (codigo: string) => (codigo || '').toString().trim().replace(',', '.');
 
       const bpSheet = [
         ['Código', 'Nível', 'Conta', ...companyHeaders],
         ...bpRowsForExcel.map((row) => [
-          row.codigo,
+          normalizeCode(row.codigo),
           row.nivel,
           formatDescricao(row.descricao, row.nivel),
           ...selectedCompanies.map((company) => row.valores[company.id] || 0),
@@ -442,7 +430,7 @@ export default function ComparativoPage() {
       const dreSheet = [
         ['Código', 'Nível', 'Conta', ...companyHeaders],
         ...dreRowsForExcel.map((row) => [
-          row.codigo,
+          normalizeCode(row.codigo),
           row.nivel,
           formatDescricao(row.descricao, row.nivel),
           ...selectedCompanies.map((company) => row.valores[company.id] || 0),

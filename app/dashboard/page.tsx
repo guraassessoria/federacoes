@@ -101,11 +101,16 @@ export default function DashboardPage() {
 
   if (estruturaDRE && estruturaDRE.length > 0) {
     // Fonte primária: estrutura de-para (estrutura contábil consolidada)
-    receitaTotal = buscarValorContabil(
-      estruturaDRE,
-      ['56', '51', '1'],
-      [['receita', 'liquida'], ['receita', 'bruta'], ['receita']]
-    );
+    receitaTotal =
+      buscarValorEstruturaPorDescricao(
+        estruturaDRE,
+        [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']]
+      ) ?? 0;
+
+    if (!receitaTotal && dre?.resultados?.totalReceitas) {
+      receitaTotal = dre.resultados.totalReceitas || 0;
+    }
+
     resultadoLiquido = resultadoDREVal ?? buscarValorContabil(
       estruturaDRE,
       ['229', '225', '210'],

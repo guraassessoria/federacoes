@@ -1,6 +1,6 @@
 import { DashboardShellLayout } from "@/components/dashboard-shell-layout";
 
-export default function DashboardLayout({
+export default function UploadLayout({
   children,
 }: {
   children: React.ReactNode;

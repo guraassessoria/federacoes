@@ -1,6 +1,6 @@
 import { DashboardShellLayout } from "@/components/dashboard-shell-layout";
 
-export default function DashboardLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;

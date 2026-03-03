@@ -147,8 +147,14 @@ export default function ComparativoPage() {
       const getEstrutura = (companyId: string) =>
         type === 'bp' ? comparativeData[companyId]?.estruturaBP || [] : comparativeData[companyId]?.estruturaDRE || [];
 
-      const templateCompany = selectedCompanies.find((company) => getEstrutura(company.id).length > 0);
-      const templateTree = templateCompany ? getEstrutura(templateCompany.id) : [];
+      const estruturasDisponiveis = selectedCompanies
+        .map((company) => getEstrutura(company.id))
+        .filter((estrutura) => estrutura.length > 0);
+
+      const templateTree =
+        estruturasDisponiveis
+          .slice()
+          .sort((a, b) => flattenContas(b).length - flattenContas(a).length)[0] || [];
       if (templateTree.length === 0) return [];
 
       if (type === 'dre') {

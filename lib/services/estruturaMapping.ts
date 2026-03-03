@@ -102,6 +102,35 @@ function findCodigoByDescricao(
   return null;
 }
 
+function findCodigoByDescricaoComExclusoes(
+  estrutura: ContaEstrutura[],
+  termSets: string[][],
+  fallbackCodigos: string[] = [],
+  excludedTermSets: string[][] = []
+): string | null {
+  const matchesExclusion = (descricao: string): boolean => {
+    if (!excludedTermSets.length) return false;
+    return excludedTermSets.some(terms => includesAllTerms(descricao, terms));
+  };
+
+  for (const terms of termSets) {
+    const matches = estrutura
+      .filter(item => includesAllTerms(item.descricao, terms) && !matchesExclusion(item.descricao))
+      .sort((a, b) => {
+        if (a.nivel !== b.nivel) return a.nivel - b.nivel;
+        return (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER);
+      });
+
+    if (matches.length > 0) return matches[0].codigo;
+  }
+
+  for (const codigo of fallbackCodigos) {
+    if (estrutura.some(item => item.codigo === codigo)) return codigo;
+  }
+
+  return null;
+}
+
 function normalizeEstruturaRows(rows: any[]): ContaEstrutura[] {
   return rows
     .map((row: any, idx: number) => {
@@ -262,13 +291,33 @@ function getContaSaldoFinal(conta: BalanceteInput): number {
   return Number(raw) || 0;
 }
 
+function isDescendantCode(parentCode: string, childCode: string): boolean {
+  if (!parentCode || !childCode || parentCode === childCode) return false;
+
+  if (childCode.startsWith(parentCode + '.')) return true;
+
+  const parentParts = parentCode.split('.');
+  const childParts = childCode.split('.');
+  if (childParts.length <= parentParts.length) return false;
+
+  for (let i = 0; i < parentParts.length - 1; i++) {
+    if (parentParts[i] !== childParts[i]) return false;
+  }
+
+  const parentLast = parentParts[parentParts.length - 1];
+  const childAtSameLevel = childParts[parentParts.length - 1] || '';
+  if (!childAtSameLevel) return false;
+
+  return childAtSameLevel === parentLast || childAtSameLevel.startsWith(parentLast);
+}
+
 function filtrarContasFolhas(data: BalanceteInput[]): BalanceteInput[] {
-  const codigos = new Set(data.map(getContaCodigo).filter(Boolean));
+  const codigos = data.map(getContaCodigo).filter(Boolean);
   return data.filter(conta => {
     const codigo = getContaCodigo(conta);
     if (!codigo) return false;
     for (const outro of codigos) {
-      if (outro !== codigo && outro.startsWith(codigo + '.')) return false;
+      if (isDescendantCode(codigo, outro)) return false;
     }
     return true;
   });
@@ -430,9 +479,19 @@ export async function mapBalanceteToDRE(
     custos: findCodigoByDescricao(estrutura, [['custo']], ['57']),
     margemBruta: findCodigoByDescricao(estrutura, [['margem', 'bruta']], ['109']),
     despesas: findCodigoByDescricao(estrutura, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], ['110']),
-    resultadoOperacional: findCodigoByDescricao(estrutura, [['resultado', 'operacional']], ['196']),
+    resultadoOperacional: findCodigoByDescricaoComExclusoes(
+      estrutura,
+      [['resultado', 'operacional']],
+      ['196'],
+      [['nao', 'operacional']]
+    ),
     laref: findCodigoByDescricao(estrutura, [['lucro', 'antes', 'resultado', 'financeiro'], ['laref']], ['197']),
-    resultadoFinanceiro: findCodigoByDescricao(estrutura, [['resultado', 'financeiro']], ['198']),
+    resultadoFinanceiro: findCodigoByDescricaoComExclusoes(
+      estrutura,
+      [['resultado', 'financeiro']],
+      ['198'],
+      [['lucro', 'antes', 'resultado', 'financeiro'], ['antes', 'resultado', 'financeiro']]
+    ),
     receitasFinanceiras: findCodigoByDescricao(estrutura, [['receita', 'financeira']], ['199']),
     despesasFinanceiras: findCodigoByDescricao(estrutura, [['despesa', 'financeira']], ['207']),
     resultadoNaoOperacional: findCodigoByDescricao(estrutura, [['resultado', 'nao', 'oper'], ['outras', 'receitas', 'despesas']], ['218']),
@@ -508,6 +567,61 @@ export async function mapBalanceteToDRE(
   const irCsllVal = codigosDRE.irCsll ? val(codigosDRE.irCsll) : 0;
   const superavitDeficitVal = lucroAntesImpostosVal - irCsllVal;
   if (codigosDRE.superavitDeficit) set(codigosDRE.superavitDeficit, superavitDeficitVal);
+
+  // ─── ETAPA 2.1: Consistência hierárquica ───
+  // Para grupos com filhos (não totalizadores de fórmula), o valor deve refletir
+  // exatamente a soma dos filhos na estrutura enviada.
+  const filhosPorPai = new Map<string, string[]>();
+  for (const item of estrutura) {
+    if (!item.codigoSuperior) continue;
+    const list = filhosPorPai.get(item.codigoSuperior) || [];
+    list.push(item.codigo);
+    filhosPorPai.set(item.codigoSuperior, list);
+  }
+
+  const descNivel = [...estrutura].sort((a, b) => b.nivel - a.nivel);
+  for (const item of descNivel) {
+    const filhos = filhosPorPai.get(item.codigo);
+    if (!filhos?.length) continue;
+    if (totalizadoresFormula.has(item.codigo)) continue;
+
+    const somaFilhos = filhos.reduce((acc, codFilho) => acc + val(codFilho), 0);
+    set(item.codigo, somaFilhos);
+  }
+
+  // Recalcular totalizadores de fórmula após a consistência hierárquica
+  const receitaBrutaVal2 = codigosDRE.receitaBruta ? val(codigosDRE.receitaBruta) : 0;
+  const deducoesVal2 = codigosDRE.deducoes ? val(codigosDRE.deducoes) : 0;
+  const receitaLiquidaVal2 = receitaBrutaVal2 + deducoesVal2;
+  if (codigosDRE.receitaLiquida) set(codigosDRE.receitaLiquida, receitaLiquidaVal2);
+
+  const custosVal2 = codigosDRE.custos ? val(codigosDRE.custos) : 0;
+  const margemBrutaVal2 = receitaLiquidaVal2 - custosVal2;
+  if (codigosDRE.margemBruta) set(codigosDRE.margemBruta, margemBrutaVal2);
+
+  const despesasVal2 = codigosDRE.despesas ? val(codigosDRE.despesas) : 0;
+  const resultadoOperacionalVal2 = margemBrutaVal2 - despesasVal2;
+  if (codigosDRE.resultadoOperacional) set(codigosDRE.resultadoOperacional, resultadoOperacionalVal2);
+
+  const larefVal2 = resultadoOperacionalVal2;
+  if (codigosDRE.laref) set(codigosDRE.laref, larefVal2);
+
+  const resultadoFinanceiroVal2 =
+    (codigosDRE.receitasFinanceiras ? val(codigosDRE.receitasFinanceiras) : 0) -
+    (codigosDRE.despesasFinanceiras ? val(codigosDRE.despesasFinanceiras) : 0);
+  if (codigosDRE.resultadoFinanceiro) set(codigosDRE.resultadoFinanceiro, resultadoFinanceiroVal2);
+
+  const resultadoNaoOperacionalVal2 =
+    (codigosDRE.receitasNaoOperacionais ? val(codigosDRE.receitasNaoOperacionais) : 0) -
+    (codigosDRE.despesasNaoOperacionais ? val(codigosDRE.despesasNaoOperacionais) : 0);
+  if (codigosDRE.resultadoNaoOperacional) set(codigosDRE.resultadoNaoOperacional, resultadoNaoOperacionalVal2);
+
+  const lucroAntesImpostosVal2 = larefVal2 + resultadoFinanceiroVal2 + resultadoNaoOperacionalVal2;
+  if (codigosDRE.lucroAntesImpostos) set(codigosDRE.lucroAntesImpostos, lucroAntesImpostosVal2);
+
+  const irCsllVal2 = codigosDRE.irCsll ? val(codigosDRE.irCsll) : 0;
+  const superavitDeficitVal2 = lucroAntesImpostosVal2 - irCsllVal2;
+  if (codigosDRE.superavitDeficit) set(codigosDRE.superavitDeficit, superavitDeficitVal2);
 
   // ─── ETAPA 3: Respeitar a hierarquia da estrutura enviada no upload ───
   // Monta árvore diretamente pela estrutura, evitando duplicações da montagem sequencial manual.

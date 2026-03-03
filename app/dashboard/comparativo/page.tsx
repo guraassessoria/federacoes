@@ -165,51 +165,26 @@ export default function ComparativoPage() {
         const lookupByCompany = new Map<
           string,
           {
-            byPathCode: Map<string, ContaComValor>;
-            byPathDesc: Map<string, ContaComValor>;
+            roots: ContaComValor[];
             byCode: Map<string, ContaComValor[]>;
           }
         >();
 
         selectedCompanies.forEach((company) => {
-          const byPathCode = new Map<string, ContaComValor>();
-          const byPathDesc = new Map<string, ContaComValor>();
           const byCode = new Map<string, ContaComValor[]>();
 
-          const indexTree = (
-            nodes: ContaComValor[],
-            parentCodePath: string[] = [],
-            parentDescPath: string[] = []
-          ) => {
-            nodes.forEach((conta) => {
-              const codePart = normalizeCode(conta.codigo);
-              const descPart = normalizeText(conta.descricao);
-              const codePath = [...parentCodePath, codePart].join('>');
-              const descPath = [...parentDescPath, descPart].join('>');
+          const roots = getEstrutura(company.id) || [];
 
-              if (!byPathCode.has(codePath)) {
-                byPathCode.set(codePath, conta);
-              }
-              if (!byPathDesc.has(descPath)) {
-                byPathDesc.set(descPath, conta);
-              }
-
-              if (!byCode.has(codePart)) {
-                byCode.set(codePart, []);
-              }
-              byCode.get(codePart)!.push(conta);
-
-              if (conta.children?.length) {
-                indexTree(conta.children, [...parentCodePath, codePart], [...parentDescPath, descPart]);
-              }
-            });
-          };
-
-          indexTree(getEstrutura(company.id));
+          flattenContas(roots).forEach((conta) => {
+            const codePart = normalizeCode(conta.codigo);
+            if (!byCode.has(codePart)) {
+              byCode.set(codePart, []);
+            }
+            byCode.get(codePart)!.push(conta);
+          });
 
           lookupByCompany.set(company.id, {
-            byPathCode,
-            byPathDesc,
+            roots,
             byCode,
           });
         });
@@ -217,60 +192,68 @@ export default function ComparativoPage() {
         const resolveConta = (
           companyId: string,
           node: ContaComValor,
-          codePath: string,
-          descPath: string,
           parentResolved?: ContaComValor
         ): ContaComValor | undefined => {
           const lookup = lookupByCompany.get(companyId);
           if (!lookup) return undefined;
 
-          const byCodePath = lookup.byPathCode.get(codePath);
-          if (byCodePath) return byCodePath;
+          const code = normalizeCode(node.codigo);
+          const desc = normalizeText(node.descricao);
 
-          const byDescPath = lookup.byPathDesc.get(descPath);
-          if (byDescPath) return byDescPath;
+          if (parentResolved?.children?.length) {
+            const siblings = parentResolved.children;
 
-          const parentCodeResolved = parentResolved ? normalizeCode(parentResolved.codigo) : '';
-          const parentCodeTemplate = normalizeCode(node.codigoSuperior);
+            const byDescInParent = siblings.find(
+              (candidate) => normalizeText(candidate.descricao) === desc
+            );
+            if (byDescInParent) return byDescInParent;
 
-          const pickBestCandidate = (candidates: ContaComValor[] | undefined): ContaComValor | undefined => {
-            if (!candidates || candidates.length === 0) return undefined;
-            if (candidates.length === 1) return candidates[0];
+            const byCodeInParent = siblings.find(
+              (candidate) => normalizeCode(candidate.codigo) === code
+            );
+            if (byCodeInParent) return byCodeInParent;
+          }
 
-            if (parentCodeResolved) {
-              const byResolvedParent = candidates.find(
-                (candidate) => normalizeCode(candidate.codigoSuperior) === parentCodeResolved
-              );
-              if (byResolvedParent) return byResolvedParent;
-            }
+          const isRootTemplate = !node.codigoSuperior;
+          if (isRootTemplate) {
+            const rootByDesc = lookup.roots.find(
+              (candidate) => normalizeText(candidate.descricao) === desc
+            );
+            if (rootByDesc) return rootByDesc;
 
-            if (parentCodeTemplate) {
-              const byTemplateParent = candidates.find(
-                (candidate) => normalizeCode(candidate.codigoSuperior) === parentCodeTemplate
-              );
-              if (byTemplateParent) return byTemplateParent;
-            }
+            const rootByCode = lookup.roots.find(
+              (candidate) => normalizeCode(candidate.codigo) === code
+            );
+            if (rootByCode) return rootByCode;
+          }
 
-            const targetNivel = node.nivelVisualizacao || node.nivel || 1;
-            const byLevel = candidates.find(
-              (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === targetNivel
+          const globalByCode = lookup.byCode.get(code) || [];
+          if (globalByCode.length === 1) return globalByCode[0];
+          if (globalByCode.length > 1) {
+            const expectedNivel = node.nivelVisualizacao || node.nivel || 1;
+            const byLevel = globalByCode.find(
+              (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === expectedNivel
             );
             if (byLevel) return byLevel;
 
-            return candidates[0];
-          };
+            const byDesc = globalByCode.find(
+              (candidate) => normalizeText(candidate.descricao) === desc
+            );
+            if (byDesc) return byDesc;
 
-          const exact = pickBestCandidate(lookup.byCode.get(normalizeCode(node.codigo)));
-          if (exact) return exact;
+            return globalByCode[0];
+          }
 
-          return undefined;
+          const flat = flattenContas(lookup.roots);
+          const globalByDesc = flat.find(
+            (candidate) => normalizeText(candidate.descricao) === desc
+          );
+          return globalByDesc;
         };
 
         const hasValueRecursive = (
           node: ContaComValor,
-          resolvedByCompany: Record<string, ContaComValor | undefined>,
-          parentCodePath: string[] = [],
-          parentDescPath: string[] = []
+          resolvedByCompany: Record<string, ContaComValor | undefined>
         ): boolean => {
           const hasOwnValue = selectedCompanies.some((company) => {
             const row = resolvedByCompany[company.id];
@@ -278,22 +261,13 @@ export default function ComparativoPage() {
           });
           if (hasOwnValue) return true;
           return (node.children || []).some((child) => {
-            const childCodePart = normalizeCode(child.codigo);
-            const childDescPart = normalizeText(child.descricao);
-            const childCodePath = [...parentCodePath, childCodePart].join('>');
-            const childDescPath = [...parentDescPath, childDescPart].join('>');
             const childResolved = Object.fromEntries(
               selectedCompanies.map((company) => [
                 company.id,
-                resolveConta(company.id, child, childCodePath, childDescPath, resolvedByCompany[company.id]),
+                resolveConta(company.id, child, resolvedByCompany[company.id]),
               ])
             ) as Record<string, ContaComValor | undefined>;
-            return hasValueRecursive(
-              child,
-              childResolved,
-              [...parentCodePath, childCodePart],
-              [...parentDescPath, childDescPart]
-            );
+            return hasValueRecursive(child, childResolved);
           });
         };
 
@@ -301,29 +275,18 @@ export default function ComparativoPage() {
         const walk = (
           nodes: ContaComValor[],
           fallbackNivel: number = 1,
-          parentResolvedByCompany?: Record<string, ContaComValor | undefined>,
-          parentCodePath: string[] = [],
-          parentDescPath: string[] = []
+          parentResolvedByCompany?: Record<string, ContaComValor | undefined>
         ) => {
           nodes.forEach((node) => {
             const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
-            const codePart = normalizeCode(node.codigo);
-            const descPart = normalizeText(node.descricao);
-            const codePath = [...parentCodePath, codePart].join('>');
-            const descPath = [...parentDescPath, descPart].join('>');
             const resolvedByCompany = Object.fromEntries(
               selectedCompanies.map((company) => [
                 company.id,
-                resolveConta(company.id, node, codePath, descPath, parentResolvedByCompany?.[company.id]),
+                resolveConta(company.id, node, parentResolvedByCompany?.[company.id]),
               ])
             ) as Record<string, ContaComValor | undefined>;
 
-            const visible = hasValueRecursive(
-              node,
-              resolvedByCompany,
-              [...parentCodePath, codePart],
-              [...parentDescPath, descPart]
-            );
+            const visible = hasValueRecursive(node, resolvedByCompany);
 
             if ((!onlyVisible || visible) && nivel <= maxNivel) {
               const valores: Record<string, number> = {};
@@ -342,13 +305,7 @@ export default function ComparativoPage() {
             }
 
             if (node.children?.length) {
-              walk(
-                node.children,
-                nivel + 1,
-                resolvedByCompany,
-                [...parentCodePath, codePart],
-                [...parentDescPath, descPart]
-              );
+              walk(node.children, nivel + 1, resolvedByCompany);
             }
           });
         };

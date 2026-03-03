@@ -88,16 +88,16 @@ export async function GET(request: NextRequest) {
 
     for (const ano of anos) {
       const yearShort = ano.slice(-2);
-      const balanceteData = await prisma.balanceteData.findMany({
+      const balancetes = await prisma.balancete.findMany({
         where: {
           companyId,
           period: { contains: `/${yearShort}` }
         },
-        orderBy: { accountNumber: 'asc' }
+        orderBy: { accountCode: 'asc' }
       });
 
-      if (balanceteData.length > 0) {
-        const { dre, bp } = await processarDadosFinanceiros(balanceteData, deParaRecords);
+      if (balancetes.length > 0) {
+        const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);
         dadosPorAno[ano] = { dre, bp };
       }
     }

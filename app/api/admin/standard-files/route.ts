@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invalidateEstruturaCache } from "@/lib/services/estruturaMapping";
 import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
@@ -58,6 +59,95 @@ type StructureRow = {
   isTotal: boolean;
   grupo: string | null;
 };
+
+function descricaoPathByCodigo(rows: StructureRow[]): Map<string, string> {
+  const byCodigo = new Map<string, StructureRow>();
+  rows.forEach((row) => byCodigo.set(row.codigo, row));
+
+  const cache = new Map<string, string>();
+
+  const normDesc = (v: string) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const build = (codigo: string, stack = new Set<string>()): string => {
+    if (cache.has(codigo)) return cache.get(codigo)!;
+    const row = byCodigo.get(codigo);
+    if (!row) return "";
+
+    if (stack.has(codigo)) return normDesc(row.descricao);
+    stack.add(codigo);
+
+    const parent = row.codigoSuperior ? byCodigo.get(row.codigoSuperior) : null;
+    const parentPath = parent ? build(parent.codigo, stack) : "";
+    const current = normDesc(row.descricao);
+    const path = parentPath ? `${parentPath}>${current}` : current;
+
+    cache.set(codigo, path);
+    stack.delete(codigo);
+    return path;
+  };
+
+  rows.forEach((row) => build(row.codigo));
+  return cache;
+}
+
+function buildCodeAliases(
+  previousRows: StructureRow[],
+  nextRows: StructureRow[],
+  existingAliases: Record<string, string>
+): Record<string, string> {
+  const oldPath = descricaoPathByCodigo(previousRows);
+  const newPath = descricaoPathByCodigo(nextRows);
+
+  const oldCodeByPath = new Map<string, string>();
+  oldPath.forEach((path, code) => {
+    if (!oldCodeByPath.has(path)) oldCodeByPath.set(path, code);
+  });
+
+  const newCodeByPath = new Map<string, string>();
+  newPath.forEach((path, code) => {
+    if (!newCodeByPath.has(path)) newCodeByPath.set(path, code);
+  });
+
+  const directAliases: Record<string, string> = {};
+  oldCodeByPath.forEach((oldCode, pathKey) => {
+    const newCode = newCodeByPath.get(pathKey);
+    if (newCode && newCode !== oldCode) {
+      directAliases[oldCode] = newCode;
+    }
+  });
+
+  const merged: Record<string, string> = { ...(existingAliases || {}) };
+
+  for (const [oldCode, mappedCode] of Object.entries(merged)) {
+    if (directAliases[mappedCode]) {
+      merged[oldCode] = directAliases[mappedCode];
+    }
+  }
+
+  for (const [oldCode, newCode] of Object.entries(directAliases)) {
+    merged[oldCode] = newCode;
+  }
+
+  const collapsed: Record<string, string> = {};
+  for (const [fromCode, toCode] of Object.entries(merged)) {
+    let current = toCode;
+    const seen = new Set<string>([fromCode]);
+    while (merged[current] && !seen.has(current)) {
+      seen.add(current);
+      current = merged[current];
+    }
+    if (fromCode !== current) {
+      collapsed[fromCode] = current;
+    }
+  }
+
+  return collapsed;
+}
 
 function parseCsv(content: string): Record<string, any>[] {
   const lines = content.split(/\r?\n/).filter((l) => l.trim());
@@ -233,6 +323,12 @@ export async function POST(req: NextRequest) {
 
     const nextVersion = (existing?.version ?? 0) + 1;
 
+    const previousRows: StructureRow[] = Array.isArray((existing as any)?.data?.rows)
+      ? ((existing as any).data.rows as StructureRow[])
+      : [];
+    const existingAliases = (existing as any)?.data?.meta?.codeAliases || {};
+    const codeAliases = buildCodeAliases(previousRows, rows, existingAliases);
+
     const saved = await prisma.standardStructure.upsert({
       where: { type: type as any },
       create: {
@@ -240,23 +336,38 @@ export async function POST(req: NextRequest) {
         version: 1,
         data: {
           rows,
-          meta: { originalFileName: fileName, uploadedAt: new Date().toISOString(), totalRows: rows.length },
+          meta: {
+            originalFileName: fileName,
+            uploadedAt: new Date().toISOString(),
+            totalRows: rows.length,
+            codeAliases,
+          },
         },
       },
       update: {
         version: nextVersion,
         data: {
           rows,
-          meta: { originalFileName: fileName, uploadedAt: new Date().toISOString(), totalRows: rows.length },
+          meta: {
+            originalFileName: fileName,
+            uploadedAt: new Date().toISOString(),
+            totalRows: rows.length,
+            codeAliases,
+          },
         },
       },
     });
+
+    if (type === "BP" || type === "DRE") {
+      invalidateEstruturaCache(type);
+    }
 
     return NextResponse.json({
       ok: true,
       type: saved.type,
       version: saved.version,
       totalRows: rows.length,
+      aliasesCount: Object.keys(codeAliases).length,
       updatedAt: saved.updatedAt,
     });
   } catch (err: any) {

@@ -18,7 +18,7 @@
  *   Superávit/Déficit       = LAI - IR
  */
 
-import { Balancete } from '@prisma/client';
+import { prisma } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -46,16 +46,69 @@ export interface DeParaRecord {
   padraoDMPL: string | null;
 }
 
+type BalanceteInput = {
+  accountCode?: string | null;
+  conta?: string | null;
+  closingBalance?: unknown;
+  saldoFinal?: unknown;
+};
+
 // ─── Cache ────────────────────────────────────────────────────
 
 let estruturaDRECache: ContaEstrutura[] | null = null;
 let estruturaBPCache: ContaEstrutura[] | null = null;
+let aliasesDRECache: Record<string, string> | null = null;
+let aliasesBPCache: Record<string, string> | null = null;
 
 // ─── Utilitários ──────────────────────────────────────────────
 
 function normalizeCodigo(cod: string): string {
   if (!cod) return '';
   return cod.replace(/^0+/, '') || '0';
+}
+
+function normalizeEstruturaRows(rows: any[]): ContaEstrutura[] {
+  return rows
+    .map((row: any) => {
+      const codigo = normalizeCodigo(String(row?.codigo || '').trim());
+      if (!codigo) return null;
+      return {
+        codigo,
+        descricao: String(row?.descricao || '').trim(),
+        codigoSuperior: row?.codigoSuperior ? normalizeCodigo(String(row.codigoSuperior).trim()) : null,
+        nivel: Number(row?.nivel) || 1,
+        nivelVisualizacao: Number(row?.nivelVisualizacao ?? row?.nivel) || 1,
+        ordem: Number.isFinite(Number(row?.ordem)) ? Number(row.ordem) : undefined,
+      } as ContaEstrutura;
+    })
+    .filter(Boolean) as ContaEstrutura[];
+}
+
+async function loadEstruturaFromStandardStructure(tipo: 'BP' | 'DRE'): Promise<{ rows: ContaEstrutura[]; aliases: Record<string, string> } | null> {
+  const record = await prisma.standardStructure.findUnique({
+    where: { type: tipo as any },
+    select: { data: true },
+  });
+
+  const data = record?.data as any;
+  const rawRows = Array.isArray(data?.rows) ? data.rows : [];
+  if (!rawRows.length) return null;
+
+  const rows = normalizeEstruturaRows(rawRows);
+  if (!rows.length) return null;
+
+  const rawAliases = data?.meta?.codeAliases && typeof data.meta.codeAliases === 'object'
+    ? data.meta.codeAliases
+    : {};
+
+  const aliases: Record<string, string> = {};
+  for (const [oldCode, newCode] of Object.entries(rawAliases)) {
+    const from = normalizeCodigo(String(oldCode || '').trim());
+    const to = normalizeCodigo(String(newCode || '').trim());
+    if (from && to && from !== to) aliases[from] = to;
+  }
+
+  return { rows, aliases };
 }
 
 function readJsonFileSafe(fileName: string): any[] | null {
@@ -76,15 +129,43 @@ function readJsonFileSafe(fileName: string): any[] | null {
 
 export async function loadEstruturaDRE(): Promise<ContaEstrutura[]> {
   if (estruturaDRECache) return estruturaDRECache;
+
+  const fromDb = await loadEstruturaFromStandardStructure('DRE');
+  if (fromDb?.rows?.length) {
+    estruturaDRECache = fromDb.rows;
+    aliasesDRECache = fromDb.aliases;
+    return estruturaDRECache;
+  }
+
   const parsed = readJsonFileSafe('estrutura_dre.json');
-  if (parsed?.length) { estruturaDRECache = parsed; return estruturaDRECache; }
+  if (parsed?.length) {
+    estruturaDRECache = normalizeEstruturaRows(parsed);
+    aliasesDRECache = {};
+    return estruturaDRECache;
+  }
+
+  aliasesDRECache = {};
   return [];
 }
 
 export async function loadEstruturaBP(): Promise<ContaEstrutura[]> {
   if (estruturaBPCache) return estruturaBPCache;
+
+  const fromDb = await loadEstruturaFromStandardStructure('BP');
+  if (fromDb?.rows?.length) {
+    estruturaBPCache = fromDb.rows;
+    aliasesBPCache = fromDb.aliases;
+    return estruturaBPCache;
+  }
+
   const parsed = readJsonFileSafe('estrutura_bp.json');
-  if (parsed?.length) { estruturaBPCache = parsed; return estruturaBPCache; }
+  if (parsed?.length) {
+    estruturaBPCache = normalizeEstruturaRows(parsed);
+    aliasesBPCache = {};
+    return estruturaBPCache;
+  }
+
+  aliasesBPCache = {};
   return [];
 }
 
@@ -94,8 +175,14 @@ export function setEstruturaCache(tipo: 'BP' | 'DRE', estrutura: ContaEstrutura[
 }
 
 export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE') {
-  if (!tipo || tipo === 'DRE') estruturaDRECache = null;
-  if (!tipo || tipo === 'BP') estruturaBPCache = null;
+  if (!tipo || tipo === 'DRE') {
+    estruturaDRECache = null;
+    aliasesDRECache = null;
+  }
+  if (!tipo || tipo === 'BP') {
+    estruturaBPCache = null;
+    aliasesBPCache = null;
+  }
 }
 
 export function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
@@ -117,11 +204,22 @@ function getTipoDemonstracao(accountCode: string): 'BP' | 'DRE' | null {
   return null;
 }
 
-function filtrarContasFolhas(data: Balancete[]): Balancete[] {
-  const codigos = new Set(data.map(c => c.accountCode));
+function getContaCodigo(conta: BalanceteInput): string {
+  return String(conta.accountCode ?? conta.conta ?? '').trim();
+}
+
+function getContaSaldoFinal(conta: BalanceteInput): number {
+  const raw = conta.closingBalance ?? conta.saldoFinal;
+  return Number(raw) || 0;
+}
+
+function filtrarContasFolhas(data: BalanceteInput[]): BalanceteInput[] {
+  const codigos = new Set(data.map(getContaCodigo).filter(Boolean));
   return data.filter(conta => {
+    const codigo = getContaCodigo(conta);
+    if (!codigo) return false;
     for (const outro of codigos) {
-      if (outro !== conta.accountCode && outro.startsWith(conta.accountCode + '.')) return false;
+      if (outro !== codigo && outro.startsWith(codigo + '.')) return false;
     }
     return true;
   });
@@ -142,25 +240,40 @@ function buildDeParaLookup(records: DeParaRecord[], tipo: 'BP' | 'DRE'): Record<
   return lookup;
 }
 
+function resolveCodigoComAliases(codigo: string, tipo: 'BP' | 'DRE'): string {
+  const aliases = tipo === 'BP' ? (aliasesBPCache || {}) : (aliasesDRECache || {});
+  let current = normalizeCodigo(codigo);
+  const visited = new Set<string>();
+
+  while (aliases[current] && !visited.has(current)) {
+    visited.add(current);
+    current = normalizeCodigo(aliases[current]);
+  }
+
+  return current;
+}
+
 // ─── Mapear Valores do Balancete ──────────────────────────────
 
 function mapearValores(
-  balancetes: Balancete[],
+  balancetes: BalanceteInput[],
   tipo: 'BP' | 'DRE',
   deParaRecords?: DeParaRecord[]
 ): Record<string, number> {
   let lookup: Record<string, string> = {};
   if (deParaRecords?.length) lookup = buildDeParaLookup(deParaRecords, tipo);
 
-  const contasTipo = balancetes.filter(c => getTipoDemonstracao(c.accountCode) === tipo);
+  const contasTipo = balancetes.filter(c => getTipoDemonstracao(getContaCodigo(c)) === tipo);
   const folhas = filtrarContasFolhas(contasTipo);
 
   const valores: Record<string, number> = {};
   for (const conta of folhas) {
-    const codPadrao = lookup[conta.accountCode];
+    const contaCodigo = getContaCodigo(conta);
+    const codPadrao = lookup[contaCodigo];
     if (codPadrao) {
-      const val = ajustarSinal(Number(conta.closingBalance) || 0, conta.accountCode);
-      valores[codPadrao] = (valores[codPadrao] || 0) + val;
+      const codResolvido = resolveCodigoComAliases(codPadrao, tipo);
+      const val = ajustarSinal(getContaSaldoFinal(conta), contaCodigo);
+      valores[codResolvido] = (valores[codResolvido] || 0) + val;
     }
   }
   return valores;
@@ -171,7 +284,7 @@ function mapearValores(
 // ═══════════════════════════════════════════════════════════════
 
 export async function mapBalanceteToBP(
-  balancetes: Balancete[],
+  balancetes: BalanceteInput[],
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
   const estrutura = await loadEstruturaBP();
@@ -222,7 +335,7 @@ function buildTree(contas: ContaComValor[]): ContaComValor[] {
 // ═══════════════════════════════════════════════════════════════
 
 export async function mapBalanceteToDRE(
-  balancetes: Balancete[],
+  balancetes: BalanceteInput[],
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
   const estrutura = await loadEstruturaDRE();
@@ -366,7 +479,7 @@ export async function mapBalanceteToDRE(
 
 /** Mantém compatibilidade com chamadas existentes */
 export async function mapBalanceteToEstrutura(
-  balancetes: Balancete[],
+  balancetes: BalanceteInput[],
   tipo: 'BP' | 'DRE',
   deParaRecords?: DeParaRecord[]
 ): Promise<ContaComValor[]> {
@@ -375,7 +488,7 @@ export async function mapBalanceteToEstrutura(
 }
 
 export async function processarDadosFinanceiros(
-  balancetes: Balancete[],
+  balancetes: BalanceteInput[],
   deParaRecords?: DeParaRecord[]
 ): Promise<{
   dre: ContaComValor[];

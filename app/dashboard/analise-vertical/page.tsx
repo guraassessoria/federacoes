@@ -205,8 +205,8 @@ export default function AnaliseVerticalPage() {
               <tr className="bg-slate-50">
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Valor</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">Percentual</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Valor</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">Percentual</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700 w-1/2">Composicao</th>
               </tr>
             </thead>
@@ -218,8 +218,8 @@ export default function AnaliseVerticalPage() {
                   <tr key={`${conta.codigo}-${idx}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="px-4 py-3 text-slate-700 font-mono">{conta.codigo}</td>
                     <td className="px-4 py-3 text-slate-700" style={{ paddingLeft: `${offset + 16}px` }}>{conta.descricao}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatPercent(value)}</td>
+                    <td className="px-4 py-3 text-left text-slate-700">{conta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-left font-semibold text-slate-800">{formatPercent(value)}</td>
                     <td className="px-4 py-3">
                       <div className="w-full bg-slate-200 rounded-full h-4">
                         <div 

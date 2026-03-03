@@ -173,9 +173,9 @@ export default function AnaliseHorizontalPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
                 {paresAnos.map(par => (
-                  <th key={par.key} className="text-right px-4 py-3 font-semibold text-slate-700">{par.label}</th>
+                  <th key={par.key} className="text-left px-4 py-3 font-semibold text-slate-700">{par.label}</th>
                 ))}
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">
                   {variacaoAcumuladaKey ? `Acumulada ${anosDisponiveis[0]}-${anosDisponiveis[anosDisponiveis.length - 1]}` : 'Acumulada'}
                 </th>
               </tr>
@@ -186,11 +186,11 @@ export default function AnaliseHorizontalPage() {
                   <td className="px-4 py-3 text-slate-700 font-mono">{item.codigo}</td>
                   <td className="px-4 py-3 text-slate-700 font-medium">{item.descricao}</td>
                   {paresAnos.map(par => (
-                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-right">
+                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-left">
                       {renderVariation(item.variacoes[par.key] ?? 0)}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right font-semibold">
+                  <td className="px-4 py-3 text-left font-semibold">
                     {renderVariation(variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0)}
                   </td>
                 </tr>
@@ -231,9 +231,9 @@ export default function AnaliseHorizontalPage() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Código</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-700">Conta</th>
                 {paresAnos.map(par => (
-                  <th key={par.key} className="text-right px-4 py-3 font-semibold text-slate-700">{par.label}</th>
+                  <th key={par.key} className="text-left px-4 py-3 font-semibold text-slate-700">{par.label}</th>
                 ))}
-                <th className="text-right px-4 py-3 font-semibold text-slate-700">
+                <th className="text-left px-4 py-3 font-semibold text-slate-700">
                   {variacaoAcumuladaKey ? `Acumulada ${anosDisponiveis[0]}-${anosDisponiveis[anosDisponiveis.length - 1]}` : 'Acumulada'}
                 </th>
               </tr>
@@ -244,11 +244,11 @@ export default function AnaliseHorizontalPage() {
                   <td className="px-4 py-3 text-slate-700 font-mono">{item.codigo}</td>
                   <td className="px-4 py-3 text-slate-700 font-medium">{item.descricao}</td>
                   {paresAnos.map(par => (
-                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-right">
+                    <td key={`${item.codigo}-${par.key}`} className="px-4 py-3 text-left">
                       {renderVariation(item.variacoes[par.key] ?? 0)}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right font-semibold">
+                  <td className="px-4 py-3 text-left font-semibold">
                     {renderVariation(variacaoAcumuladaKey ? item.variacoes[variacaoAcumuladaKey] ?? 0 : 0)}
                   </td>
                 </tr>

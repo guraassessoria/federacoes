@@ -71,8 +71,7 @@ function extrairContasVerticais(
   contas: ContaComValor[],
   baseValor: number,
   maxNivel: number,
-  incluirZeros: boolean,
-  demonstracao: 'DRE' | 'BP'
+  incluirZeros: boolean
 ): ContaVertical[] {
   const resultado: ContaVertical[] = [];
   const baseAbs = Math.abs(baseValor);
@@ -81,7 +80,7 @@ function extrairContasVerticais(
   function processar(lista: ContaComValor[], nivelFallback: number = 1): void {
     for (const conta of lista) {
       const nivelConta = conta.nivelVisualizacao ?? conta.nivel ?? nivelFallback;
-      const analitica = demonstracao === 'DRE' ? nivelConta >= 4 : nivelConta >= 3;
+      const analitica = nivelConta >= 3;
       if (nivelConta <= maxNivel) {
         const key = `${conta.codigo}|${conta.descricao}`;
         if (!visitados.has(key)) {
@@ -215,7 +214,7 @@ export async function GET(request: NextRequest) {
               descricao: baseDRE.descricao,
               valor: baseDRE.valor,
             },
-            contas: extrairContasVerticais(dre, baseDRE.valor, maxNivel, incluirZeros, 'DRE'),
+            contas: extrairContasVerticais(dre, baseDRE.valor, maxNivel, incluirZeros),
           };
         }
 
@@ -228,7 +227,7 @@ export async function GET(request: NextRequest) {
               descricao: baseBP.descricao,
               valor: baseBP.valor,
             },
-            contas: extrairContasVerticais(bp, baseBP.valor, maxNivel, incluirZeros, 'BP'),
+            contas: extrairContasVerticais(bp, baseBP.valor, maxNivel, incluirZeros),
           };
         }
       }

@@ -87,10 +87,11 @@ export default function AnaliseVerticalPage() {
     : (anosDisponiveis[anosDisponiveis.length - 1] ?? availableYears[availableYears.length - 1]);
 
   const dadosAnoAtual = fonteAtual?.[effectiveYear];
+  const codigoBaseAtual = dadosAnoAtual?.base.codigo;
   const contasTabela = (dadosAnoAtual?.contas ?? []).filter(conta => conta.nivel <= 3);
 
   const contasComparativas = (dadosAnoAtual?.contas ?? [])
-    .filter(conta => conta.nivel <= 2 && conta.codigo !== dadosAnoAtual.base.codigo)
+    .filter(conta => conta.nivel <= 2 && (!codigoBaseAtual || conta.codigo !== codigoBaseAtual))
     .sort((a, b) => Math.abs(b.percentual) - Math.abs(a.percentual))
     .slice(0, 8);
 

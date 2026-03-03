@@ -67,6 +67,51 @@ function encontrarBasePorCodigo(contas: ContaComValor[], codigosPreferenciais: s
   return null;
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function encontrarBasePorDescricao(contas: ContaComValor[], termosPreferenciais: string[][]): ContaComValor | null {
+  const flat: ContaComValor[] = [];
+  const walk = (lista: ContaComValor[]) => {
+    for (const conta of lista) {
+      flat.push(conta);
+      if (conta.children?.length) walk(conta.children);
+    }
+  };
+  walk(contas);
+
+  for (const termos of termosPreferenciais) {
+    const matchComValor = flat.find((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      return termos.every((termo) => desc.includes(normalizarTexto(termo))) && conta.valor !== 0;
+    });
+    if (matchComValor) return matchComValor;
+
+    const match = flat.find((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+    });
+    if (match) return match;
+  }
+
+  return null;
+}
+
+function encontrarBaseContabil(
+  contas: ContaComValor[],
+  codigosPreferenciais: string[],
+  termosPreferenciais: string[][]
+): ContaComValor | null {
+  return (
+    encontrarBasePorDescricao(contas, termosPreferenciais) ||
+    encontrarBasePorCodigo(contas, codigosPreferenciais)
+  );
+}
+
 function extrairContasVerticais(
   contas: ContaComValor[],
   baseValor: number,
@@ -205,8 +250,12 @@ export async function GET(request: NextRequest) {
         const { dre, bp } = await processarDadosFinanceiros(balancetes, deParaRecords);
         analiseVertical.meta.anosDisponiveis.push(ano);
 
-        // DRE: base contábil principal = Receita Líquida (56), fallback Receita Bruta (51)
-        const baseDRE = encontrarBasePorCodigo(dre, ['56', '51']);
+        // DRE: base contábil principal = Receita Líquida/Bruta
+        const baseDRE = encontrarBaseContabil(
+          dre,
+          ['56', '51'],
+          [['receita', 'liquida'], ['receita', 'bruta'], ['receita']]
+        );
         if (baseDRE) {
           analiseVertical.DRE[ano] = {
             base: {
@@ -218,8 +267,12 @@ export async function GET(request: NextRequest) {
           };
         }
 
-        // BP: base contábil principal = Ativo Total (1), fallback Total Passivo+PL (76)
-        const baseBP = encontrarBasePorCodigo(bp, ['1', '76']);
+        // BP: base contábil principal = Ativo Total, fallback Passivo total
+        const baseBP = encontrarBaseContabil(
+          bp,
+          ['1', '76'],
+          [['ativo'], ['passivo']]
+        );
         if (baseBP) {
           analiseVertical.BP[ano] = {
             base: {

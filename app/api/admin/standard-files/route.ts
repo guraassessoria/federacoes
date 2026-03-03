@@ -318,7 +318,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.standardStructure.findUnique({
       where: { type: type as any },
-      select: { version: true },
+      select: { version: true, data: true },
     });
 
     const nextVersion = (existing?.version ?? 0) + 1;

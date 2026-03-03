@@ -131,6 +131,45 @@ function buscarValorPorCodigos(contas: ContaComValor[], codigos: string[]): numb
   return null;
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function buscarValorPorDescricaoComposta(contas: ContaComValor[], termos: string[]): number | null {
+  const stack = [...contas];
+  while (stack.length > 0) {
+    const conta = stack.shift()!;
+    const descricao = normalizarTexto(conta.descricao || '');
+    const match = termos.every((termo) => descricao.includes(normalizarTexto(termo)));
+    if (match) {
+      return conta.valor !== 0 ? conta.valor : null;
+    }
+    if (conta.children?.length) {
+      stack.push(...conta.children);
+    }
+  }
+  return null;
+}
+
+function buscarValorSemantico(
+  contas: ContaComValor[],
+  codigosFallback: string[],
+  termosPreferenciais: string[][]
+): number | null {
+  const byCodigo = buscarValorPorCodigos(contas, codigosFallback);
+  if (byCodigo !== null) return byCodigo;
+
+  for (const termos of termosPreferenciais) {
+    const byDesc = buscarValorPorDescricaoComposta(contas, termos);
+    if (byDesc !== null) return byDesc;
+  }
+
+  return null;
+}
+
 function buscarValorPorDescricao(contas: ContaComValor[], termos: string[]): number | null {
   const stack = [...contas];
   while (stack.length > 0) {
@@ -153,54 +192,70 @@ export function extrairValores(
   bp: ContaComValor[],
   dre: ContaComValor[]
 ): ValoresExtraidos {
-  const receitasTotal =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_TOTAL, '51', '1']) ??
-    buscarValorPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
+  const receitasTotal = buscarValorSemantico(
+    dre,
+    [CODIGOS_DRE.RECEITAS_TOTAL, '51', '1'],
+    [['receita', 'liquida'], ['receita', 'bruta'], ['receita']]
+  );
 
-  const custosTotal =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.CUSTOS_TOTAL, '52']) ??
-    buscarValorPorDescricao(dre, ['custos']);
+  const custosTotal = buscarValorSemantico(
+    dre,
+    [CODIGOS_DRE.CUSTOS_TOTAL, '52'],
+    [['custo']]
+  );
 
-  const despesasTotal =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_TOTAL, '104']) ??
-    buscarValorPorDescricao(dre, ['despesas']);
+  const despesasTotal = buscarValorSemantico(
+    dre,
+    [CODIGOS_DRE.DESPESAS_TOTAL, '104'],
+    [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']]
+  );
 
-  const resultadoOperacional =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_OPERACIONAL, '211']) ??
-    buscarValorPorDescricao(dre, ['resultado operacional']);
+  const resultadoOperacional = buscarValorSemantico(
+    dre,
+    [CODIGOS_DRE.RESULTADO_OPERACIONAL, '211'],
+    [['resultado', 'operacional']]
+  );
 
-  const resultadoLiquido =
-    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_LIQUIDO, '225']) ??
-    buscarValorPorDescricao(dre, ['resultado líquido', 'superávit', 'déficit']);
+  const resultadoLiquido = buscarValorSemantico(
+    dre,
+    [CODIGOS_DRE.RESULTADO_LIQUIDO, '225'],
+    [['superavit'], ['deficit', 'exercicio'], ['resultado', 'liquido']]
+  );
 
   return {
     // BP
-    ativoTotal: buscarValorPorCodigo(bp, CODIGOS_BP.ATIVO_TOTAL),
-    ativoCirculante: buscarValorPorCodigo(bp, CODIGOS_BP.ATIVO_CIRCULANTE),
-    disponibilidades: buscarValorPorCodigo(bp, CODIGOS_BP.DISPONIBILIDADES),
-    contasReceber: buscarValorPorCodigo(bp, CODIGOS_BP.CONTAS_A_RECEBER),
-    estoques: buscarValorPorCodigo(bp, CODIGOS_BP.ESTOQUES),
-    ativoNaoCirculante: buscarValorPorCodigo(bp, CODIGOS_BP.ATIVO_NAO_CIRCULANTE),
-    realizavelLP: buscarValorPorCodigo(bp, CODIGOS_BP.REALIZAVEL_LONGO_PRAZO),
-    imobilizado: buscarValorPorCodigo(bp, CODIGOS_BP.IMOBILIZADO),
-    passivoCirculante: buscarValorPorCodigo(bp, CODIGOS_BP.PASSIVO_CIRCULANTE),
-    fornecedores: buscarValorPorCodigo(bp, CODIGOS_BP.FORNECEDORES),
-    passivoNaoCirculante: buscarValorPorCodigo(bp, CODIGOS_BP.PASSIVO_NAO_CIRCULANTE),
-    patrimonioLiquido: buscarValorPorCodigo(bp, CODIGOS_BP.PATRIMONIO_LIQUIDO),
+    ativoTotal: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_TOTAL], [['ativo']]),
+    ativoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_CIRCULANTE], [['ativo', 'circulante']]),
+    disponibilidades: buscarValorSemantico(bp, [CODIGOS_BP.DISPONIBILIDADES], [['disponibilidade'], ['caixa']]),
+    contasReceber: buscarValorSemantico(bp, [CODIGOS_BP.CONTAS_A_RECEBER], [['contas', 'receber']]),
+    estoques: buscarValorSemantico(bp, [CODIGOS_BP.ESTOQUES], [['estoque']]),
+    ativoNaoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.ATIVO_NAO_CIRCULANTE], [['ativo', 'nao', 'circulante']]),
+    realizavelLP: buscarValorSemantico(bp, [CODIGOS_BP.REALIZAVEL_LONGO_PRAZO], [['realizavel', 'longo', 'prazo']]),
+    imobilizado: buscarValorSemantico(bp, [CODIGOS_BP.IMOBILIZADO], [['imobilizado']]),
+    passivoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.PASSIVO_CIRCULANTE], [['passivo', 'circulante']]),
+    fornecedores: buscarValorSemantico(bp, [CODIGOS_BP.FORNECEDORES], [['fornecedor']]),
+    passivoNaoCirculante: buscarValorSemantico(bp, [CODIGOS_BP.PASSIVO_NAO_CIRCULANTE], [['passivo', 'nao', 'circulante']]),
+    patrimonioLiquido: buscarValorSemantico(bp, [CODIGOS_BP.PATRIMONIO_LIQUIDO], [['patrimonio', 'liquido']]),
     
     // DRE
     receitasTotal,
     custosTotal,
     despesasTotal,
-    resultadoFinanceiro:
-      buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_FINANCEIRO, '190']) ??
-      buscarValorPorDescricao(dre, ['resultado financeiro']),
-    receitasFinanceiras:
-      buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_FINANCEIRAS, '191']) ??
-      buscarValorPorDescricao(dre, ['receitas financeiras']),
-    despesasFinanceiras:
-      buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_FINANCEIRAS]) ??
-      buscarValorPorDescricao(dre, ['despesas financeiras']),
+    resultadoFinanceiro: buscarValorSemantico(
+      dre,
+      [CODIGOS_DRE.RESULTADO_FINANCEIRO, '190'],
+      [['resultado', 'financeiro']]
+    ),
+    receitasFinanceiras: buscarValorSemantico(
+      dre,
+      [CODIGOS_DRE.RECEITAS_FINANCEIRAS, '191'],
+      [['receita', 'financeira']]
+    ),
+    despesasFinanceiras: buscarValorSemantico(
+      dre,
+      [CODIGOS_DRE.DESPESAS_FINANCEIRAS],
+      [['despesa', 'financeira']]
+    ),
     resultadoOperacional,
     resultadoLiquido
   };
@@ -241,9 +296,9 @@ export function calcularIndices(
   // Liquidez Corrente = Ativo Circulante / Passivo Circulante
   let liquidezCorrente: IndiceCalculado;
   if (v.ativoCirculante === null) {
-    liquidezCorrente = indiceIndisponivel('Ativo Circulante não encontrado no BP (código 2)');
+    liquidezCorrente = indiceIndisponivel('Ativo Circulante não encontrado no BP');
   } else if (v.passivoCirculante === null || v.passivoCirculante === 0) {
-    liquidezCorrente = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP (código 77)');
+    liquidezCorrente = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP');
   } else {
     liquidezCorrente = indiceDisponivel(v.ativoCirculante / v.passivoCirculante);
   }
@@ -251,9 +306,9 @@ export function calcularIndices(
   // Liquidez Seca = (Ativo Circulante - Estoques) / Passivo Circulante
   let liquidezSeca: IndiceCalculado;
   if (v.ativoCirculante === null) {
-    liquidezSeca = indiceIndisponivel('Ativo Circulante não encontrado no BP (código 2)');
+    liquidezSeca = indiceIndisponivel('Ativo Circulante não encontrado no BP');
   } else if (v.passivoCirculante === null || v.passivoCirculante === 0) {
-    liquidezSeca = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP (código 77)');
+    liquidezSeca = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP');
   } else {
     // Estoques pode ser null/0, nesse caso usamos 0
     const estoques = v.estoques ?? 0;
@@ -263,9 +318,9 @@ export function calcularIndices(
   // Liquidez Imediata = Disponibilidades / Passivo Circulante
   let liquidezImediata: IndiceCalculado;
   if (v.disponibilidades === null) {
-    liquidezImediata = indiceIndisponivel('Disponibilidades não encontrado no BP (código 3 - inclui Caixa, Bancos e Aplicações de Liquidez Imediata)');
+    liquidezImediata = indiceIndisponivel('Disponibilidades não encontradas no BP (inclui Caixa, Bancos e Aplicações de Liquidez Imediata)');
   } else if (v.passivoCirculante === null || v.passivoCirculante === 0) {
-    liquidezImediata = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP (código 77)');
+    liquidezImediata = indiceIndisponivel('Passivo Circulante não encontrado ou igual a zero no BP');
   } else {
     liquidezImediata = indiceDisponivel(v.disponibilidades / v.passivoCirculante);
   }
@@ -273,9 +328,9 @@ export function calcularIndices(
   // Liquidez Geral = (AC + RLP) / (PC + PNC)
   let liquidezGeral: IndiceCalculado;
   if (v.ativoCirculante === null) {
-    liquidezGeral = indiceIndisponivel('Ativo Circulante não encontrado no BP (código 2)');
+    liquidezGeral = indiceIndisponivel('Ativo Circulante não encontrado no BP');
   } else if (v.passivoCirculante === null && v.passivoNaoCirculante === null) {
-    liquidezGeral = indiceIndisponivel('Passivo Circulante e Passivo Não Circulante não encontrados no BP (códigos 77 e 113)');
+    liquidezGeral = indiceIndisponivel('Passivo Circulante e Passivo Não Circulante não encontrados no BP');
   } else {
     const realizavelLP = v.realizavelLP ?? 0;
     const pc = v.passivoCirculante ?? 0;
@@ -295,7 +350,7 @@ export function calcularIndices(
   // O Resultado Bruto seria Receitas - Custos com Competições
   let margemBruta: IndiceCalculado;
   if (v.receitasTotal === null || v.receitasTotal === 0) {
-    margemBruta = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
+    margemBruta = indiceIndisponivel('Receita Total não encontrada ou igual a zero na DRE');
   } else if (v.custosTotal === null) {
     // Se não há custos, a margem bruta é 100%
     margemBruta = indiceDisponivel(100);
@@ -308,7 +363,7 @@ export function calcularIndices(
   // Margem Operacional = Resultado Operacional / Receitas * 100
   let margemOperacional: IndiceCalculado;
   if (v.receitasTotal === null || v.receitasTotal === 0) {
-    margemOperacional = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
+    margemOperacional = indiceIndisponivel('Receita Total não encontrada ou igual a zero na DRE');
   } else if (v.resultadoOperacional === null) {
     // Tentar calcular: Receitas - Custos - Despesas
     if (v.custosTotal !== null && v.despesasTotal !== null) {
@@ -317,7 +372,7 @@ export function calcularIndices(
       const resOp = v.receitasTotal - custosNormalizados - despesasNormalizadas;
       margemOperacional = indiceDisponivel((resOp / v.receitasTotal) * 100);
     } else {
-      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 196) e não foi possível calcular');
+      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE e não foi possível calcular');
     }
   } else {
     margemOperacional = indiceDisponivel((v.resultadoOperacional / v.receitasTotal) * 100);
@@ -326,9 +381,9 @@ export function calcularIndices(
   // Margem Líquida = Resultado Líquido / Receitas * 100
   let margemLiquida: IndiceCalculado;
   if (v.receitasTotal === null || v.receitasTotal === 0) {
-    margemLiquida = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
+    margemLiquida = indiceIndisponivel('Receita Total não encontrada ou igual a zero na DRE');
   } else if (v.resultadoLiquido === null) {
-    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
+    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE');
   } else {
     margemLiquida = indiceDisponivel((v.resultadoLiquido / v.receitasTotal) * 100);
   }
@@ -337,7 +392,7 @@ export function calcularIndices(
   // Nota: Depreciação não está separada na estrutura atual, então usamos Resultado Operacional como proxy
   let margemEbitda: IndiceCalculado;
   if (v.receitasTotal === null || v.receitasTotal === 0) {
-    margemEbitda = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
+    margemEbitda = indiceIndisponivel('Receita Total não encontrada ou igual a zero na DRE');
   } else {
     // Calcular resultado operacional antes do resultado financeiro
     const custosTotal = Math.abs(v.custosTotal ?? 0);
@@ -350,9 +405,9 @@ export function calcularIndices(
   // ROA = Resultado Líquido / Ativo Total * 100
   let roa: IndiceCalculado;
   if (v.ativoTotal === null || v.ativoTotal === 0) {
-    roa = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP (código 1)');
+    roa = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP');
   } else if (v.resultadoLiquido === null) {
-    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
+    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE');
   } else {
     roa = indiceDisponivel((v.resultadoLiquido / v.ativoTotal) * 100);
   }
@@ -360,9 +415,9 @@ export function calcularIndices(
   // ROE = Resultado Líquido / Patrimônio Líquido * 100
   let roe: IndiceCalculado;
   if (v.patrimonioLiquido === null || v.patrimonioLiquido === 0) {
-    roe = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP (código 125)');
+    roe = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP');
   } else if (v.resultadoLiquido === null) {
-    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
+    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE');
   } else {
     roe = indiceDisponivel((v.resultadoLiquido / v.patrimonioLiquido) * 100);
   }
@@ -372,7 +427,7 @@ export function calcularIndices(
   // Endividamento Geral = (PC + PNC) / Ativo Total * 100
   let endividamentoGeral: IndiceCalculado;
   if (v.ativoTotal === null || v.ativoTotal === 0) {
-    endividamentoGeral = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP (código 1)');
+    endividamentoGeral = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP');
   } else {
     const pc = v.passivoCirculante ?? 0;
     const pnc = v.passivoNaoCirculante ?? 0;
@@ -394,7 +449,7 @@ export function calcularIndices(
   // Grau de Alavancagem = (PC + PNC) / PL
   let grauAlavancagem: IndiceCalculado;
   if (v.patrimonioLiquido === null || v.patrimonioLiquido === 0) {
-    grauAlavancagem = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP (código 125)');
+    grauAlavancagem = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP');
   } else {
     const pc = v.passivoCirculante ?? 0;
     const pnc = v.passivoNaoCirculante ?? 0;
@@ -404,9 +459,9 @@ export function calcularIndices(
   // Imobilização do PL = Imobilizado / PL * 100
   let imobilizacaoPL: IndiceCalculado;
   if (v.patrimonioLiquido === null || v.patrimonioLiquido === 0) {
-    imobilizacaoPL = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP (código 125)');
+    imobilizacaoPL = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP');
   } else if (v.imobilizado === null) {
-    imobilizacaoPL = indiceIndisponivel('Imobilizado não encontrado no BP (código 43)');
+    imobilizacaoPL = indiceIndisponivel('Imobilizado não encontrado no BP');
   } else {
     imobilizacaoPL = indiceDisponivel((v.imobilizado / v.patrimonioLiquido) * 100);
   }
@@ -416,9 +471,9 @@ export function calcularIndices(
   // Giro do Ativo = Receitas / Ativo Total
   let giroAtivo: IndiceCalculado;
   if (v.ativoTotal === null || v.ativoTotal === 0) {
-    giroAtivo = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP (código 1)');
+    giroAtivo = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP');
   } else if (v.receitasTotal === null) {
-    giroAtivo = indiceIndisponivel('Receitas Total não encontrado na DRE (código 1)');
+    giroAtivo = indiceIndisponivel('Receita Total não encontrada na DRE');
   } else {
     giroAtivo = indiceDisponivel(v.receitasTotal / v.ativoTotal);
   }
@@ -426,9 +481,9 @@ export function calcularIndices(
   // Prazo Médio de Recebimento = (Contas a Receber / Receitas) * 360
   let prazoMedioRecebimento: IndiceCalculado;
   if (v.receitasTotal === null || v.receitasTotal === 0) {
-    prazoMedioRecebimento = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
+    prazoMedioRecebimento = indiceIndisponivel('Receita Total não encontrada ou igual a zero na DRE');
   } else if (v.contasReceber === null) {
-    prazoMedioRecebimento = indiceIndisponivel('Contas a Receber não encontrado no BP (código 7)');
+    prazoMedioRecebimento = indiceIndisponivel('Contas a Receber não encontradas no BP');
   } else {
     prazoMedioRecebimento = indiceDisponivel((v.contasReceber / v.receitasTotal) * 360);
   }
@@ -436,9 +491,9 @@ export function calcularIndices(
   // Prazo Médio de Pagamento = (Fornecedores / Custos) * 360
   let prazoMedioPagamento: IndiceCalculado;
   if (v.custosTotal === null || v.custosTotal === 0) {
-    prazoMedioPagamento = indiceIndisponivel('Custos Total não encontrado ou igual a zero na DRE (código 52)');
+    prazoMedioPagamento = indiceIndisponivel('Custos totais não encontrados ou iguais a zero na DRE');
   } else if (v.fornecedores === null) {
-    prazoMedioPagamento = indiceIndisponivel('Fornecedores não encontrado no BP (código 78)');
+    prazoMedioPagamento = indiceIndisponivel('Fornecedores não encontrados no BP');
   } else {
     prazoMedioPagamento = indiceDisponivel((v.fornecedores / Math.abs(v.custosTotal)) * 360);
   }

@@ -67,6 +67,41 @@ function normalizeCodigo(cod: string): string {
   return cod.replace(/^0+/, '') || '0';
 }
 
+function normalizeText(text: string): string {
+  return (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function includesAllTerms(text: string, terms: string[]): boolean {
+  const normalized = normalizeText(text);
+  return terms.every(term => normalized.includes(normalizeText(term)));
+}
+
+function findCodigoByDescricao(
+  estrutura: ContaEstrutura[],
+  termSets: string[][],
+  fallbackCodigos: string[] = []
+): string | null {
+  for (const terms of termSets) {
+    const matches = estrutura
+      .filter(item => includesAllTerms(item.descricao, terms))
+      .sort((a, b) => {
+        if (a.nivel !== b.nivel) return a.nivel - b.nivel;
+        return (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER);
+      });
+
+    if (matches.length > 0) return matches[0].codigo;
+  }
+
+  for (const codigo of fallbackCodigos) {
+    if (estrutura.some(item => item.codigo === codigo)) return codigo;
+  }
+
+  return null;
+}
+
 function normalizeEstruturaRows(rows: any[]): ContaEstrutura[] {
   return rows
     .map((row: any) => {
@@ -349,10 +384,40 @@ export async function mapBalanceteToDRE(
     mapa.set(c.codigo, { ...c, ordem: idx, valor: valores[c.codigo] || 0, children: [] });
   });
 
+  const codigosDRE = {
+    receitaBruta: findCodigoByDescricao(estrutura, [['receita', 'bruta']], ['51']),
+    deducoes: findCodigoByDescricao(estrutura, [['dedu', 'receita']], ['52']),
+    receitaLiquida: findCodigoByDescricao(estrutura, [['receita', 'liquida']], ['56']),
+    custos: findCodigoByDescricao(estrutura, [['custo']], ['57']),
+    margemBruta: findCodigoByDescricao(estrutura, [['margem', 'bruta']], ['109']),
+    despesas: findCodigoByDescricao(estrutura, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], ['110']),
+    resultadoOperacional: findCodigoByDescricao(estrutura, [['resultado', 'operacional']], ['196']),
+    laref: findCodigoByDescricao(estrutura, [['lucro', 'antes', 'resultado', 'financeiro'], ['laref']], ['197']),
+    resultadoFinanceiro: findCodigoByDescricao(estrutura, [['resultado', 'financeiro']], ['198']),
+    receitasFinanceiras: findCodigoByDescricao(estrutura, [['receita', 'financeira']], ['199']),
+    despesasFinanceiras: findCodigoByDescricao(estrutura, [['despesa', 'financeira']], ['207']),
+    resultadoNaoOperacional: findCodigoByDescricao(estrutura, [['resultado', 'nao', 'oper'], ['outras', 'receitas', 'despesas']], ['218']),
+    receitasNaoOperacionais: findCodigoByDescricao(estrutura, [['receita', 'nao', 'oper'], ['outras', 'receitas']], ['219']),
+    despesasNaoOperacionais: findCodigoByDescricao(estrutura, [['despesa', 'nao', 'oper'], ['outras', 'despesas']], ['223']),
+    lucroAntesImpostos: findCodigoByDescricao(estrutura, [['lucro', 'antes', 'imposto'], ['resultado', 'antes', 'imposto']], ['227']),
+    irCsll: findCodigoByDescricao(estrutura, [['ir', 'csll'], ['imposto', 'renda'], ['contribuicao', 'social']], ['228']),
+    superavitDeficit: findCodigoByDescricao(estrutura, [['superavit'], ['deficit', 'exercicio'], ['resultado', 'liquido']], ['229']),
+  };
+
   // ─── ETAPA 1: Soma bottom-up para grupos NÃO-totalizadores ───
-  // Grupos que somam filhos normalmente (ex: 51, 57, 110, etc.)
-  // Totalizadores com fórmula NÃO recebem soma dos filhos
-  const totalizadoresFormula = new Set(['56', '109', '196', '197', '198', '218', '227', '229']);
+  // Grupos que somam filhos normalmente; totalizadores com fórmula não recebem soma dos filhos
+  const totalizadoresFormula = new Set(
+    [
+      codigosDRE.receitaLiquida,
+      codigosDRE.margemBruta,
+      codigosDRE.resultadoOperacional,
+      codigosDRE.laref,
+      codigosDRE.resultadoFinanceiro,
+      codigosDRE.resultadoNaoOperacional,
+      codigosDRE.lucroAntesImpostos,
+      codigosDRE.superavitDeficit,
+    ].filter(Boolean) as string[]
+  );
 
   const ordenadas = [...estrutura].sort((a, b) => b.nivel - a.nivel);
   for (const item of ordenadas) {
@@ -369,14 +434,41 @@ export async function mapBalanceteToDRE(
   const val = (cod: string) => mapa.get(cod)?.valor || 0;
   const set = (cod: string, v: number) => { const c = mapa.get(cod); if (c) c.valor = v; };
 
-  set('56',  val('51') + val('52'));              // Receita Líquida = Bruta + Deduções
-  set('109', val('56') - val('57'));              // Margem Bruta = Rec Líq - Custos
-  set('196', val('109') - val('110'));            // Result Operacional = Margem - Despesas
-  set('197', val('196'));                          // LAREF = Result Operacional
-  set('198', val('199') - val('207'));            // Result Financeiro = Rec Fin - Desp Fin
-  set('218', val('219') - val('223'));            // Result Não Oper = Rec - Desp
-  set('227', val('197') + val('198') + val('218')); // LAI
-  set('229', val('227') - val('228'));            // Superávit/Déficit
+  const receitaBrutaVal = codigosDRE.receitaBruta ? val(codigosDRE.receitaBruta) : 0;
+  const deducoesVal = codigosDRE.deducoes ? val(codigosDRE.deducoes) : 0;
+  const receitaLiquidaVal = codigosDRE.receitaLiquida
+    ? receitaBrutaVal + deducoesVal
+    : receitaBrutaVal + deducoesVal;
+
+  if (codigosDRE.receitaLiquida) set(codigosDRE.receitaLiquida, receitaLiquidaVal);
+
+  const custosVal = codigosDRE.custos ? val(codigosDRE.custos) : 0;
+  const margemBrutaVal = receitaLiquidaVal - custosVal;
+  if (codigosDRE.margemBruta) set(codigosDRE.margemBruta, margemBrutaVal);
+
+  const despesasVal = codigosDRE.despesas ? val(codigosDRE.despesas) : 0;
+  const resultadoOperacionalVal = margemBrutaVal - despesasVal;
+  if (codigosDRE.resultadoOperacional) set(codigosDRE.resultadoOperacional, resultadoOperacionalVal);
+
+  const larefVal = resultadoOperacionalVal;
+  if (codigosDRE.laref) set(codigosDRE.laref, larefVal);
+
+  const resultadoFinanceiroVal =
+    (codigosDRE.receitasFinanceiras ? val(codigosDRE.receitasFinanceiras) : 0) -
+    (codigosDRE.despesasFinanceiras ? val(codigosDRE.despesasFinanceiras) : 0);
+  if (codigosDRE.resultadoFinanceiro) set(codigosDRE.resultadoFinanceiro, resultadoFinanceiroVal);
+
+  const resultadoNaoOperacionalVal =
+    (codigosDRE.receitasNaoOperacionais ? val(codigosDRE.receitasNaoOperacionais) : 0) -
+    (codigosDRE.despesasNaoOperacionais ? val(codigosDRE.despesasNaoOperacionais) : 0);
+  if (codigosDRE.resultadoNaoOperacional) set(codigosDRE.resultadoNaoOperacional, resultadoNaoOperacionalVal);
+
+  const lucroAntesImpostosVal = larefVal + resultadoFinanceiroVal + resultadoNaoOperacionalVal;
+  if (codigosDRE.lucroAntesImpostos) set(codigosDRE.lucroAntesImpostos, lucroAntesImpostosVal);
+
+  const irCsllVal = codigosDRE.irCsll ? val(codigosDRE.irCsll) : 0;
+  const superavitDeficitVal = lucroAntesImpostosVal - irCsllVal;
+  if (codigosDRE.superavitDeficit) set(codigosDRE.superavitDeficit, superavitDeficitVal);
 
   // ─── ETAPA 3: Montar árvore interna (para detalhes expandíveis) ───
   // Cada grupo que tem filhos recebe seus filhos como children
@@ -430,45 +522,59 @@ export async function mapBalanceteToDRE(
   //        totalizadores CALCULADOS são apenas linhas de resultado (sem children)
   
   // 1. Receita Bruta (expandível → detalhes das receitas)
-  resultado.push(nodeWithChildren('51', 'Receita Bruta')!);
+  if (codigosDRE.receitaBruta) resultado.push(nodeWithChildren(codigosDRE.receitaBruta, 'Receita Bruta')!);
   
   // 2. (-) Deduções da Receita (expandível se houver)
-  if (val('52') !== 0) resultado.push(nodeWithChildren('52')!);
+  if (codigosDRE.deducoes && val(codigosDRE.deducoes) !== 0) resultado.push(nodeWithChildren(codigosDRE.deducoes)!);
   
   // 3. Receita Líquida = Receita Bruta - Deduções (SEM children)
-  resultado.push(node('56', 'Receita Líquida')!);
+  if (codigosDRE.receitaLiquida) resultado.push(node(codigosDRE.receitaLiquida, 'Receita Líquida')!);
   
   // 4. (-) Custos (expandível → detalhes dos custos)
-  resultado.push(nodeWithChildren('57', '(-) Custos dos Serviços')!);
+  if (codigosDRE.custos) resultado.push(nodeWithChildren(codigosDRE.custos, '(-) Custos dos Serviços')!);
   
   // 5. Margem Bruta = Receita Líquida - Custos (SEM children)
-  resultado.push(node('109', 'Margem Bruta')!);
+  if (codigosDRE.margemBruta) resultado.push(node(codigosDRE.margemBruta, 'Margem Bruta')!);
   
   // 6. (-) Despesas (expandível → detalhes das despesas)
-  resultado.push(nodeWithChildren('110', '(-) Despesas Gerais')!);
+  if (codigosDRE.despesas) resultado.push(nodeWithChildren(codigosDRE.despesas, '(-) Despesas Gerais')!);
   
   // 7. Resultado Operacional = Margem - Despesas (SEM children)
-  resultado.push(node('196', 'Resultado Operacional')!);
+  if (codigosDRE.resultadoOperacional) resultado.push(node(codigosDRE.resultadoOperacional, 'Resultado Operacional')!);
   
   // 8. LAREF = Resultado Operacional (SEM children)
-  resultado.push(node('197', 'Lucro Antes do Resultado Financeiro')!);
+  if (codigosDRE.laref) resultado.push(node(codigosDRE.laref, 'Lucro Antes do Resultado Financeiro')!);
   
   // 9. (+/-) Resultado Financeiro (expandível, indentado nível 2)
-  const resFin = nodeWithChildren('198', '(+/-) Resultado Financeiro');
+  const resFin = codigosDRE.resultadoFinanceiro
+    ? nodeWithChildren(codigosDRE.resultadoFinanceiro, '(+/-) Resultado Financeiro')
+    : null;
   if (resFin) { resFin.nivelVisualizacao = 2; resultado.push(resFin); }
   
   // 10. (+/-) Outras Receitas/Despesas (expandível, indentado nível 2)
-  const resNaoOper = nodeWithChildren('218', '(+/-) Outras Receitas/Despesas');
+  const resNaoOper = codigosDRE.resultadoNaoOperacional
+    ? nodeWithChildren(codigosDRE.resultadoNaoOperacional, '(+/-) Outras Receitas/Despesas')
+    : null;
   if (resNaoOper) { resNaoOper.nivelVisualizacao = 2; resultado.push(resNaoOper); }
   
   // 11. Lucro Antes dos Impostos (SEM children)
-  resultado.push(node('227', 'Lucro Líquido Antes dos Impostos')!);
+  if (codigosDRE.lucroAntesImpostos) resultado.push(node(codigosDRE.lucroAntesImpostos, 'Lucro Líquido Antes dos Impostos')!);
   
   // 12. IR e CSLL (se houver)
-  if (val('228') !== 0) resultado.push(node('228', 'LAIR e LACS')!);
+  if (codigosDRE.irCsll && val(codigosDRE.irCsll) !== 0) resultado.push(node(codigosDRE.irCsll, 'LAIR e LACS')!);
   
   // 13. Superávit/Déficit (SEM children)
-  resultado.push(node('229', 'Superávit/Déficit do Exercício')!);
+  if (codigosDRE.superavitDeficit) resultado.push(node(codigosDRE.superavitDeficit, 'Superávit/Déficit do Exercício')!);
+
+  if (resultado.length === 0) {
+    return estrutura
+      .filter(conta => conta.nivel <= 2)
+      .map(conta => ({
+        ...conta,
+        valor: mapa.get(conta.codigo)?.valor || 0,
+        children: reNivelar(mapa.get(conta.codigo)?.children || [], conta.nivelVisualizacao),
+      }));
+  }
 
   return resultado.filter(Boolean);
 }
@@ -501,14 +607,19 @@ export async function processarDadosFinanceiros(
     mapBalanceteToBP(balancetes, deParaRecords),
   ]);
 
-  // Resultado = valor do Superávit/Déficit (229)
-  const resultadoDRE = dre.find(c => c.codigo === '229')?.valor || 0;
+  // Resultado = Superávit/Déficit por descrição (fallback códigos legados)
+  const resultadoConta =
+    dre.find(c => includesAllTerms(c.descricao, ['superavit'])) ||
+    dre.find(c => includesAllTerms(c.descricao, ['deficit', 'exercicio'])) ||
+    dre.find(c => c.codigo === '229');
+  const resultadoDRE = resultadoConta?.valor || 0;
 
   // Inserir resultado no BP
   inserirResultadoNoBP(bp, resultadoDRE);
   
-  // Total Passivo + PL
-  const totalPassivoPL = buscarValor(bp, '76') || 0;
+  // Total Passivo + PL (preferir raiz de passivo por descrição)
+  const passivoRoot = bp.find(c => includesAllTerms(c.descricao, ['passivo'])) || bp.find(c => c.codigo === '76');
+  const totalPassivoPL = passivoRoot?.valor || 0;
 
   return { dre, bp, resultadoDRE, totalPassivoPL };
 }
@@ -528,10 +639,19 @@ function buscarValor(contas: ContaComValor[], codigo: string): number {
 
 function inserirResultadoNoBP(bp: ContaComValor[], resultado: number): void {
   if (resultado === 0) return;
+
+  const superavitNode = flattenHierarchy(bp).find(conta =>
+    includesAllTerms(conta.descricao, ['superavit']) && includesAllTerms(conta.descricao, ['acumul'])
+  ) || flattenHierarchy(bp).find(conta =>
+    includesAllTerms(conta.descricao, ['deficit']) && includesAllTerms(conta.descricao, ['acumul'])
+  ) || flattenHierarchy(bp).find(conta => conta.codigo === '141');
+
+  if (!superavitNode) return;
+  const superavitCodigo = superavitNode.codigo;
   
   function buscar(contas: ContaComValor[]): boolean {
     for (const c of contas) {
-      if (c.codigo === '141') {
+      if (c.codigo === superavitCodigo) {
         c.valor += resultado;
         return true;
       }
@@ -541,23 +661,18 @@ function inserirResultadoNoBP(bp: ContaComValor[], resultado: number): void {
   }
   
   if (buscar(bp)) {
-    // Recalcular ancestors: 141 → 125 → 76
     const mapa = new Map<string, ContaComValor>();
     function indexar(contas: ContaComValor[]) {
       for (const c of contas) { mapa.set(c.codigo, c); if (c.children?.length) indexar(c.children); }
     }
     indexar(bp);
-    
-    const c141 = mapa.get('141');
-    if (c141?.codigoSuperior) {
-      const c125 = mapa.get(c141.codigoSuperior);
-      if (c125?.children) {
-        c125.valor = c125.children.reduce((s, x) => s + x.valor, 0);
-        if (c125.codigoSuperior) {
-          const c76 = mapa.get(c125.codigoSuperior);
-          if (c76?.children) c76.valor = c76.children.reduce((s, x) => s + x.valor, 0);
-        }
-      }
+
+    let atual = mapa.get(superavitCodigo);
+    while (atual?.codigoSuperior) {
+      const pai = mapa.get(atual.codigoSuperior);
+      if (!pai?.children) break;
+      pai.valor = pai.children.reduce((s, x) => s + x.valor, 0);
+      atual = pai;
     }
   }
 }

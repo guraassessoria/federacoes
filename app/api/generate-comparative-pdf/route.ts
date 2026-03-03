@@ -29,6 +29,13 @@ function formatNumber(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 // Interface para dados processados de uma federação
 interface DadosFederacao {
   id: string;
@@ -53,69 +60,17 @@ interface DadosFederacao {
 
 // Função para extrair valores principais
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
-  const buscar = (contas: ContaComValor[], codigo: string): number | null => {
-    for (const conta of contas) {
-      if (conta.codigo === codigo) return conta.valor !== 0 ? conta.valor : null;
-      if (conta.children?.length) {
-        const v = buscar(conta.children, codigo);
-        if (v !== null) return v;
-      }
-    }
-    return null;
-  };
-
-  const flatten = (contas: ContaComValor[]): ContaComValor[] => {
-    const result: ContaComValor[] = [];
-    const walk = (items: ContaComValor[]) => {
-      for (const item of items) {
-        result.push(item);
-        if (item.children?.length) walk(item.children);
-      }
-    };
-    walk(contas);
-    return result;
-  };
-
-  const buscarPorCodigos = (contas: ContaComValor[], codigos: string[]): number | null => {
-    for (const codigo of codigos) {
-      const valor = buscar(contas, codigo);
-      if (valor !== null) return valor;
-    }
-    return null;
-  };
-
-  const buscarPorDescricao = (contas: ContaComValor[], termos: string[]): number | null => {
-    const flat = flatten(contas);
-    for (const conta of flat) {
-      const descricao = conta.descricao?.toLowerCase?.() || '';
-      if (termos.some((termo) => descricao.includes(termo))) {
-        return conta.valor !== 0 ? conta.valor : null;
-      }
-    }
-    return null;
-  };
-
-  const receitasTotal =
-    buscarPorCodigos(dre, ['1', '51', '56']) ??
-    buscarPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
-
-  const custosTotal =
-    buscarPorCodigos(dre, ['52', '57']) ??
-    buscarPorDescricao(dre, ['custos']);
-
-  const despesasTotal =
-    buscarPorCodigos(dre, ['104', '110']) ??
-    buscarPorDescricao(dre, ['despesas']);
+  const valores = extrairValores(bp, dre);
 
   return {
-    ativoTotal: buscar(bp, '1'),
-    ativoCirculante: buscar(bp, '2'),
-    passivoCirculante: buscar(bp, '77'),
-    passivoNaoCirculante: buscar(bp, '113'),
-    patrimonioLiquido: buscar(bp, '125'),
-    receitasTotal,
-    custosTotal,
-    despesasTotal
+    ativoTotal: valores.ativoTotal,
+    ativoCirculante: valores.ativoCirculante,
+    passivoCirculante: valores.passivoCirculante,
+    passivoNaoCirculante: valores.passivoNaoCirculante,
+    patrimonioLiquido: valores.patrimonioLiquido,
+    receitasTotal: valores.receitasTotal,
+    custosTotal: valores.custosTotal,
+    despesasTotal: valores.despesasTotal
   };
 }
 
@@ -135,6 +90,34 @@ function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaCom
     }
   }
   return null;
+}
+
+function flattenEstrutura(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function encontrarCodigoPorDescricao(
+  contas: ContaComValor[],
+  termosPreferenciais: string[][],
+  fallbackCodigo: string
+): string {
+  const flat = flattenEstrutura(contas);
+  for (const termos of termosPreferenciais) {
+    const match = flat.find((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+    });
+    if (match) return match.codigo;
+  }
+  return fallbackCodigo;
 }
 
 // Função para gerar linhas de tabela comparativa com hierarquia
@@ -205,6 +188,20 @@ function generateComparativeHTML(
 
   // Função para gerar cabeçalho da tabela com federações
   const headerFederacoes = federacoes.map(f => `<th>${f.sigla}</th>`).join('');
+
+  const primeiraFederacao = federacoes[0];
+  const bpRef = primeiraFederacao?.bp || [];
+  const dreRef = primeiraFederacao?.dre || [];
+
+  const codigoAtivo = encontrarCodigoPorDescricao(bpRef, [['ativo']], '1');
+  const codigoPassivo = encontrarCodigoPorDescricao(bpRef, [['passivo']], '76');
+  const codigoPL = encontrarCodigoPorDescricao(bpRef, [['patrimonio', 'liquido']], '125');
+
+  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'liquida'], ['receita', 'bruta'], ['receita']], '1');
+  const codigoCustos = encontrarCodigoPorDescricao(dreRef, [['custo']], '52');
+  const codigoDespesas = encontrarCodigoPorDescricao(dreRef, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], '104');
+  const codigoResultadoFinanceiro = encontrarCodigoPorDescricao(dreRef, [['resultado', 'financeiro']], '190');
+  const codigoResultadoOperacional = encontrarCodigoPorDescricao(dreRef, [['resultado', 'operacional']], '211');
 
   // Função para gerar linha de comparação
   const gerarLinhaComparacao = (
@@ -358,7 +355,7 @@ function generateComparativeHTML(
         <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhasTabelaComparativa(federacoes, '1', 'bp', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoAtivo, 'bp', 3)}
     </table>
 
     <div class="section-title">PASSIVO</div>
@@ -367,7 +364,7 @@ function generateComparativeHTML(
         <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhasTabelaComparativa(federacoes, '76', 'bp', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoPassivo, 'bp', 3)}
     </table>
 
     <div class="section-title">PATRIMÔNIO LÍQUIDO</div>
@@ -376,7 +373,7 @@ function generateComparativeHTML(
         <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhasTabelaComparativa(federacoes, '125', 'bp', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoPL, 'bp', 3)}
     </table>
 
     <table>
@@ -399,11 +396,11 @@ function generateComparativeHTML(
         <th style="width: 30%;">Conta</th>
         ${headerFederacoes}
       </tr>
-      ${gerarLinhasTabelaComparativa(federacoes, '1', 'dre', 3)}
-      ${gerarLinhasTabelaComparativa(federacoes, '52', 'dre', 3)}
-      ${gerarLinhasTabelaComparativa(federacoes, '104', 'dre', 3)}
-      ${gerarLinhasTabelaComparativa(federacoes, '190', 'dre', 3)}
-      ${gerarLinhasTabelaComparativa(federacoes, '211', 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoReceita, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoCustos, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoDespesas, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoResultadoFinanceiro, 'dre', 3)}
+      ${gerarLinhasTabelaComparativa(federacoes, codigoResultadoOperacional, 'dre', 3)}
     </table>
 
     <table>

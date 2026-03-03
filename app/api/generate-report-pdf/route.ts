@@ -29,6 +29,41 @@ function formatNumber(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+function normalizarTexto(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function flattenContas(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function encontrarCodigoPorDescricao(
+  contas: ContaComValor[],
+  termosPreferenciais: string[][],
+  fallbackCodigo: string
+): string {
+  const flat = flattenContas(contas);
+  for (const termos of termosPreferenciais) {
+    const match = flat.find((conta) => {
+      const desc = normalizarTexto(conta.descricao || '');
+      return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+    });
+    if (match) return match.codigo;
+  }
+  return fallbackCodigo;
+}
+
 // Função para extrair valores principais das demonstrações
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
   const valores = extrairValores(bp, dre);
@@ -99,6 +134,10 @@ function generateReportHTML(
   const indices = calcularIndices(bp, dre);
   const indicesPDF = indicesParaPDF(indices);
   const valores = extrairValoresPrincipais(dre, bp);
+
+  const codigoAtivo = encontrarCodigoPorDescricao(bp, [['ativo']], '1');
+  const codigoPassivo = encontrarCodigoPorDescricao(bp, [['passivo']], '76');
+  const codigoPL = encontrarCodigoPorDescricao(bp, [['patrimonio', 'liquido']], '125');
 
   // Função para gerar card de índice apenas se disponível
   const gerarCardIndice = (nome: string, valor: number | undefined, formato: 'numero' | 'percentual' = 'numero'): string => {
@@ -263,7 +302,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '1'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoAtivo), 3)}
     </table>
 
     <div class="subsection-title">PASSIVO</div>
@@ -272,7 +311,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '76'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoPassivo), 3)}
     </table>
 
     <div class="subsection-title">PATRIMÔNIO LÍQUIDO</div>
@@ -281,7 +320,7 @@ function generateReportHTML(
         <th style="width: 70%;">Conta</th>
         <th>Valor</th>
       </tr>
-      ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 3)}
+      ${gerarLinhasTabela(bp.filter(c => c.codigo === codigoPL), 3)}
     </table>
   </div>
 

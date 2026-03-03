@@ -162,123 +162,86 @@ export default function ComparativoPage() {
             .replace(/\s+/g, ' ')
             .trim();
 
-        const lookupByCompany = new Map<
-          string,
-          {
-            roots: ContaComValor[];
-            byCode: Map<string, ContaComValor[]>;
-          }
-        >();
+        const estruturaPorEmpresa = new Map<string, ContaComValor[]>();
+        const flatPorEmpresa = new Map<string, ContaComValor[]>();
 
         selectedCompanies.forEach((company) => {
-          const byCode = new Map<string, ContaComValor[]>();
-
           const roots = getEstrutura(company.id) || [];
-
-          flattenContas(roots).forEach((conta) => {
-            const codePart = normalizeCode(conta.codigo);
-            if (!byCode.has(codePart)) {
-              byCode.set(codePart, []);
-            }
-            byCode.get(codePart)!.push(conta);
-          });
-
-          lookupByCompany.set(company.id, {
-            roots,
-            byCode,
-          });
+          estruturaPorEmpresa.set(company.id, roots);
+          flatPorEmpresa.set(company.id, flattenContas(roots));
         });
 
         const resolveConta = (
           companyId: string,
-          node: ContaComValor,
+          nodeTemplate: ContaComValor,
           parentResolved?: ContaComValor
         ): ContaComValor | undefined => {
-          const lookup = lookupByCompany.get(companyId);
-          if (!lookup) return undefined;
-
-          const code = normalizeCode(node.codigo);
-          const desc = normalizeText(node.descricao);
+          const codigo = normalizeCode(nodeTemplate.codigo);
+          const descricao = normalizeText(nodeTemplate.descricao);
 
           if (parentResolved?.children?.length) {
-            const siblings = parentResolved.children;
-
-            const byDescInParent = siblings.find(
-              (candidate) => normalizeText(candidate.descricao) === desc
-            );
-            if (byDescInParent) return byDescInParent;
-
-            const byCodeInParent = siblings.find(
-              (candidate) => normalizeCode(candidate.codigo) === code
+            const byCodeInParent = parentResolved.children.find(
+              (child) => normalizeCode(child.codigo) === codigo
             );
             if (byCodeInParent) return byCodeInParent;
+
+            const byDescInParent = parentResolved.children.find(
+              (child) => normalizeText(child.descricao) === descricao
+            );
+            if (byDescInParent) return byDescInParent;
           }
 
-          const isRootTemplate = !node.codigoSuperior;
-          if (isRootTemplate) {
-            const rootByDesc = lookup.roots.find(
-              (candidate) => normalizeText(candidate.descricao) === desc
-            );
-            if (rootByDesc) return rootByDesc;
+          const roots = estruturaPorEmpresa.get(companyId) || [];
+          if (!parentResolved) {
+            const byCodeAtRoot = roots.find((root) => normalizeCode(root.codigo) === codigo);
+            if (byCodeAtRoot) return byCodeAtRoot;
 
-            const rootByCode = lookup.roots.find(
-              (candidate) => normalizeCode(candidate.codigo) === code
-            );
-            if (rootByCode) return rootByCode;
+            const byDescAtRoot = roots.find((root) => normalizeText(root.descricao) === descricao);
+            if (byDescAtRoot) return byDescAtRoot;
           }
 
-          const globalByCode = lookup.byCode.get(code) || [];
-          if (globalByCode.length === 1) return globalByCode[0];
-          if (globalByCode.length > 1) {
-            const expectedNivel = node.nivelVisualizacao || node.nivel || 1;
-            const byLevel = globalByCode.find(
-              (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === expectedNivel
+          const flat = flatPorEmpresa.get(companyId) || [];
+          const expectedNivel = nodeTemplate.nivelVisualizacao || nodeTemplate.nivel || 1;
+
+          const codeMatches = flat.filter((conta) => normalizeCode(conta.codigo) === codigo);
+          if (codeMatches.length === 1) return codeMatches[0];
+          if (codeMatches.length > 1) {
+            const byLevel = codeMatches.find(
+              (conta) => (conta.nivelVisualizacao || conta.nivel || 1) === expectedNivel
             );
             if (byLevel) return byLevel;
 
-            const byDesc = globalByCode.find(
-              (candidate) => normalizeText(candidate.descricao) === desc
+            const byDesc = codeMatches.find(
+              (conta) => normalizeText(conta.descricao) === descricao
             );
             if (byDesc) return byDesc;
 
-            return globalByCode[0];
+            return codeMatches[0];
           }
 
-          const flat = flattenContas(lookup.roots);
-          const globalByDesc = flat.find(
-            (candidate) => normalizeText(candidate.descricao) === desc
+          const descMatches = flat.filter(
+            (conta) => normalizeText(conta.descricao) === descricao
           );
-          return globalByDesc;
+          if (descMatches.length === 1) return descMatches[0];
+          if (descMatches.length > 1) {
+            const byLevel = descMatches.find(
+              (conta) => (conta.nivelVisualizacao || conta.nivel || 1) === expectedNivel
+            );
+            if (byLevel) return byLevel;
+            return descMatches[0];
+          }
+
+          return undefined;
         };
 
-        const hasValueRecursive = (
-          node: ContaComValor,
-          resolvedByCompany: Record<string, ContaComValor | undefined>
-        ): boolean => {
-          const hasOwnValue = selectedCompanies.some((company) => {
-            const row = resolvedByCompany[company.id];
-            return Math.abs(row?.valor || 0) > 0;
-          });
-          if (hasOwnValue) return true;
-          return (node.children || []).some((child) => {
-            const childResolved = Object.fromEntries(
-              selectedCompanies.map((company) => [
-                company.id,
-                resolveConta(company.id, child, resolvedByCompany[company.id]),
-              ])
-            ) as Record<string, ContaComValor | undefined>;
-            return hasValueRecursive(child, childResolved);
-          });
-        };
-
-        const rows: LinhaComparativa[] = [];
-        const walk = (
+        const walkTemplate = (
           nodes: ContaComValor[],
-          fallbackNivel: number = 1,
           parentResolvedByCompany?: Record<string, ContaComValor | undefined>
-        ) => {
+        ): LinhaComparativa[] => {
+          const rows: LinhaComparativa[] = [];
+
           nodes.forEach((node) => {
-            const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
+            const nivel = node.nivelVisualizacao || node.nivel || 1;
             const resolvedByCompany = Object.fromEntries(
               selectedCompanies.map((company) => [
                 company.id,
@@ -286,13 +249,19 @@ export default function ComparativoPage() {
               ])
             ) as Record<string, ContaComValor | undefined>;
 
-            const visible = hasValueRecursive(node, resolvedByCompany);
+            const childRows = node.children?.length
+              ? walkTemplate(node.children, resolvedByCompany)
+              : [];
 
-            if ((!onlyVisible || visible) && nivel <= maxNivel) {
+            const ownHasValue = selectedCompanies.some(
+              (company) => Math.abs(resolvedByCompany[company.id]?.valor || 0) > 0
+            );
+            const visible = ownHasValue || childRows.length > 0;
+
+            if (nivel <= maxNivel && (!onlyVisible || visible)) {
               const valores: Record<string, number> = {};
               selectedCompanies.forEach((company) => {
-                const row = resolvedByCompany[company.id];
-                valores[company.id] = row?.valor || 0;
+                valores[company.id] = resolvedByCompany[company.id]?.valor || 0;
               });
 
               rows.push({
@@ -304,13 +273,13 @@ export default function ComparativoPage() {
               });
             }
 
-            if (node.children?.length) {
-              walk(node.children, nivel + 1, resolvedByCompany);
-            }
+            rows.push(...childRows);
           });
+
+          return rows;
         };
 
-        walk(templateTree);
+        const rows = walkTemplate(templateTree);
         return ordenarDreReceitaBrutaPrimeiro(rows);
       }
 
@@ -368,7 +337,7 @@ export default function ComparativoPage() {
   );
 
   const bpRows = useMemo(() => buildComparativeRows('bp', 3), [buildComparativeRows]);
-  const dreRows = useMemo(() => buildComparativeRows('dre', 3), [buildComparativeRows]);
+  const dreRows = useMemo(() => buildComparativeRows('dre', 4), [buildComparativeRows]);
 
   const indicesRows = useMemo(() => {
     const labels: Array<{ key: string; label: string; group: 'liquidez' | 'rentabilidade' | 'endividamento' | 'atividade' }> = [

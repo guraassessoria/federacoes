@@ -7,6 +7,7 @@ import { Columns3, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { useDashboard } from '@/lib/contexts/DashboardContext';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { formatCurrency } from '@/lib/data';
+import { ordenarDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 
 interface CompanyAccess {
   id: string;
@@ -40,6 +41,7 @@ interface LinhaComparativa {
   codigo: string;
   descricao: string;
   nivel: number;
+  isSintetica?: boolean;
   valores: Record<string, number>;
 }
 
@@ -149,6 +151,171 @@ export default function ComparativoPage() {
       const templateTree = templateCompany ? getEstrutura(templateCompany.id) : [];
       if (templateTree.length === 0) return [];
 
+      if (type === 'dre') {
+        const structureOrderMap = new Map<string, number>();
+        const canonicalRows = flattenContas(templateTree)
+          .filter((conta) => (conta.nivelVisualizacao || conta.nivel || 1) <= maxNivel)
+          .reduce((acc, conta) => {
+            if (!acc.some((item) => item.codigo === conta.codigo)) {
+              acc.push(conta);
+            }
+            return acc;
+          }, [] as ContaComValor[]);
+
+        canonicalRows.forEach((conta, index) => {
+          structureOrderMap.set(conta.codigo, index);
+        });
+
+        const canonicalParentMap = new Map<string, string | null>();
+        canonicalRows.forEach((conta) => {
+          canonicalParentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+        });
+
+        const canonicalLastDescendantOrder = new Map<string, number>();
+        canonicalRows.forEach((conta, index) => {
+          let ancestor = conta.codigoSuperior;
+          const visited = new Set<string>();
+          while (ancestor && !visited.has(ancestor)) {
+            visited.add(ancestor);
+            const previousMax = canonicalLastDescendantOrder.get(ancestor) ?? structureOrderMap.get(ancestor) ?? -1;
+            if (index > previousMax) {
+              canonicalLastDescendantOrder.set(ancestor, index);
+            }
+            ancestor = canonicalParentMap.get(ancestor) ?? null;
+          }
+        });
+
+        const rowMap = new Map<string, LinhaComparativa & { codigoSuperior: string | null }>();
+
+        const ensureRow = (conta: ContaComValor) => {
+          const nivel = conta.nivelVisualizacao || conta.nivel || 1;
+          const existing = rowMap.get(conta.codigo);
+          if (existing) {
+            if (!existing.codigoSuperior && conta.codigoSuperior) {
+              existing.codigoSuperior = conta.codigoSuperior;
+            }
+            return existing;
+          }
+
+          const created = {
+            codigo: conta.codigo,
+            descricao: conta.descricao,
+            nivel,
+            codigoSuperior: conta.codigoSuperior ?? null,
+            valores: Object.fromEntries(selectedCompanies.map((company) => [company.id, 0])) as Record<string, number>,
+          };
+          rowMap.set(conta.codigo, created);
+          return created;
+        };
+
+        canonicalRows.forEach((conta) => {
+          ensureRow(conta);
+        });
+
+        const globalParentMap = new Map<string, string | null>();
+
+        selectedCompanies.forEach((company) => {
+          const flat = flattenContas(getEstrutura(company.id)).filter(
+            (conta) => (conta.nivelVisualizacao || conta.nivel || 1) <= maxNivel
+          );
+
+          flat.forEach((conta) => {
+            const row = ensureRow(conta);
+            row.valores[company.id] = conta.valor || 0;
+            if (!globalParentMap.has(conta.codigo)) {
+              globalParentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+            }
+          });
+        });
+
+        const allParentMap = new Map<string, string | null>();
+        rowMap.forEach((row) => {
+          allParentMap.set(row.codigo, row.codigoSuperior ?? null);
+        });
+        globalParentMap.forEach((parent, codigo) => {
+          if (!allParentMap.has(codigo)) {
+            allParentMap.set(codigo, parent ?? null);
+          }
+        });
+
+        const getAnchorOrder = (codigo: string): number | undefined => {
+          if (structureOrderMap.has(codigo)) {
+            return structureOrderMap.get(codigo);
+          }
+
+          let parent = allParentMap.get(codigo) ?? globalParentMap.get(codigo) ?? null;
+          const visited = new Set<string>();
+
+          while (parent && !visited.has(parent)) {
+            visited.add(parent);
+            if (structureOrderMap.has(parent)) {
+              return structureOrderMap.get(parent);
+            }
+            parent = allParentMap.get(parent) ?? globalParentMap.get(parent) ?? null;
+          }
+
+          return undefined;
+        };
+
+        const orderedRows = Array.from(rowMap.values())
+          .filter((row) => {
+            if (!onlyVisible) return true;
+            return selectedCompanies.some((company) => Math.abs(row.valores[company.id] || 0) > 0);
+          })
+          .sort((a, b) => {
+            const isKnownA = structureOrderMap.has(a.codigo);
+            const isKnownB = structureOrderMap.has(b.codigo);
+
+            if (isKnownA && isKnownB) {
+              return (structureOrderMap.get(a.codigo) || 0) - (structureOrderMap.get(b.codigo) || 0);
+            }
+
+            if (isKnownA && !isKnownB) {
+              const anchorB = getAnchorOrder(b.codigo);
+              const baseB = anchorB !== undefined
+                ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+                : Number.MAX_SAFE_INTEGER;
+              return (structureOrderMap.get(a.codigo) || 0) - baseB;
+            }
+
+            if (!isKnownA && isKnownB) {
+              const anchorA = getAnchorOrder(a.codigo);
+              const baseA = anchorA !== undefined
+                ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+                : Number.MAX_SAFE_INTEGER;
+              return baseA - (structureOrderMap.get(b.codigo) || 0);
+            }
+
+            const anchorA = getAnchorOrder(a.codigo);
+            const anchorB = getAnchorOrder(b.codigo);
+
+            const anchorBaseA = anchorA !== undefined
+              ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+              : Number.MAX_SAFE_INTEGER;
+            const anchorBaseB = anchorB !== undefined
+              ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+              : Number.MAX_SAFE_INTEGER;
+
+            if (anchorBaseA !== anchorBaseB) return anchorBaseA - anchorBaseB;
+
+            const codeA = parseFloat(a.codigo.replace(',', '.'));
+            const codeB = parseFloat(b.codigo.replace(',', '.'));
+            if (!Number.isNaN(codeA) && !Number.isNaN(codeB) && codeA !== codeB) return codeA - codeB;
+
+            return a.descricao.localeCompare(b.descricao);
+          });
+
+        const parentCodes = new Set<string>();
+        allParentMap.forEach((parent) => {
+          if (parent) parentCodes.add(parent);
+        });
+
+        return ordenarDreReceitaBrutaPrimeiro(orderedRows).map((row) => ({
+          ...row,
+          isSintetica: parentCodes.has(row.codigo),
+        }));
+      }
+
       const lookupByCompany = new Map<string, Map<string, ContaComValor>>();
       selectedCompanies.forEach((company) => {
         const map = new Map<string, ContaComValor>();
@@ -185,6 +352,7 @@ export default function ComparativoPage() {
               codigo: node.codigo,
               descricao: node.descricao,
               nivel,
+              isSintetica: !!node.children?.length,
               valores,
             });
           }
@@ -436,11 +604,11 @@ export default function ComparativoPage() {
                   {bpRows.map((row, idx) => (
                     <tr key={`bp-row-${row.codigo}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                       <td className="px-4 py-2 text-slate-500 font-mono">{row.codigo}</td>
-                      <td className="px-4 py-2 text-slate-800" style={{ paddingLeft: `${16 + row.nivel * 12}px` }}>
+                      <td className={`px-4 py-2 text-slate-800 ${row.isSintetica ? 'font-semibold' : ''}`} style={{ paddingLeft: `${16 + row.nivel * 12}px` }}>
                         {row.descricao}
                       </td>
                       {selectedCompanies.map((company) => (
-                        <td key={`bp-${row.codigo}-${company.id}`} className="text-right px-4 py-2 text-slate-700">
+                        <td key={`bp-${row.codigo}-${company.id}`} className={`text-right px-4 py-2 text-slate-700 ${row.isSintetica ? 'font-semibold' : ''}`}>
                           {formatCurrency((row.valores[company.id] || 0) / 1000)}
                         </td>
                       ))}
@@ -472,11 +640,11 @@ export default function ComparativoPage() {
                   {dreRows.map((row, idx) => (
                     <tr key={`dre-row-${row.codigo}`} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                       <td className="px-4 py-2 text-slate-500 font-mono">{row.codigo}</td>
-                      <td className="px-4 py-2 text-slate-800" style={{ paddingLeft: `${16 + row.nivel * 12}px` }}>
+                      <td className={`px-4 py-2 text-slate-800 ${row.isSintetica ? 'font-semibold' : ''}`} style={{ paddingLeft: `${16 + row.nivel * 12}px` }}>
                         {row.descricao}
                       </td>
                       {selectedCompanies.map((company) => (
-                        <td key={`dre-${row.codigo}-${company.id}`} className="text-right px-4 py-2 text-slate-700">
+                        <td key={`dre-${row.codigo}-${company.id}`} className={`text-right px-4 py-2 text-slate-700 ${row.isSintetica ? 'font-semibold' : ''}`}>
                           {formatCurrency((row.valores[company.id] || 0) / 1000)}
                         </td>
                       ))}

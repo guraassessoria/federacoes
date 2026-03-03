@@ -475,17 +475,24 @@ export default function DemonstracoesPage() {
       const XLSX = await import('xlsx');
       const workbook = XLSX.utils.book_new();
 
-      const bpRows = flattenContas(data.estruturaBP || []).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2);
-      const dreRows = flattenContas(data.estruturaDRE || []).filter((row) => (row.nivelVisualizacao || row.nivel || 1) <= 2);
+      const bpRows = flattenContas(data.estruturaBP || []);
+      const dreRows = flattenContas(data.estruturaDRE || []);
+      const formatDescricao = (descricao: string, nivel: number) => `${'  '.repeat(Math.max(0, nivel - 1))}${descricao}`;
 
       const bpSheet = [
-        ['Código', 'Conta', 'Valor'],
-        ...bpRows.map((row) => [row.codigo, row.descricao, row.valor || 0]),
+        ['Código', 'Nível', 'Conta', 'Valor'],
+        ...bpRows.map((row) => {
+          const nivel = row.nivelVisualizacao || row.nivel || 1;
+          return [row.codigo, nivel, formatDescricao(row.descricao, nivel), row.valor || 0];
+        }),
       ];
 
       const dreSheet = [
-        ['Código', 'Conta', 'Valor'],
-        ...dreRows.map((row) => [row.codigo, row.descricao, row.valor || 0]),
+        ['Código', 'Nível', 'Conta', 'Valor'],
+        ...dreRows.map((row) => {
+          const nivel = row.nivelVisualizacao || row.nivel || 1;
+          return [row.codigo, nivel, formatDescricao(row.descricao, nivel), row.valor || 0];
+        }),
       ];
 
       const indicesRows = [

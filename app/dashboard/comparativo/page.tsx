@@ -139,7 +139,7 @@ export default function ComparativoPage() {
   );
 
   const buildComparativeRows = useCallback(
-    (type: 'bp' | 'dre', maxNivel: number = 4): LinhaComparativa[] => {
+    (type: 'bp' | 'dre', maxNivel: number = 4, onlyVisible: boolean = true): LinhaComparativa[] => {
       if (selectedCompanies.length === 0) return [];
 
       const getEstrutura = (companyId: string) =>
@@ -174,7 +174,7 @@ export default function ComparativoPage() {
           const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
           const visible = hasValueRecursive(node);
 
-          if (visible && nivel <= maxNivel) {
+          if ((!onlyVisible || visible) && nivel <= maxNivel) {
             const valores: Record<string, number> = {};
             selectedCompanies.forEach((company) => {
               const row = lookupByCompany.get(company.id)?.get(node.codigo);
@@ -290,21 +290,26 @@ export default function ComparativoPage() {
       const workbook = XLSX.utils.book_new();
 
       const companyHeaders = selectedCompanies.map((company) => company.name);
+      const bpRowsForExcel = buildComparativeRows('bp', Number.MAX_SAFE_INTEGER, false);
+      const dreRowsForExcel = buildComparativeRows('dre', Number.MAX_SAFE_INTEGER, false);
+      const formatDescricao = (descricao: string, nivel: number) => `${'  '.repeat(Math.max(0, nivel - 1))}${descricao}`;
 
       const bpSheet = [
-        ['Código', 'Conta', ...companyHeaders],
-        ...bpRows.map((row) => [
+        ['Código', 'Nível', 'Conta', ...companyHeaders],
+        ...bpRowsForExcel.map((row) => [
           row.codigo,
-          row.descricao,
+          row.nivel,
+          formatDescricao(row.descricao, row.nivel),
           ...selectedCompanies.map((company) => row.valores[company.id] || 0),
         ]),
       ];
 
       const dreSheet = [
-        ['Código', 'Conta', ...companyHeaders],
-        ...dreRows.map((row) => [
+        ['Código', 'Nível', 'Conta', ...companyHeaders],
+        ...dreRowsForExcel.map((row) => [
           row.codigo,
-          row.descricao,
+          row.nivel,
+          formatDescricao(row.descricao, row.nivel),
           ...selectedCompanies.map((company) => row.valores[company.id] || 0),
         ]),
       ];

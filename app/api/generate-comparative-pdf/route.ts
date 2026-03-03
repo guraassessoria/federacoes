@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { ordenarArvoreDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
@@ -214,7 +215,7 @@ function generateComparativeHTML(
   const codigoPassivo = encontrarCodigoPorDescricao(bpRef, [['passivo']], '76');
   const codigoPL = encontrarCodigoPorDescricao(bpRef, [['patrimonio', 'liquido']], '125');
 
-  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'liquida'], ['receita', 'bruta'], ['receita', 'total']], '1');
+  const codigoReceita = encontrarCodigoPorDescricao(dreRef, [['receita', 'bruta'], ['receita', 'liquida'], ['receita', 'total']], '1');
   const codigoCustos = encontrarCodigoPorDescricao(dreRef, [['custo']], '52');
   const codigoDespesas = encontrarCodigoPorDescricao(dreRef, [['despesa', 'ger'], ['despesa', 'operacional'], ['despesa']], '104');
   const codigoResultadoFinanceiro = encontrarCodigoPorDescricao(
@@ -679,7 +680,7 @@ export async function POST(request: NextRequest) {
         // Gerar dados fictícios para empresa sem balancete
         console.log(`Sem dados reais para ${company.name} — usando dados fictícios`);
         const demo = gerarDadosFicticiosComparativo(year);
-        dre = demo.dre;
+        dre = ordenarArvoreDreReceitaBrutaPrimeiro(demo.dre);
         bp = demo.bp;
         resultadoDRE = demo.resultadoDRE;
         totalPassivoPL = demo.totalPassivoPL;
@@ -697,7 +698,7 @@ export async function POST(request: NextRequest) {
           padraoDMPL: r.padraoDMPL,
         }));
         const processado = await processarDadosFinanceiros(balancetes, deParaRecords);
-        dre = processado.dre;
+        dre = ordenarArvoreDreReceitaBrutaPrimeiro(processado.dre);
         bp = processado.bp;
         resultadoDRE = processado.resultadoDRE;
         totalPassivoPL = processado.totalPassivoPL;

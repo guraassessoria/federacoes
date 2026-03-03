@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
 import { API_ENDPOINTS } from '@/lib/constants';
 import { useDashboard } from '@/lib/contexts/DashboardContext';
+import { ordenarArvoreDreReceitaBrutaPrimeiro, ordenarDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 
 // Interface para conta hierárquica (dados brutos do balancete)
 interface HierarchicalAccount {
@@ -370,7 +371,7 @@ export default function DemonstracoesPage() {
           }
 
           const result = await response.json();
-          monthsMap[month.value] = result?.data?.estruturaDRE || [];
+          monthsMap[month.value] = ordenarArvoreDreReceitaBrutaPrimeiro(result?.data?.estruturaDRE || []);
         } catch (error) {
           console.error(`Erro ao buscar DRE mensal ${month.value}/${year}:`, error);
           monthsMap[month.value] = [];
@@ -894,7 +895,7 @@ export default function DemonstracoesPage() {
     const data = financialData[selectedYear];
     if (!data) return [];
     
-    if (activeTab === 'dre' && data.estruturaDRE) return data.estruturaDRE;
+    if (activeTab === 'dre' && data.estruturaDRE) return ordenarArvoreDreReceitaBrutaPrimeiro(data.estruturaDRE);
     if (activeTab === 'bp' && data.estruturaBP) return data.estruturaBP;
     return [];
   };
@@ -1114,7 +1115,7 @@ export default function DemonstracoesPage() {
       return flat.find((c) => c.codigo === codigo)?.valor || 0;
     };
 
-    return Array.from(rowMap.values())
+    const orderedRows = Array.from(rowMap.values())
       .map((row) => {
         const previousYTD = ytdMonths.reduce(
           (sum, month) => sum + getYearMonthValue(previousYearMonths, month.value, row.codigo),
@@ -1187,6 +1188,8 @@ export default function DemonstracoesPage() {
 
         return a.descricao.localeCompare(b.descricao);
       });
+
+      return ordenarDreReceitaBrutaPrimeiro(orderedRows);
   }, [viewMode, monthlyDreData, selectedYear, previousYear, selectedMonth, ytdMonths, flattenContas, getAccountNature]);
 
   return (

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, flattenHierarchy, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { ordenarArvoreDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
@@ -543,12 +544,13 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
   padraoDMPL: r.padraoDMPL,
 }));
     const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balancetes, deParaRecords);
+    const dreApresentacao = ordenarArvoreDreReceitaBrutaPrimeiro(dre);
 
     // Gerar HTML
     const periodo = year || `20${yearShort}`;
     const html = generateReportHTML(
       company.name,
-      dre,
+      dreApresentacao,
       bp,
       resultadoDRE,
       totalPassivoPL,

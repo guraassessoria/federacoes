@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { ordenarDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,12 @@ function compareCodigoContabil(a: string, b: string): number {
   }
 
   return 0;
+}
+
+function compareCodigoContabilDre(codigoA: string, codigoB: string): number {
+  if (codigoA === '51' && codigoB !== '51') return -1;
+  if (codigoB === '51' && codigoA !== '51') return 1;
+  return compareCodigoContabil(codigoA, codigoB);
 }
 
 async function buscarBalancetesAno(companyId: string, yearShort: string) {
@@ -249,12 +256,13 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    const dreOrdenados = Array.from(dreCodigos).sort(compareCodigoContabil);
+    const dreOrdenados = Array.from(dreCodigos).sort(compareCodigoContabilDre);
     const bpOrdenados = Array.from(bpCodigos).sort(compareCodigoContabil);
 
-    for (const codigo of dreOrdenados) {
-      analiseHorizontal.DRE[codigo] = construirSerie(codigo, 'dre');
-    }
+    const dreSeries = dreOrdenados.map((codigo) => construirSerie(codigo, 'dre'));
+    ordenarDreReceitaBrutaPrimeiro(dreSeries).forEach((serie) => {
+      analiseHorizontal.DRE[serie.codigo] = serie;
+    });
 
     for (const codigo of bpOrdenados) {
       analiseHorizontal.BP[codigo] = construirSerie(codigo, 'bp');

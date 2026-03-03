@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { ordenarDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -257,13 +258,14 @@ export async function GET(request: NextRequest) {
           [['receita', 'liquida'], ['receita', 'bruta'], ['receita']]
         );
         if (baseDRE) {
+          const contasDre = extrairContasVerticais(dre, baseDRE.valor, maxNivel, incluirZeros);
           analiseVertical.DRE[ano] = {
             base: {
               codigo: baseDRE.codigo,
               descricao: baseDRE.descricao,
               valor: baseDRE.valor,
             },
-            contas: extrairContasVerticais(dre, baseDRE.valor, maxNivel, incluirZeros),
+            contas: ordenarDreReceitaBrutaPrimeiro(contasDre),
           };
         }
 

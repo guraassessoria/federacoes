@@ -104,7 +104,7 @@ function findCodigoByDescricao(
 
 function normalizeEstruturaRows(rows: any[]): ContaEstrutura[] {
   return rows
-    .map((row: any) => {
+    .map((row: any, idx: number) => {
       const codigo = normalizeCodigo(String(row?.codigo || '').trim());
       if (!codigo) return null;
       return {
@@ -113,10 +113,16 @@ function normalizeEstruturaRows(rows: any[]): ContaEstrutura[] {
         codigoSuperior: row?.codigoSuperior ? normalizeCodigo(String(row.codigoSuperior).trim()) : null,
         nivel: Number(row?.nivel) || 1,
         nivelVisualizacao: Number(row?.nivelVisualizacao ?? row?.nivel) || 1,
-        ordem: Number.isFinite(Number(row?.ordem)) ? Number(row.ordem) : undefined,
+        ordem: Number.isFinite(Number(row?.ordem)) ? Number(row.ordem) : idx + 1,
       } as ContaEstrutura;
     })
-    .filter(Boolean) as ContaEstrutura[];
+    .filter((item): item is ContaEstrutura => item !== null)
+    .sort((a: ContaEstrutura, b: ContaEstrutura) => {
+      const ao = Number.isFinite(a.ordem ?? NaN) ? (a.ordem as number) : Number.MAX_SAFE_INTEGER;
+      const bo = Number.isFinite(b.ordem ?? NaN) ? (b.ordem as number) : Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return a.codigo.localeCompare(b.codigo);
+    }) as ContaEstrutura[];
 }
 
 async function loadEstruturaFromStandardStructure(tipo: 'BP' | 'DRE'): Promise<{ rows: ContaEstrutura[]; aliases: Record<string, string> } | null> {
@@ -221,13 +227,21 @@ export function invalidateEstruturaCache(tipo?: 'BP' | 'DRE') {
 }
 
 export function dbRowsToContaEstrutura(rows: any[]): ContaEstrutura[] {
-  return rows.map((row: any) => ({
-    codigo: String(row.codigo || ''),
-    descricao: String(row.descricao || ''),
-    codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
-    nivel: Number(row.nivel) || 1,
-    nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
-  }));
+  return rows
+    .map((row: any, idx: number) => ({
+      codigo: String(row.codigo || ''),
+      descricao: String(row.descricao || ''),
+      codigoSuperior: row.codigoSuperior ? String(row.codigoSuperior) : null,
+      nivel: Number(row.nivel) || 1,
+      nivelVisualizacao: Number(row.nivelVisualizacao ?? row.nivel) || 1,
+      ordem: Number.isFinite(Number(row?.ordem)) ? Number(row.ordem) : idx + 1,
+    }))
+    .sort((a: ContaEstrutura, b: ContaEstrutura) => {
+      const ao = Number.isFinite(a.ordem ?? NaN) ? (a.ordem as number) : Number.MAX_SAFE_INTEGER;
+      const bo = Number.isFinite(b.ordem ?? NaN) ? (b.ordem as number) : Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return a.codigo.localeCompare(b.codigo);
+    });
 }
 
 // ─── Classificação e Filtro ───────────────────────────────────
@@ -348,20 +362,45 @@ export async function mapBalanceteToBP(
 }
 
 function buildTree(contas: ContaComValor[]): ContaComValor[] {
+  const compareByOrdem = (a: ContaComValor, b: ContaComValor): number => {
+    const ao = Number.isFinite(a.ordem ?? NaN) ? (a.ordem as number) : Number.MAX_SAFE_INTEGER;
+    const bo = Number.isFinite(b.ordem ?? NaN) ? (b.ordem as number) : Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return a.codigo.localeCompare(b.codigo);
+  };
+
+  const sortRecursively = (nodes: ContaComValor[]) => {
+    nodes.sort(compareByOrdem);
+    for (const node of nodes) {
+      if (node.children?.length) sortRecursively(node.children);
+    }
+  };
+
+  const ordered = [...contas].sort(compareByOrdem);
+  const indexByCodigo = new Map<string, number>();
+  ordered.forEach((c, idx) => indexByCodigo.set(c.codigo, idx));
+
   const mapa = new Map<string, ContaComValor>();
-  contas.forEach(c => mapa.set(c.codigo, { ...c, children: [] }));
+  ordered.forEach(c => mapa.set(c.codigo, { ...c, children: [] }));
 
   const raizes: ContaComValor[] = [];
-  contas.forEach(c => {
+  ordered.forEach(c => {
     const atual = mapa.get(c.codigo)!;
     if (c.codigoSuperior) {
       const pai = mapa.get(c.codigoSuperior);
-      if (pai) pai.children!.push(atual);
-      else raizes.push(atual);
+      const paiIdx = indexByCodigo.get(c.codigoSuperior);
+      const atualIdx = indexByCodigo.get(c.codigo);
+      if (pai && paiIdx !== undefined && atualIdx !== undefined && paiIdx <= atualIdx) {
+        pai.children!.push(atual);
+      } else {
+        raizes.push(atual);
+      }
     } else {
       raizes.push(atual);
     }
   });
+
+  sortRecursively(raizes);
   return raizes;
 }
 

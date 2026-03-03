@@ -93,6 +93,10 @@ function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): ContaCom
   return null;
 }
 
+function normalizarCodigo(value: string | null | undefined): string {
+  return (value || '').toString().trim().replace(',', '.');
+}
+
 function flattenEstrutura(contas: ContaComValor[]): ContaComValor[] {
   const result: ContaComValor[] = [];
   const walk = (items: ContaComValor[]) => {
@@ -146,6 +150,75 @@ function gerarLinhasTabelaComparativa(
   maxNivel: number = 3
 ): string {
   let html = '';
+
+  type DreLookup = {
+    byCode: Map<string, ContaComValor>;
+    byNormalizedCode: Map<string, ContaComValor>;
+    byDescricao: Map<string, ContaComValor[]>;
+  };
+
+  const dreLookups = new Map<string, DreLookup>();
+
+  if (tipo === 'dre') {
+    federacoes.forEach((fed) => {
+      const byCode = new Map<string, ContaComValor>();
+      const byNormalizedCode = new Map<string, ContaComValor>();
+      const byDescricao = new Map<string, ContaComValor[]>();
+
+      flattenEstrutura(fed.dre).forEach((conta) => {
+        byCode.set(conta.codigo, conta);
+
+        const normalizedCode = normalizarCodigo(conta.codigo);
+        if (!byNormalizedCode.has(normalizedCode)) {
+          byNormalizedCode.set(normalizedCode, conta);
+        }
+
+        const descKey = normalizarTexto(conta.descricao || '').trim();
+        if (!byDescricao.has(descKey)) {
+          byDescricao.set(descKey, []);
+        }
+        byDescricao.get(descKey)!.push(conta);
+      });
+
+      dreLookups.set(fed.id, { byCode, byNormalizedCode, byDescricao });
+    });
+  }
+
+  const resolverContaDre = (
+    fedId: string,
+    contaTemplate: ContaComValor,
+    parentResolved?: ContaComValor | null
+  ): ContaComValor | null => {
+    const lookup = dreLookups.get(fedId);
+    if (!lookup) return null;
+
+    const exact = lookup.byCode.get(contaTemplate.codigo);
+    if (exact) return exact;
+
+    const byNormalized = lookup.byNormalizedCode.get(normalizarCodigo(contaTemplate.codigo));
+    if (byNormalized) return byNormalized;
+
+    const descKey = normalizarTexto(contaTemplate.descricao || '').trim();
+    const candidates = lookup.byDescricao.get(descKey) || [];
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    if (parentResolved) {
+      const parentCode = normalizarCodigo(parentResolved.codigo);
+      const withSameParent = candidates.find(
+        (candidate) => normalizarCodigo(candidate.codigoSuperior) === parentCode
+      );
+      if (withSameParent) return withSameParent;
+    }
+
+    const templateNivel = contaTemplate.nivelVisualizacao || contaTemplate.nivel || 1;
+    const withSameLevel = candidates.find(
+      (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === templateNivel
+    );
+    if (withSameLevel) return withSameLevel;
+
+    return candidates[0];
+  };
   
   // Buscar a conta raiz na primeira federação para ter a estrutura
   const primeiraFed = federacoes[0];
@@ -154,13 +227,17 @@ function gerarLinhasTabelaComparativa(
   
   if (!raiz) return '';
   
-  function processar(codigo: string, descricao: string, nivel: number): void {
+  function processar(contaTemplate: ContaComValor, nivel: number, parentResolvedByFed: Record<string, ContaComValor | null> = {}): void {
     if (nivel > maxNivel) return;
     
     // Buscar valores em todas as federações
+    const resolvedByFed: Record<string, ContaComValor | null> = {};
     const valores = federacoes.map(fed => {
-      const contasFed = tipo === 'bp' ? fed.bp : fed.dre;
-      const conta = buscarContaPorCodigo(contasFed, codigo);
+      const conta = tipo === 'dre'
+        ? resolverContaDre(fed.id, contaTemplate, parentResolvedByFed[fed.id])
+        : buscarContaPorCodigo(fed.bp, contaTemplate.codigo);
+
+      resolvedByFed[fed.id] = conta;
       return conta?.valor ?? 0;
     });
     
@@ -177,19 +254,18 @@ function gerarLinhasTabelaComparativa(
     else if (isSubtotal) rowClass = 'class="subtotal-row"';
     
     const celulasValores = valores.map(v => `<td>${v !== 0 ? formatCurrency(v) : '-'}</td>`).join('');
-    html += `<tr ${rowClass}><td>${indent}${descricao}</td>${celulasValores}</tr>`;
+    html += `<tr ${rowClass}><td>${indent}${contaTemplate.descricao}</td>${celulasValores}</tr>`;
     
     // Processar filhos recursivamente
-    const contaReferencia = buscarContaPorCodigo(tipo === 'bp' ? primeiraFed.bp : primeiraFed.dre, codigo);
-    if (contaReferencia?.children?.length) {
-      contaReferencia.children.forEach(child => {
-        processar(child.codigo, child.descricao, nivel + 1);
+    if (contaTemplate.children?.length) {
+      contaTemplate.children.forEach(child => {
+        processar(child, nivel + 1, resolvedByFed);
       });
     }
   }
   
   // Iniciar processamento a partir da raiz
-  processar(raiz.codigo, raiz.descricao, 0);
+  processar(raiz, 0);
   
   return html;
 }

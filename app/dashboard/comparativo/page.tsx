@@ -152,34 +152,121 @@ export default function ComparativoPage() {
       if (templateTree.length === 0) return [];
 
       if (type === 'dre') {
-        const lookupByCompany = new Map<string, Map<string, ContaComValor>>();
+        const normalizeCode = (code: string | null | undefined) =>
+          (code || '').toString().trim().replace(',', '.');
+        const normalizeText = (text: string | null | undefined) =>
+          (text || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const lookupByCompany = new Map<
+          string,
+          {
+            byCode: Map<string, ContaComValor>;
+            byNormalizedCode: Map<string, ContaComValor>;
+            byDescricao: Map<string, ContaComValor[]>;
+          }
+        >();
+
         selectedCompanies.forEach((company) => {
-          const map = new Map<string, ContaComValor>();
+          const byCode = new Map<string, ContaComValor>();
+          const byNormalizedCode = new Map<string, ContaComValor>();
+          const byDescricao = new Map<string, ContaComValor[]>();
+
           flattenContas(getEstrutura(company.id)).forEach((conta) => {
-            map.set(conta.codigo, conta);
+            byCode.set(conta.codigo, conta);
+
+            const normalized = normalizeCode(conta.codigo);
+            if (!byNormalizedCode.has(normalized)) {
+              byNormalizedCode.set(normalized, conta);
+            }
+
+            const descKey = normalizeText(conta.descricao);
+            if (!byDescricao.has(descKey)) {
+              byDescricao.set(descKey, []);
+            }
+            byDescricao.get(descKey)!.push(conta);
           });
-          lookupByCompany.set(company.id, map);
+
+          lookupByCompany.set(company.id, { byCode, byNormalizedCode, byDescricao });
         });
 
-        const hasValueRecursive = (node: ContaComValor): boolean => {
+        const resolveConta = (
+          companyId: string,
+          node: ContaComValor,
+          parentResolved?: ContaComValor
+        ): ContaComValor | undefined => {
+          const lookup = lookupByCompany.get(companyId);
+          if (!lookup) return undefined;
+
+          const exact = lookup.byCode.get(node.codigo);
+          if (exact) return exact;
+
+          const normalized = lookup.byNormalizedCode.get(normalizeCode(node.codigo));
+          if (normalized) return normalized;
+
+          const descCandidates = lookup.byDescricao.get(normalizeText(node.descricao)) || [];
+          if (descCandidates.length === 0) return undefined;
+          if (descCandidates.length === 1) return descCandidates[0];
+
+          if (parentResolved) {
+            const parentCode = normalizeCode(parentResolved.codigo);
+            const withSameParent = descCandidates.find(
+              (candidate) => normalizeCode(candidate.codigoSuperior) === parentCode
+            );
+            if (withSameParent) return withSameParent;
+          }
+
+          const nodeNivel = node.nivelVisualizacao || node.nivel || 1;
+          const withSameLevel = descCandidates.find(
+            (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === nodeNivel
+          );
+          if (withSameLevel) return withSameLevel;
+
+          return descCandidates[0];
+        };
+
+        const hasValueRecursive = (node: ContaComValor, resolvedByCompany: Record<string, ContaComValor | undefined>): boolean => {
           const hasOwnValue = selectedCompanies.some((company) => {
-            const row = lookupByCompany.get(company.id)?.get(node.codigo);
+            const row = resolvedByCompany[company.id];
             return Math.abs(row?.valor || 0) > 0;
           });
           if (hasOwnValue) return true;
-          return (node.children || []).some((child) => hasValueRecursive(child));
+          return (node.children || []).some((child) => {
+            const childResolved = Object.fromEntries(
+              selectedCompanies.map((company) => [
+                company.id,
+                resolveConta(company.id, child, resolvedByCompany[company.id]),
+              ])
+            ) as Record<string, ContaComValor | undefined>;
+            return hasValueRecursive(child, childResolved);
+          });
         };
 
         const rows: LinhaComparativa[] = [];
-        const walk = (nodes: ContaComValor[], fallbackNivel: number = 1) => {
+        const walk = (
+          nodes: ContaComValor[],
+          fallbackNivel: number = 1,
+          parentResolvedByCompany?: Record<string, ContaComValor | undefined>
+        ) => {
           nodes.forEach((node) => {
             const nivel = node.nivelVisualizacao || node.nivel || fallbackNivel;
-            const visible = hasValueRecursive(node);
+            const resolvedByCompany = Object.fromEntries(
+              selectedCompanies.map((company) => [
+                company.id,
+                resolveConta(company.id, node, parentResolvedByCompany?.[company.id]),
+              ])
+            ) as Record<string, ContaComValor | undefined>;
+
+            const visible = hasValueRecursive(node, resolvedByCompany);
 
             if ((!onlyVisible || visible) && nivel <= maxNivel) {
               const valores: Record<string, number> = {};
               selectedCompanies.forEach((company) => {
-                const row = lookupByCompany.get(company.id)?.get(node.codigo);
+                const row = resolvedByCompany[company.id];
                 valores[company.id] = row?.valor || 0;
               });
 
@@ -193,7 +280,7 @@ export default function ComparativoPage() {
             }
 
             if (node.children?.length) {
-              walk(node.children, nivel + 1);
+              walk(node.children, nivel + 1, resolvedByCompany);
             }
           });
         };

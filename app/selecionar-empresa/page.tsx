@@ -14,6 +14,7 @@ import {
   BarChart3,
   Plus,
 } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 interface Company {
   id: string;
@@ -38,7 +39,7 @@ export default function SelecionarEmpresaPage() {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch("/api/user/companies");
+      const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
       const data = await res.json();
       setCompanies(data.companies || []);
     } catch (error) {

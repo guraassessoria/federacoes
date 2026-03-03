@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Buscar dados de 2024
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' }
   });
   

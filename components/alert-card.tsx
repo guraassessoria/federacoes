@@ -13,7 +13,7 @@ interface AlertCardProps {
   delay?: number;
 }
 
-export default function AlertCard({ tipo, categoria, descricao, valor, recomendacao, delay = 0 }: AlertCardProps) {
+export function AlertCard({ tipo, categoria, descricao, valor, recomendacao, delay = 0 }: AlertCardProps) {
   const isOportunidade = tipo === 'oportunidade';
   const isAtencao = tipo === 'atencao';
   
@@ -49,3 +49,5 @@ export default function AlertCard({ tipo, categoria, descricao, valor, recomenda
     </motion.div>
   );
 }
+
+export default AlertCard;

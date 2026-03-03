@@ -19,7 +19,7 @@ function parsePeriod(period: string): { year: number; month: number } | null {
 
 async function main() {
   // Obter todos os períodos
-  const periods = await prisma.balanceteData.findMany({
+  const periods = await prisma.balancete.findMany({
     select: { period: true },
     distinct: ['period']
   });
@@ -38,7 +38,7 @@ async function main() {
   
   // Contar registros
   for (const period of filteredPeriods) {
-    const count = await prisma.balanceteData.count({ where: { period } });
+    const count = await prisma.balancete.count({ where: { period } });
     console.log(`  ${period}: ${count} registros`);
   }
 }

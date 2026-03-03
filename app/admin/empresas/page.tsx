@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { API_ENDPOINTS } from '@/lib/constants';
 import {
   Building2,
   Plus,
@@ -47,7 +48,7 @@ export default function AdminEmpresasPage() {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch("/api/companies");
+      const res = await fetch(API_ENDPOINTS.COMPANIES);
       const data = await res.json();
       setCompanies(data.companies || []);
     } catch (error) {
@@ -87,8 +88,8 @@ export default function AdminEmpresasPage() {
 
     try {
       const url = editingCompany
-        ? `/api/companies/${editingCompany.id}`
-        : "/api/companies";
+        ? API_ENDPOINTS.COMPANY(editingCompany.id)
+        : API_ENDPOINTS.COMPANIES;
       const method = editingCompany ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -117,7 +118,7 @@ export default function AdminEmpresasPage() {
     setError("");
 
     try {
-      const res = await fetch(`/api/companies/${deletingCompany.id}`, {
+      const res = await fetch(API_ENDPOINTS.COMPANY(deletingCompany.id), {
         method: "DELETE",
       });
 

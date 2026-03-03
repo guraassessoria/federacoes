@@ -27,7 +27,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   );
 };
 
-export default function CustomPieChart({ data, colors, showLabels = true }: PieChartProps) {
+export function CustomPieChart({ data, colors, showLabels = true }: PieChartProps) {
   const safeData = data ?? [];
   const safeColors = colors ?? [];
   
@@ -57,3 +57,5 @@ export default function CustomPieChart({ data, colors, showLabels = true }: PieC
     </ResponsiveContainer>
   );
 }
+
+export default CustomPieChart;

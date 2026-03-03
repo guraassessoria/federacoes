@@ -5,7 +5,7 @@ import KPICard from "@/components/kpi-card";
 import AlertCard from "@/components/alert-card";
 import CustomLineChart from "@/components/charts/line-chart";
 import CustomPieChart from "@/components/charts/pie-chart";
-import { DollarSign, TrendingUp, PiggyBank, Wallet, AlertCircle, Info } from "lucide-react";
+import { DollarSign, TrendingUp, PiggyBank, Wallet, AlertCircle, Info, Building2 } from "lucide-react";
 import { useFinancialData, useFinancialFormatters } from "@/hooks/useFinancialData";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
 
@@ -57,6 +57,7 @@ export default function DashboardPage() {
   const dre = data.dre;
   const bp = data.bp;
   const indices = data.indices;
+  const indexAvailability = data.indexAvailability;
   
   // Dados da estrutura de-para (quando disponíveis, são mais precisos)
   const estruturaDRE = (data as any).estruturaDRE as any[] | undefined;
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   let receitaTotal = 0;
   let resultadoLiquido = 0;
   let ativoTotal = 0;
+  let passivoTotal = 0;
   let patrimonioLiquido = 0;
 
   if (estruturaDRE && estruturaDRE.length > 0) {
@@ -81,30 +83,51 @@ export default function DashboardPage() {
 
   if (estruturaBP && estruturaBP.length > 0) {
     ativoTotal = buscarValorEstrutura(estruturaBP, '1') || 0;
+    const passivoCirculante = buscarValorEstrutura(estruturaBP, '77') || 0;
+    const passivoNaoCirculante = buscarValorEstrutura(estruturaBP, '113') || 0;
+    passivoTotal = passivoCirculante + passivoNaoCirculante;
     patrimonioLiquido = buscarValorEstrutura(estruturaBP, '125') || 0;
   } else if (bp) {
     ativoTotal = bp.totalAtivo || 0;
+    const passivoCirculante = bp.passivoCirculante?.["TOTAL_PASSIVO_CIRCULANTE"] || 0;
+    const passivoNaoCirculante = bp.passivoNaoCirculante?.["TOTAL_PASSIVO_NAO_CIRCULANTE"] || 0;
+    passivoTotal = passivoCirculante + passivoNaoCirculante;
     patrimonioLiquido = bp.patrimonioLiquido?.["TOTAL_PATRIMONIO_LIQUIDO"] || 0;
   }
 
-  // Composição de receitas (formato flat)
-  const receitasData = dre?.receitas
+  // Composição até o 2º nível da DRE (com fallback flat)
+  const receitasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["51", "56", "1"]);
+  const custosEstruturaData = montarComposicaoNivel2(estruturaDRE, ["57", "52"]);
+  const despesasEstruturaData = montarComposicaoNivel2(estruturaDRE, ["110", "104"]);
+
+  const receitasFlatData = dre?.receitas
     ? Object.entries(dre.receitas).map(([name, value]) => ({
         name: name.replace(/_/g, " "),
-        value: value as number,
+        value: Math.abs(value as number),
       }))
     : [];
 
-  // Composição de custos (formato flat)
-  const custosData = dre?.custos
+  const custosFlatData = dre?.custos
     ? Object.entries(dre.custos).map(([name, value]) => ({
         name: name.replace(/_/g, " "),
-        value: value as number,
+        value: Math.abs(value as number),
       }))
     : [];
+
+  const despesasFlatData = dre?.despesas
+    ? Object.entries(dre.despesas).map(([name, value]) => ({
+        name: name.replace(/_/g, " "),
+        value: Math.abs(value as number),
+      }))
+    : [];
+
+  const receitasData = receitasEstruturaData.length > 0 ? receitasEstruturaData : receitasFlatData;
+  const custosData = custosEstruturaData.length > 0 ? custosEstruturaData : custosFlatData;
+  const despesasData = despesasEstruturaData.length > 0 ? despesasEstruturaData : despesasFlatData;
 
   const receitasColors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
   const custosColors = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#6366F1"];
+  const despesasColors = ["#F43F5E", "#FB7185", "#E11D48", "#BE123C", "#9F1239"];
 
   // Dados para gráfico de evolução
   const lineChartData = data.months
@@ -136,6 +159,13 @@ export default function DashboardPage() {
     ? `${getMonthName(selectedMonth)}/${selectedYear}` 
     : selectedYear;
 
+  const renderIndicePrincipal = (value: number, suffix: string, available: boolean | undefined, decimals: number = 1) => {
+    if (available === false) {
+      return <span className="inline-block px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-sm font-semibold">Indisponível</span>;
+    }
+    return <span>{value.toFixed(decimals)}{suffix}</span>;
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -153,10 +183,11 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <KPICard title="Receita Total" value={formatCurrency(receitaTotal)} change={0} icon={DollarSign} color="blue" />
         <KPICard title="Resultado Líquido" value={formatCurrency(resultadoLiquido)} change={0} icon={TrendingUp} color={resultadoLiquido >= 0 ? "green" : "red"} />
         <KPICard title="Ativo Total" value={formatCurrency(ativoTotal)} change={0} icon={PiggyBank} color="purple" />
+        <KPICard title="Passivo Total" value={formatCurrency(passivoTotal)} change={0} icon={Building2} color="red" />
         <KPICard title="Patrimônio Líquido" value={formatCurrency(patrimonioLiquido)} change={0} icon={Wallet} color="orange" />
       </div>
 
@@ -168,19 +199,27 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Liquidez Corrente</p>
-              <p className="text-2xl font-bold text-blue-600">{indices.liquidez.corrente.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {renderIndicePrincipal(indices.liquidez.corrente, '', indexAvailability?.liquidez?.corrente, 2)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Margem Líquida</p>
-              <p className="text-2xl font-bold text-green-600">{indices.rentabilidade.margemLiquida.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-green-600">
+                {renderIndicePrincipal(indices.rentabilidade.margemLiquida, '%', indexAvailability?.rentabilidade?.margemLiquida)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">ROE</p>
-              <p className="text-2xl font-bold text-purple-600">{indices.rentabilidade.roe.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {renderIndicePrincipal(indices.rentabilidade.roe, '%', indexAvailability?.rentabilidade?.roe)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-500">Endividamento</p>
-              <p className="text-2xl font-bold text-orange-600">{indices.endividamento.endividamentoGeral.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {renderIndicePrincipal(indices.endividamento.endividamentoGeral, '%', indexAvailability?.endividamento?.endividamentoGeral)}
+              </p>
             </div>
           </div>
         </motion.div>
@@ -211,15 +250,29 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Costs Pie Chart */}
-      {custosData.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-          className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Custos</h2>
-          <div className="h-80">
-            <CustomPieChart data={custosData} colors={custosColors} />
-          </div>
-        </motion.div>
+      {/* Costs / Expenses Pie Charts */}
+      {(custosData.length > 0 || despesasData.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {custosData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+              className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Custos</h2>
+              <div className="h-80">
+                <CustomPieChart data={custosData} colors={custosColors} />
+              </div>
+            </motion.div>
+          )}
+
+          {despesasData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+              className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribuição de Despesas</h2>
+              <div className="h-80">
+                <CustomPieChart data={despesasData} colors={despesasColors} />
+              </div>
+            </motion.div>
+          )}
+        </div>
       )}
 
       {/* Alerts */}
@@ -242,4 +295,62 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+function flattenEstrutura(contas: any[]): any[] {
+  const result: any[] = [];
+  const walk = (items: any[]) => {
+    for (const item of items || []) {
+      result.push(item);
+      if (item.children?.length) {
+        walk(item.children);
+      }
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
+function montarComposicaoNivel2(
+  estruturaDRE: any[] | undefined,
+  rootCodes: string[],
+): Array<{ name: string; value: number }> {
+  if (!estruturaDRE || estruturaDRE.length === 0) return [];
+
+  const flat = flattenEstrutura(estruturaDRE);
+  const parentMap = new Map<string, string | null>();
+  flat.forEach((conta) => {
+    parentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+  });
+
+  const isUnderRoot = (codigo: string): boolean => {
+    let current = codigo;
+    const visited = new Set<string>();
+
+    while (current && !visited.has(current)) {
+      if (rootCodes.includes(current)) return true;
+      visited.add(current);
+      current = parentMap.get(current) || '';
+    }
+
+    return false;
+  };
+
+  const usados = new Set<string>();
+  return flat
+    .filter((conta) => {
+      const nivel = conta.nivelVisualizacao || conta.nivel || 0;
+      return nivel === 2 && isUnderRoot(conta.codigo);
+    })
+    .filter((conta) => {
+      if (usados.has(conta.codigo)) return false;
+      usados.add(conta.codigo);
+      return true;
+    })
+    .map((conta) => ({
+      name: conta.descricao,
+      value: Math.abs(Number(conta.valor || 0)),
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 }

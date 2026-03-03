@@ -125,20 +125,20 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const deleted = await tx.balanceteData.deleteMany({
+      const deleted = await tx.balancete.deleteMany({
         where: { companyId, period },
       });
 
-      const created = await tx.balanceteData.createMany({
+      const created = await tx.balancete.createMany({
         data: validRows.map((r) => ({
           companyId,
           period,
-          accountNumber: r.accountNumber,
+          accountCode: r.accountNumber,
           accountDescription: r.accountDescription,
-          previousBalance: r.previousBalance,
+          openingBalance: r.previousBalance,
           debit: r.debit,
           credit: r.credit,
-          finalBalance: r.finalBalance,
+          closingBalance: r.finalBalance,
           accountNature: r.accountNature === "C" ? "C" : "D",
         })),
       });

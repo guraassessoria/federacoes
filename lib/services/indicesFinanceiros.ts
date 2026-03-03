@@ -33,15 +33,15 @@ const CODIGOS_BP = {
 
 // Códigos das contas na estrutura padrão - DRE
 const CODIGOS_DRE = {
-  RECEITAS_TOTAL: '1',
-  CUSTOS_TOTAL: '52',
-  DESPESAS_TOTAL: '104',
-  RESULTADO_FINANCEIRO: '190',
-  RECEITAS_FINANCEIRAS: '191',
-  DESPESAS_FINANCEIRAS: '199',
-  RESULTADO: '210',
-  RESULTADO_OPERACIONAL: '211',
-  RESULTADO_LIQUIDO: '225'
+  RECEITAS_TOTAL: '56',
+  CUSTOS_TOTAL: '57',
+  DESPESAS_TOTAL: '110',
+  RESULTADO_FINANCEIRO: '198',
+  RECEITAS_FINANCEIRAS: '199',
+  DESPESAS_FINANCEIRAS: '207',
+  RESULTADO: '227',
+  RESULTADO_OPERACIONAL: '196',
+  RESULTADO_LIQUIDO: '229'
 };
 
 // Interface para índice calculado
@@ -123,6 +123,29 @@ function buscarValorPorCodigo(contas: ContaComValor[], codigo: string): number |
   return null;
 }
 
+function buscarValorPorCodigos(contas: ContaComValor[], codigos: string[]): number | null {
+  for (const codigo of codigos) {
+    const valor = buscarValorPorCodigo(contas, codigo);
+    if (valor !== null) return valor;
+  }
+  return null;
+}
+
+function buscarValorPorDescricao(contas: ContaComValor[], termos: string[]): number | null {
+  const stack = [...contas];
+  while (stack.length > 0) {
+    const conta = stack.shift()!;
+    const descricao = conta.descricao?.toLowerCase?.() || '';
+    if (termos.some((termo) => descricao.includes(termo))) {
+      return conta.valor !== 0 ? conta.valor : null;
+    }
+    if (conta.children?.length) {
+      stack.push(...conta.children);
+    }
+  }
+  return null;
+}
+
 /**
  * Extrai todos os valores necessários do BP e DRE
  */
@@ -130,6 +153,26 @@ export function extrairValores(
   bp: ContaComValor[],
   dre: ContaComValor[]
 ): ValoresExtraidos {
+  const receitasTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_TOTAL, '51', '1']) ??
+    buscarValorPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
+
+  const custosTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.CUSTOS_TOTAL, '52']) ??
+    buscarValorPorDescricao(dre, ['custos']);
+
+  const despesasTotal =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_TOTAL, '104']) ??
+    buscarValorPorDescricao(dre, ['despesas']);
+
+  const resultadoOperacional =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_OPERACIONAL, '211']) ??
+    buscarValorPorDescricao(dre, ['resultado operacional']);
+
+  const resultadoLiquido =
+    buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_LIQUIDO, '225']) ??
+    buscarValorPorDescricao(dre, ['resultado líquido', 'superávit', 'déficit']);
+
   return {
     // BP
     ativoTotal: buscarValorPorCodigo(bp, CODIGOS_BP.ATIVO_TOTAL),
@@ -146,14 +189,20 @@ export function extrairValores(
     patrimonioLiquido: buscarValorPorCodigo(bp, CODIGOS_BP.PATRIMONIO_LIQUIDO),
     
     // DRE
-    receitasTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.RECEITAS_TOTAL),
-    custosTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.CUSTOS_TOTAL),
-    despesasTotal: buscarValorPorCodigo(dre, CODIGOS_DRE.DESPESAS_TOTAL),
-    resultadoFinanceiro: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_FINANCEIRO),
-    receitasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.RECEITAS_FINANCEIRAS),
-    despesasFinanceiras: buscarValorPorCodigo(dre, CODIGOS_DRE.DESPESAS_FINANCEIRAS),
-    resultadoOperacional: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_OPERACIONAL),
-    resultadoLiquido: buscarValorPorCodigo(dre, CODIGOS_DRE.RESULTADO_LIQUIDO)
+    receitasTotal,
+    custosTotal,
+    despesasTotal,
+    resultadoFinanceiro:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.RESULTADO_FINANCEIRO, '190']) ??
+      buscarValorPorDescricao(dre, ['resultado financeiro']),
+    receitasFinanceiras:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.RECEITAS_FINANCEIRAS, '191']) ??
+      buscarValorPorDescricao(dre, ['receitas financeiras']),
+    despesasFinanceiras:
+      buscarValorPorCodigos(dre, [CODIGOS_DRE.DESPESAS_FINANCEIRAS]) ??
+      buscarValorPorDescricao(dre, ['despesas financeiras']),
+    resultadoOperacional,
+    resultadoLiquido
   };
 }
 
@@ -251,7 +300,8 @@ export function calcularIndices(
     // Se não há custos, a margem bruta é 100%
     margemBruta = indiceDisponivel(100);
   } else {
-    const resultadoBruto = v.receitasTotal - v.custosTotal;
+    const custosNormalizados = Math.abs(v.custosTotal);
+    const resultadoBruto = v.receitasTotal - custosNormalizados;
     margemBruta = indiceDisponivel((resultadoBruto / v.receitasTotal) * 100);
   }
   
@@ -262,10 +312,12 @@ export function calcularIndices(
   } else if (v.resultadoOperacional === null) {
     // Tentar calcular: Receitas - Custos - Despesas
     if (v.custosTotal !== null && v.despesasTotal !== null) {
-      const resOp = v.receitasTotal - v.custosTotal - v.despesasTotal;
+      const custosNormalizados = Math.abs(v.custosTotal);
+      const despesasNormalizadas = Math.abs(v.despesasTotal);
+      const resOp = v.receitasTotal - custosNormalizados - despesasNormalizadas;
       margemOperacional = indiceDisponivel((resOp / v.receitasTotal) * 100);
     } else {
-      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 211) e não foi possível calcular');
+      margemOperacional = indiceIndisponivel('Resultado Operacional não encontrado na DRE (código 196) e não foi possível calcular');
     }
   } else {
     margemOperacional = indiceDisponivel((v.resultadoOperacional / v.receitasTotal) * 100);
@@ -276,7 +328,7 @@ export function calcularIndices(
   if (v.receitasTotal === null || v.receitasTotal === 0) {
     margemLiquida = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
   } else if (v.resultadoLiquido === null) {
-    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    margemLiquida = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     margemLiquida = indiceDisponivel((v.resultadoLiquido / v.receitasTotal) * 100);
   }
@@ -288,8 +340,8 @@ export function calcularIndices(
     margemEbitda = indiceIndisponivel('Receitas Total não encontrado ou igual a zero na DRE (código 1)');
   } else {
     // Calcular resultado operacional antes do resultado financeiro
-    const custosTotal = v.custosTotal ?? 0;
-    const despesasTotal = v.despesasTotal ?? 0;
+    const custosTotal = Math.abs(v.custosTotal ?? 0);
+    const despesasTotal = Math.abs(v.despesasTotal ?? 0);
     const ebitdaAproximado = v.receitasTotal - custosTotal - despesasTotal;
     // Nota: Este é um EBITDA aproximado, pois a depreciação está dentro de despesas
     margemEbitda = indiceDisponivel((ebitdaAproximado / v.receitasTotal) * 100);
@@ -300,7 +352,7 @@ export function calcularIndices(
   if (v.ativoTotal === null || v.ativoTotal === 0) {
     roa = indiceIndisponivel('Ativo Total não encontrado ou igual a zero no BP (código 1)');
   } else if (v.resultadoLiquido === null) {
-    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    roa = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     roa = indiceDisponivel((v.resultadoLiquido / v.ativoTotal) * 100);
   }
@@ -310,7 +362,7 @@ export function calcularIndices(
   if (v.patrimonioLiquido === null || v.patrimonioLiquido === 0) {
     roe = indiceIndisponivel('Patrimônio Líquido não encontrado ou igual a zero no BP (código 125)');
   } else if (v.resultadoLiquido === null) {
-    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 225)');
+    roe = indiceIndisponivel('Resultado Líquido não encontrado na DRE (código 229)');
   } else {
     roe = indiceDisponivel((v.resultadoLiquido / v.patrimonioLiquido) * 100);
   }
@@ -388,7 +440,7 @@ export function calcularIndices(
   } else if (v.fornecedores === null) {
     prazoMedioPagamento = indiceIndisponivel('Fornecedores não encontrado no BP (código 78)');
   } else {
-    prazoMedioPagamento = indiceDisponivel((v.fornecedores / v.custosTotal) * 360);
+    prazoMedioPagamento = indiceDisponivel((v.fornecedores / Math.abs(v.custosTotal)) * 360);
   }
   
   return {

@@ -75,18 +75,18 @@ function ajustarSinal(valor: number, accountNumber: string): number {
 }
 
 async function main() {
-  const contas = await prisma.balanceteData.findMany({
+  const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
-    select: { accountNumber: true, accountDescription: true, finalBalance: true },
-    distinct: ['accountNumber'],
-    orderBy: { accountNumber: 'asc' }
+    select: { accountCode: true, accountDescription: true, closingBalance: true },
+    distinct: ['accountCode'],
+    orderBy: { accountCode: 'asc' }
   });
   
-  const todosCodigos = [...new Set(contas.map(c => c.accountNumber))];
+  const todosCodigos = [...new Set(contas.map(c => c.accountCode))];
   const folhas = contas.filter(conta => {
     for (const codigo of todosCodigos) {
-      if (codigo === conta.accountNumber) continue;
-      if (eFilho(conta.accountNumber, codigo)) return false;
+      if (codigo === conta.accountCode) continue;
+      if (eFilho(conta.accountCode, codigo)) return false;
     }
     return true;
   });
@@ -94,9 +94,9 @@ async function main() {
   // Agrupar por código padrão
   const valoresPorCodigo: Record<string, { total: number; contas: string[] }> = {};
   
-  for (const conta of folhas.filter(c => c.accountNumber.startsWith('1') || c.accountNumber.startsWith('2'))) {
-    const mapping = encontrarCodigoPadrao(conta.accountNumber);
-    const valorAjustado = ajustarSinal(Number(conta.finalBalance), conta.accountNumber);
+  for (const conta of folhas.filter(c => c.accountCode.startsWith('1') || c.accountCode.startsWith('2'))) {
+    const mapping = encontrarCodigoPadrao(conta.accountCode);
+    const valorAjustado = ajustarSinal(Number(conta.closingBalance), conta.accountCode);
     
     if (mapping) {
       if (!valoresPorCodigo[mapping.codigo]) {
@@ -104,10 +104,10 @@ async function main() {
       }
       valoresPorCodigo[mapping.codigo].total += valorAjustado;
       valoresPorCodigo[mapping.codigo].contas.push(
-        `${conta.accountNumber} (${conta.accountDescription?.substring(0, 25)}) = ${valorAjustado.toLocaleString('pt-BR')}`
+        `${conta.accountCode} (${conta.accountDescription?.substring(0, 25)}) = ${valorAjustado.toLocaleString('pt-BR')}`
       );
     } else {
-      console.log(`SEM MAPEAMENTO: ${conta.accountNumber} = ${valorAjustado}`);
+      console.log(`SEM MAPEAMENTO: ${conta.accountCode} = ${valorAjustado}`);
     }
   }
   

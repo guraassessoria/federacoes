@@ -7,6 +7,7 @@ import { Info } from 'lucide-react';
 interface IndicatorCardProps {
   title: string;
   values: Record<string, number> | { year: string; value: number }[];
+  unavailable?: boolean;
   type?: 'number' | 'percent' | 'currency';
   format?: 'number' | 'percent' | 'currency'; // backward compatibility
   benchmark?: { min: number; max: number };
@@ -15,9 +16,10 @@ interface IndicatorCardProps {
   invertColors?: boolean; // Para índices onde valores baixos são melhores
 }
 
-export default function IndicatorCard({ 
+export function IndicatorCard({ 
   title, 
   values, 
+  unavailable = false,
   type,
   format,
   benchmark,
@@ -84,7 +86,7 @@ export default function IndicatorCard({
       
       <div className="space-y-3">
         {normalizedValues?.map?.((item) => {
-          const status = getStatus(item?.value ?? 0);
+          const status = unavailable ? 'neutral' : getStatus(item?.value ?? 0);
           return (
             <div key={item?.year} className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{item?.year}</span>
@@ -92,7 +94,7 @@ export default function IndicatorCard({
                 'px-3 py-1 rounded-full text-sm font-semibold border',
                 statusColors[status]
               )}>
-                {formatValue(item?.value ?? 0)}
+                {unavailable ? 'Indisponível' : formatValue(item?.value ?? 0)}
               </span>
             </div>
           );
@@ -109,3 +111,5 @@ export default function IndicatorCard({
     </motion.div>
   );
 }
+
+export default IndicatorCard;

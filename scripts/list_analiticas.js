@@ -2,9 +2,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const contas = await prisma.balanceteData.findMany({
+  const contas = await prisma.balancete.findMany({
     where: { period: { contains: '25' } },
-    select: { accountNumber: true, accountDescription: true, finalBalance: true },
+    select: { accountCode: true, accountDescription: true, closingBalance: true },
     orderBy: { accountNumber: 'asc' }
   });
   
@@ -16,7 +16,7 @@ async function main() {
   });
   
   console.log('=== BP ===');
-  analiticas.filter(c => (c.accountNumber.startsWith('1') || c.accountNumber.startsWith('2')) && c.finalBalance !== 0)
+  analiticas.filter(c => (c.accountCode.startsWith('1') || c.accountCode.startsWith('2')) && c.closingBalance !== 0)
     .forEach(c => console.log(c.accountNumber + '|' + c.accountDescription + '|' + c.finalBalance));
   
   console.log('');

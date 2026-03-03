@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
+import { API_ENDPOINTS } from "@/lib/constants";
 import type {
   ProcessedBP,
   ProcessedDRE,
@@ -9,11 +10,26 @@ import type {
 } from "@/lib/services/financialProcessing";
 
 interface FinancialData {
+  indexAvailability?: {
+    liquidez?: { corrente?: boolean; seca?: boolean; imediata?: boolean; geral?: boolean };
+    rentabilidade?: { margemBruta?: boolean; margemOperacional?: boolean; margemLiquida?: boolean; margemEbitda?: boolean; roa?: boolean; roe?: boolean };
+    endividamento?: { endividamentoGeral?: boolean; composicaoEndividamento?: boolean; grauAlavancagem?: boolean; imobilizacaoPL?: boolean };
+    atividade?: { giroAtivo?: boolean; prazoMedioRecebimento?: boolean; prazoMedioPagamento?: boolean };
+  };
   bp: ProcessedBP | null;
   dre: ProcessedDRE | null;
   indices: FinancialIndices | null;
   period?: string;
-  months?: Array<{ period: string; indices: FinancialIndices }>;
+  months?: Array<{
+    period: string;
+    indices: FinancialIndices;
+    indexAvailability?: {
+      liquidez?: { corrente?: boolean; seca?: boolean; imediata?: boolean; geral?: boolean };
+      rentabilidade?: { margemBruta?: boolean; margemOperacional?: boolean; margemLiquida?: boolean; margemEbitda?: boolean; roa?: boolean; roe?: boolean };
+      endividamento?: { endividamentoGeral?: boolean; composicaoEndividamento?: boolean; grauAlavancagem?: boolean; imobilizacaoPL?: boolean };
+      atividade?: { giroAtivo?: boolean; prazoMedioRecebimento?: boolean; prazoMedioPagamento?: boolean };
+    };
+  }>;
 }
 
 interface UseFinancialDataReturn {
@@ -62,7 +78,7 @@ export function useFinancialData(): UseFinancialDataReturn {
         month: selectedMonth,
       });
 
-      const response = await fetch(`/api/financial-data?${params}`);
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params}`);
       
       if (!response.ok) {
         throw new Error("Erro ao buscar dados financeiros");

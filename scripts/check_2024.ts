@@ -4,9 +4,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Buscar dados de 2024 (DEZ/24)
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' },
-    orderBy: { accountNumber: 'asc' }
+    orderBy: { accountCode: 'asc' }
   });
   
   console.log(`Total de registros DEZ/24: ${dados2024.length}`);
@@ -14,28 +14,28 @@ async function main() {
   // Função para verificar se é conta folha (analítica)
   function isLeaf(accountNumber: string): boolean {
     return !dados2024.some(other => 
-      other.accountNumber !== accountNumber && 
-      other.accountNumber.startsWith(accountNumber + '.')
+      other.accountCode !== accountNumber && 
+      other.accountCode.startsWith(accountNumber + '.')
     );
   }
   
   // Separar receitas (3.x) e custos (4.x) - APENAS FOLHAS
-  const receitas = dados2024.filter(d => d.accountNumber.startsWith('3') && isLeaf(d.accountNumber));
-  const custos = dados2024.filter(d => d.accountNumber.startsWith('4') && isLeaf(d.accountNumber));
+  const receitas = dados2024.filter(d => d.accountCode.startsWith('3') && isLeaf(d.accountCode));
+  const custos = dados2024.filter(d => d.accountCode.startsWith('4') && isLeaf(d.accountCode));
   
   console.log('\n=== RECEITAS 2024 (apenas contas analíticas) ===');
   let totalReceitas = 0;
   receitas.forEach(d => {
-    console.log(`${d.accountNumber} - ${d.accountDescription}: ${Number(d.finalBalance).toFixed(2)}`);
-    totalReceitas += Number(d.finalBalance);
+    console.log(`${d.accountCode} - ${d.accountDescription}: ${Number(d.closingBalance).toFixed(2)}`);
+    totalReceitas += Number(d.closingBalance);
   });
   console.log(`TOTAL RECEITAS: R$ ${totalReceitas.toFixed(2)}`);
   
   console.log('\n=== CUSTOS/DESPESAS 2024 (apenas contas analíticas) ===');
   let totalCustos = 0;
   custos.forEach(d => {
-    console.log(`${d.accountNumber} - ${d.accountDescription}: ${Number(d.finalBalance).toFixed(2)}`);
-    totalCustos += Number(d.finalBalance);
+    console.log(`${d.accountCode} - ${d.accountDescription}: ${Number(d.closingBalance).toFixed(2)}`);
+    totalCustos += Number(d.closingBalance);
   });
   console.log(`TOTAL CUSTOS/DESPESAS: R$ ${totalCustos.toFixed(2)}`);
   

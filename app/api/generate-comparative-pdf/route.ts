@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -63,15 +64,58 @@ function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
     return null;
   };
 
+  const flatten = (contas: ContaComValor[]): ContaComValor[] => {
+    const result: ContaComValor[] = [];
+    const walk = (items: ContaComValor[]) => {
+      for (const item of items) {
+        result.push(item);
+        if (item.children?.length) walk(item.children);
+      }
+    };
+    walk(contas);
+    return result;
+  };
+
+  const buscarPorCodigos = (contas: ContaComValor[], codigos: string[]): number | null => {
+    for (const codigo of codigos) {
+      const valor = buscar(contas, codigo);
+      if (valor !== null) return valor;
+    }
+    return null;
+  };
+
+  const buscarPorDescricao = (contas: ContaComValor[], termos: string[]): number | null => {
+    const flat = flatten(contas);
+    for (const conta of flat) {
+      const descricao = conta.descricao?.toLowerCase?.() || '';
+      if (termos.some((termo) => descricao.includes(termo))) {
+        return conta.valor !== 0 ? conta.valor : null;
+      }
+    }
+    return null;
+  };
+
+  const receitasTotal =
+    buscarPorCodigos(dre, ['1', '51', '56']) ??
+    buscarPorDescricao(dre, ['receita líquida', 'receita bruta', 'receitas']);
+
+  const custosTotal =
+    buscarPorCodigos(dre, ['52', '57']) ??
+    buscarPorDescricao(dre, ['custos']);
+
+  const despesasTotal =
+    buscarPorCodigos(dre, ['104', '110']) ??
+    buscarPorDescricao(dre, ['despesas']);
+
   return {
     ativoTotal: buscar(bp, '1'),
     ativoCirculante: buscar(bp, '2'),
     passivoCirculante: buscar(bp, '77'),
     passivoNaoCirculante: buscar(bp, '113'),
     patrimonioLiquido: buscar(bp, '125'),
-    receitasTotal: buscar(dre, '1'),
-    custosTotal: buscar(dre, '52'),
-    despesasTotal: buscar(dre, '104')
+    receitasTotal,
+    custosTotal,
+    despesasTotal
   };
 }
 
@@ -594,12 +638,12 @@ export async function POST(request: NextRequest) {
 
     // Processar cada federação
     for (const company of companies) {
-      const balanceteData = await prisma.balanceteData.findMany({
+      const balancetes = await prisma.balancete.findMany({
         where: {
           companyId: company.id,
           period: { contains: `/${yearShort}` }
         },
-        orderBy: { accountNumber: 'asc' }
+        orderBy: { accountCode: 'asc' }
       });
 
   let dre: ContaComValor[];
@@ -607,7 +651,7 @@ export async function POST(request: NextRequest) {
       let resultadoDRE: number;
       let totalPassivoPL: number;
 
-      if (balanceteData.length === 0) {
+      if (balancetes.length === 0) {
         // Gerar dados fictícios para empresa sem balancete
         console.log(`Sem dados reais para ${company.name} — usando dados fictícios`);
         const demo = gerarDadosFicticiosComparativo(year);
@@ -628,7 +672,7 @@ export async function POST(request: NextRequest) {
           padraoDFC: r.padraoDFC,
           padraoDMPL: r.padraoDMPL,
         }));
-        const processado = await processarDadosFinanceiros(balanceteData, deParaRecords);
+        const processado = await processarDadosFinanceiros(balancetes, deParaRecords);
         dre = processado.dre;
         bp = processado.bp;
         resultadoDRE = processado.resultadoDRE;
@@ -663,42 +707,64 @@ export async function POST(request: NextRequest) {
     const html = generateComparativeHTML(federacoes, periodo);
 
     // Verificar se API de PDF está configurada
-    const html2pdfUrl = process.env.HTML2PDF_API_URL;
-    const html2pdfKey = process.env.HTML2PDF_API_KEY;
+    const html2pdfUrl =
+      process.env.HTML2PDF_API_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_URL ||
+      process.env.HTML2PDF_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_URL ||
+      process.env.PDF_API_URL ||
+      process.env.NEXT_PUBLIC_PDF_API_URL;
 
-    if (!html2pdfUrl || !html2pdfKey) {
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="comparativo_federacoes_${periodo}.html"`
-        }
-      });
+    const html2pdfKey =
+      process.env.HTML2PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_KEY ||
+      process.env.HTML2PDF_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_KEY ||
+      process.env.PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_PDF_API_KEY;
+
+    if (!html2pdfUrl) {
+      return NextResponse.json({
+        error: 'Serviço de geração de PDF não configurado. Defina uma URL em HTML2PDF_API_URL (ou HTML2PDF_URL / PDF_API_URL).'
+      }, { status: 500 });
     }
 
+    const isHtml2PdfApp = /api\.html2pdf\.app/i.test(html2pdfUrl);
+
     // Gerar PDF via API
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (html2pdfKey && !isHtml2PdfApp) {
+      headers['Authorization'] = `Bearer ${html2pdfKey}`;
+    }
+
+    const payload = isHtml2PdfApp
+      ? {
+          html,
+          apiKey: html2pdfKey,
+          format: 'A4',
+        }
+      : {
+          html,
+          options: {
+            format: 'A4',
+            margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+            printBackground: true,
+          },
+        };
+
     const pdfResponse = await fetch(html2pdfUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${html2pdfKey}`
-      },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: 'A4',
-          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-          printBackground: true
-        }
-      })
+      headers,
+      body: JSON.stringify(payload)
     });
 
     if (!pdfResponse.ok) {
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="comparativo_federacoes_${periodo}.html"`
-        }
-      });
+      const errorText = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Falha no serviço de PDF: ${errorText || 'erro desconhecido'}`
+      }, { status: 502 });
     }
 
     // Verificar se é resposta assíncrona
@@ -712,8 +778,13 @@ export async function POST(request: NextRequest) {
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
+        const statusHeaders: Record<string, string> = {};
+        if (html2pdfKey && !isHtml2PdfApp) {
+          statusHeaders['Authorization'] = `Bearer ${html2pdfKey}`;
+        }
+
         const statusResponse = await fetch(`${html2pdfUrl}/status/${jobData.jobId}`, {
-          headers: { 'Authorization': `Bearer ${html2pdfKey}` }
+          headers: statusHeaders
         });
         
         if (statusResponse.ok) {
@@ -721,6 +792,11 @@ export async function POST(request: NextRequest) {
           
           if (statusData.status === 'completed' && statusData.pdfUrl) {
             const pdfDownload = await fetch(statusData.pdfUrl);
+            const downloadType = pdfDownload.headers.get('content-type') || '';
+            if (!downloadType.includes('application/pdf')) {
+              const invalidBody = await pdfDownload.text();
+              throw new Error(`Resposta inválida do serviço de PDF: ${invalidBody.slice(0, 200)}`);
+            }
             const pdfBuffer = await pdfDownload.arrayBuffer();
             
             return new NextResponse(pdfBuffer, {
@@ -740,6 +816,12 @@ export async function POST(request: NextRequest) {
       throw new Error('Timeout na geração do PDF');
     }
 
+    if (!contentType?.includes('application/pdf')) {
+      const invalidBody = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Serviço retornou conteúdo não-PDF: ${invalidBody.slice(0, 200)}`
+      }, { status: 502 });
+    }
     const pdfBuffer = await pdfResponse.arrayBuffer();
     return new NextResponse(pdfBuffer, {
       headers: {
@@ -749,10 +831,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Erro ao gerar relatório comparativo:', error);
-    return NextResponse.json({ 
-      error: 'Erro ao gerar relatório comparativo',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, { status: 500 });
+    const { status, body } = handleApiError(error);
+    body.error = body.error || 'Erro ao gerar relatório comparativo';
+    return NextResponse.json(body, { status });
   }
 }

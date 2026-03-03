@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, flattenHierarchy, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
 
 export const dynamic = 'force-dynamic';
@@ -30,33 +31,24 @@ function formatNumber(value: number | null | undefined): string {
 
 // Função para extrair valores principais das demonstrações
 function extrairValoresPrincipais(dre: ContaComValor[], bp: ContaComValor[]) {
-  const buscar = (contas: ContaComValor[], codigo: string): number | null => {
-    for (const conta of contas) {
-      if (conta.codigo === codigo) return conta.valor !== 0 ? conta.valor : null;
-      if (conta.children?.length) {
-        const v = buscar(conta.children, codigo);
-        if (v !== null) return v;
-      }
-    }
-    return null;
-  };
+  const valores = extrairValores(bp, dre);
 
   return {
     // BP
-    ativoTotal: buscar(bp, '1'),
-    ativoCirculante: buscar(bp, '2'),
-    disponibilidades: buscar(bp, '3'),
-    ativoNaoCirculante: buscar(bp, '33'),
-    imobilizado: buscar(bp, '43'),
-    passivoCirculante: buscar(bp, '77'),
-    passivoNaoCirculante: buscar(bp, '113'),
-    patrimonioLiquido: buscar(bp, '125'),
+    ativoTotal: valores.ativoTotal,
+    ativoCirculante: valores.ativoCirculante,
+    disponibilidades: valores.disponibilidades,
+    ativoNaoCirculante: valores.ativoNaoCirculante,
+    imobilizado: valores.imobilizado,
+    passivoCirculante: valores.passivoCirculante,
+    passivoNaoCirculante: valores.passivoNaoCirculante,
+    patrimonioLiquido: valores.patrimonioLiquido,
     // DRE
-    receitasTotal: buscar(dre, '1'),
-    custosTotal: buscar(dre, '52'),
-    despesasTotal: buscar(dre, '104'),
-    resultadoFinanceiro: buscar(dre, '190'),
-    resultadoLiquido: buscar(dre, '225')
+    receitasTotal: valores.receitasTotal,
+    custosTotal: valores.custosTotal,
+    despesasTotal: valores.despesasTotal,
+    resultadoFinanceiro: valores.resultadoFinanceiro,
+    resultadoLiquido: valores.resultadoLiquido
   };
 }
 
@@ -291,13 +283,6 @@ function generateReportHTML(
       </tr>
       ${gerarLinhasTabela(bp.filter(c => c.codigo === '125'), 3)}
     </table>
-
-    <table>
-      <tr class="total-row">
-        <td style="width: 70%;">TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO</td>
-        <td>${formatCurrency(totalPassivoPL)}</td>
-      </tr>
-    </table>
   </div>
 
   <!-- PÁGINA 3: DRE -->
@@ -472,15 +457,15 @@ export async function POST(request: NextRequest) {
     // Buscar dados do balancete
     // year vem como "2025" (4 dígitos), períodos são "JAN/25" (2 dígitos)
     const yearShort = year ? year.slice(-2) : '25';
-    const balanceteData = await prisma.balanceteData.findMany({
+    const balancetes = await prisma.balancete.findMany({
       where: {
         companyId,
         period: { contains: `/${yearShort}` }
       },
-      orderBy: { accountNumber: 'asc' }
+      orderBy: { accountCode: 'asc' }
     });
 
-    if (balanceteData.length === 0) {
+    if (balancetes.length === 0) {
       return NextResponse.json({ 
         error: `Nenhum dado de balancete encontrado para o ano ${yearShort}` 
       }, { status: 404 });
@@ -498,7 +483,7 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
   padraoDFC: r.padraoDFC,
   padraoDMPL: r.padraoDMPL,
 }));
-    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balanceteData, deParaRecords);
+    const { dre, bp, resultadoDRE, totalPassivoPL } = await processarDadosFinanceiros(balancetes, deParaRecords);
 
     // Gerar HTML
     const periodo = year || `20${yearShort}`;
@@ -512,46 +497,65 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     );
 
     // Verificar se API de PDF está configurada
-    const html2pdfUrl = process.env.HTML2PDF_API_URL;
-    const html2pdfKey = process.env.HTML2PDF_API_KEY;
+    const html2pdfUrl =
+      process.env.HTML2PDF_API_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_URL ||
+      process.env.HTML2PDF_URL ||
+      process.env.NEXT_PUBLIC_HTML2PDF_URL ||
+      process.env.PDF_API_URL ||
+      process.env.NEXT_PUBLIC_PDF_API_URL;
 
-    if (!html2pdfUrl || !html2pdfKey) {
-      // Retornar HTML se API não configurada
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="relatorio_${company.name.replace(/\s+/g, '_')}_${periodo}.html"`
-        }
-      });
+    const html2pdfKey =
+      process.env.HTML2PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_API_KEY ||
+      process.env.HTML2PDF_KEY ||
+      process.env.NEXT_PUBLIC_HTML2PDF_KEY ||
+      process.env.PDF_API_KEY ||
+      process.env.NEXT_PUBLIC_PDF_API_KEY;
+
+    if (!html2pdfUrl) {
+      return NextResponse.json({
+        error: 'Serviço de geração de PDF não configurado. Defina uma URL em HTML2PDF_API_URL (ou HTML2PDF_URL / PDF_API_URL).'
+      }, { status: 500 });
     }
 
+    const isHtml2PdfApp = /api\.html2pdf\.app/i.test(html2pdfUrl);
+
     // Gerar PDF via API
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (html2pdfKey && !isHtml2PdfApp) {
+      headers['Authorization'] = `Bearer ${html2pdfKey}`;
+    }
+
+    const payload = isHtml2PdfApp
+      ? {
+          html,
+          apiKey: html2pdfKey,
+          format: 'A4',
+        }
+      : {
+          html,
+          options: {
+            format: 'A4',
+            margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+            printBackground: true,
+          },
+        };
+
     const pdfResponse = await fetch(html2pdfUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${html2pdfKey}`
-      },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: 'A4',
-          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-          printBackground: true
-        }
-      })
+      headers,
+      body: JSON.stringify(payload)
     });
 
     if (!pdfResponse.ok) {
       const errorText = await pdfResponse.text();
       console.error('Erro ao gerar PDF:', errorText);
-      // Fallback: retornar HTML
-      return new NextResponse(html, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': `attachment; filename="relatorio_${company.name.replace(/\s+/g, '_')}_${periodo}.html"`
-        }
-      });
+      return NextResponse.json({
+        error: `Falha no serviço de PDF: ${errorText || 'erro desconhecido'}`
+      }, { status: 502 });
     }
 
     // Verificar se é resposta assíncrona (job)
@@ -566,8 +570,13 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
+        const statusHeaders: Record<string, string> = {};
+        if (html2pdfKey && !isHtml2PdfApp) {
+          statusHeaders['Authorization'] = `Bearer ${html2pdfKey}`;
+        }
+
         const statusResponse = await fetch(`${html2pdfUrl}/status/${jobData.jobId}`, {
-          headers: { 'Authorization': `Bearer ${html2pdfKey}` }
+          headers: statusHeaders
         });
         
         if (statusResponse.ok) {
@@ -575,6 +584,11 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
           
           if (statusData.status === 'completed' && statusData.pdfUrl) {
             const pdfDownload = await fetch(statusData.pdfUrl);
+            const downloadType = pdfDownload.headers.get('content-type') || '';
+            if (!downloadType.includes('application/pdf')) {
+              const invalidBody = await pdfDownload.text();
+              throw new Error(`Resposta inválida do serviço de PDF: ${invalidBody.slice(0, 200)}`);
+            }
             const pdfBuffer = await pdfDownload.arrayBuffer();
             
             return new NextResponse(pdfBuffer, {
@@ -595,6 +609,12 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     }
 
     // Resposta direta com PDF
+    if (!contentType?.includes('application/pdf')) {
+      const invalidBody = await pdfResponse.text();
+      return NextResponse.json({
+        error: `Serviço retornou conteúdo não-PDF: ${invalidBody.slice(0, 200)}`
+      }, { status: 502 });
+    }
     const pdfBuffer = await pdfResponse.arrayBuffer();
     return new NextResponse(pdfBuffer, {
       headers: {
@@ -604,10 +624,9 @@ const deParaRecords: DeParaRecord[] = deParaRows.map(r => ({
     });
 
   } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
-    return NextResponse.json({ 
-      error: 'Erro ao gerar relatório',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, { status: 500 });
+    const { status, body } = handleApiError(error);
+    // augment message for this context
+    body.error = body.error || 'Erro ao gerar relatório';
+    return NextResponse.json(body, { status });
   }
 }

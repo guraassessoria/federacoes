@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 const MESES = [
   "JAN", "FEV", "MAR", "ABR", "MAI", "JUN",
@@ -65,7 +66,7 @@ export default function GerenciamentoDadosPage() {
 
   const fetchCompanyInfo = async (companyId: string) => {
     try {
-      const res = await fetch("/api/user/companies");
+      const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
       const data = await res.json();
       const company = data.companies?.find((c: { id: string }) => c.id === companyId);
       if (company) {
@@ -80,12 +81,12 @@ export default function GerenciamentoDadosPage() {
     setLoadingFiles(true);
     try {
       // Buscar balancetes
-      const balRes = await fetch(`/api/files/balancete?companyId=${companyId}`);
+      const balRes = await fetch(`${API_ENDPOINTS.FILES_BALANCETE}?companyId=${companyId}`);
       const balData = await balRes.json();
       setBalancetes(balData.files || []);
 
       // Buscar De x Para
-      const deParaRes = await fetch(`/api/files/de-para?companyId=${companyId}`);
+      const deParaRes = await fetch(`${API_ENDPOINTS.FILES_DE_PARA}?companyId=${companyId}`);
       const deParaData = await deParaRes.json();
       setDeParaFiles(deParaData.files || []);
     } catch (error) {
@@ -114,7 +115,7 @@ export default function GerenciamentoDadosPage() {
         dataTypes.push("dePara");
       }
 
-      const res = await fetch("/api/clear-data", {
+      const res = await fetch(API_ENDPOINTS.CLEAR_DATA, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

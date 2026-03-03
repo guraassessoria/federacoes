@@ -52,7 +52,7 @@ function filtrarContasFolhas(dados: any[]): any[] {
 }
 
 async function main() {
-  const dados2024 = await prisma.balanceteData.findMany({
+  const dados2024 = await prisma.balancete.findMany({
     where: { period: 'DEZ/24' },
     orderBy: { accountNumber: 'asc' }
   });
@@ -81,8 +81,8 @@ async function main() {
   const receitas = folhas.filter(c => c.accountNumber.startsWith('3'));
   const custos = folhas.filter(c => c.accountNumber.startsWith('4'));
   
-  let totalReceitas = receitas.reduce((sum, c) => sum + Number(c.finalBalance), 0);
-  let totalCustos = custos.reduce((sum, c) => sum + Number(c.finalBalance), 0);
+  let totalReceitas = receitas.reduce((sum, c) => sum + Number(c.closingBalance), 0);
+  let totalCustos = custos.reduce((sum, c) => sum + Number(c.closingBalance), 0);
   
   console.log(`\n=== RESULTADO CORRETO 2024 ===`);
   console.log(`Receitas (${receitas.length} contas): R$ ${totalReceitas.toFixed(2)}`);

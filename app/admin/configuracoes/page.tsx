@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { API_ENDPOINTS } from '@/lib/constants';
 import {
   Upload,
   FileSpreadsheet,
@@ -168,7 +169,7 @@ export default function EstruturasPage() {
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch("/api/admin/standard-files", { cache: "no-store" });
+      const res = await fetch(API_ENDPOINTS.ADMIN_STANDARD_FILES, { cache: "no-store" });
       const json = await res.json();
       if (json.structures) setSummary(json.structures);
     } catch (e) {
@@ -189,7 +190,7 @@ export default function EstruturasPage() {
   const fetchStructure = async (type: StructureType) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/standard-files?type=${type}`, {
+      const res = await fetch(`${API_ENDPOINTS.ADMIN_STANDARD_FILES}?type=${type}`, {
         cache: "no-store",
       });
       const json = await res.json();
@@ -255,7 +256,7 @@ export default function EstruturasPage() {
       form.append("type", activeType);
       form.append("file", selectedFile);
 
-      const res = await fetch("/api/admin/standard-files", {
+      const res = await fetch(API_ENDPOINTS.ADMIN_STANDARD_FILES, {
         method: "POST",
         body: form,
       });

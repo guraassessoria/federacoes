@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FileSpreadsheet, ChevronDown, ChevronRight, Download, Loader2, FileBarChart, X, Check } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
 import CustomBarChart from '@/components/charts/bar-chart';
+import { API_ENDPOINTS } from '@/lib/constants';
+import { useDashboard } from '@/lib/contexts/DashboardContext';
 
 // Interface para conta hierárquica (dados brutos do balancete)
 interface HierarchicalAccount {
@@ -84,6 +86,20 @@ interface UserCompany {
 
 // Anos disponíveis
 const anosDisponiveis = ['2023', '2024', '2025'];
+const MONTHS = [
+  { value: '01', label: 'JAN' },
+  { value: '02', label: 'FEV' },
+  { value: '03', label: 'MAR' },
+  { value: '04', label: 'ABR' },
+  { value: '05', label: 'MAI' },
+  { value: '06', label: 'JUN' },
+  { value: '07', label: 'JUL' },
+  { value: '08', label: 'AGO' },
+  { value: '09', label: 'SET' },
+  { value: '10', label: 'OUT' },
+  { value: '11', label: 'NOV' },
+  { value: '12', label: 'DEZ' },
+];
 
 // Todas as federações do sistema (com dados disponíveis na API)
 // Federações derivadas das empresas do usuário (não mais lista estática)
@@ -221,9 +237,19 @@ const dvaData: Record<string, Record<string, number>> = {
   }
 };
 
+function buscarContaPorCodigo(contas: ContaComValor[], codigo: string): number | undefined {
+  for (const conta of contas) {
+    if (conta.codigo === codigo) return conta.valor;
+    if (conta.children?.length) {
+      const nested = buscarContaPorCodigo(conta.children, codigo);
+      if (nested !== undefined) return nested;
+    }
+  }
+  return undefined;
+}
+
 export default function DemonstracoesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('bp');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Ativo Circulante', 'Patrimonio Liquido', 'Receitas Operacionais', 'Resultados', 'Atividades Operacionais', 'Variacao do Caixa', 'Capital Social', 'Total Patrimonio Liquido', 'Receitas', 'Distribuicao - Pessoal']);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingComparative, setGeneratingComparative] = useState(false);
@@ -233,8 +259,14 @@ export default function DemonstracoesPage() {
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [selectedFederacoes, setSelectedFederacoes] = useState<string[]>([]);
   const [financialData, setFinancialData] = useState<Record<string, FinancialApiData>>({});
+  const [monthlyDreData, setMonthlyDreData] = useState<Record<string, Record<string, ContaComValor[]>>>({});
   const [loadingFinancialData, setLoadingFinancialData] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const {
+    selectedCompanyId,
+    selectedYear,
+    viewMode,
+    selectedMonth,
+  } = useDashboard();
   
   // Empresas disponíveis para comparação (direto do cadastro do usuário)
   const federacoesDisponiveis = userCompanies.map(uc => ({
@@ -247,7 +279,7 @@ export default function DemonstracoesPage() {
   useEffect(() => {
     const fetchUserCompanies = async () => {
       try {
-        const response = await fetch('/api/user/companies');
+        const response = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (response.ok) {
           const data = await response.json();
           console.log('Empresas do usuário:', data.companies);
@@ -275,9 +307,7 @@ export default function DemonstracoesPage() {
   useEffect(() => {
     const syncFromStorage = () => {
       const stored = localStorage.getItem('selectedCompanyName');
-      const storedId = localStorage.getItem('selectedCompany');
       if (stored) setCompanyName(stored);
-      if (storedId) setSelectedCompanyId(storedId);
     };
     
     // Ler ao montar
@@ -289,12 +319,21 @@ export default function DemonstracoesPage() {
   }, []);
 
   // Buscar dados financeiros da API quando empresa ou ano mudar
-  const fetchFinancialData = useCallback(async (companyId: string, year: string) => {
+  const fetchFinancialData = useCallback(async (companyId: string, year: string, mode: 'anual' | 'mensal', month?: string) => {
     if (!companyId) return;
     
     setLoadingFinancialData(true);
     try {
-      const response = await fetch(`/api/financial-data?companyId=${companyId}&viewMode=anual&year=${year}`);
+      const params = new URLSearchParams({
+        companyId,
+        viewMode: mode,
+        year,
+      });
+      if (mode === 'mensal' && month) {
+        params.set('month', month);
+      }
+
+      const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params.toString()}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
@@ -312,14 +351,69 @@ export default function DemonstracoesPage() {
     }
   }, []);
 
+  const fetchMonthlyDreYear = useCallback(async (companyId: string, year: string) => {
+    const monthsMap: Record<string, ContaComValor[]> = {};
+
+    await Promise.all(
+      MONTHS.map(async (month) => {
+        try {
+          const params = new URLSearchParams({
+            companyId,
+            viewMode: 'mensal',
+            year,
+            month: month.value,
+          });
+          const response = await fetch(`${API_ENDPOINTS.FINANCIAL_DATA}?${params.toString()}`);
+          if (!response.ok) {
+            monthsMap[month.value] = [];
+            return;
+          }
+
+          const result = await response.json();
+          monthsMap[month.value] = result?.data?.estruturaDRE || [];
+        } catch (error) {
+          console.error(`Erro ao buscar DRE mensal ${month.value}/${year}:`, error);
+          monthsMap[month.value] = [];
+        }
+      })
+    );
+
+    return monthsMap;
+  }, []);
+
   // Buscar dados para todos os anos quando a empresa for selecionada
   useEffect(() => {
-    if (selectedCompanyId) {
+    if (!selectedCompanyId) return;
+
+    if (viewMode === 'anual') {
       anosDisponiveis.forEach(year => {
-        fetchFinancialData(selectedCompanyId, year);
+        fetchFinancialData(selectedCompanyId, year, 'anual');
       });
+      setMonthlyDreData({});
+      return;
     }
-  }, [selectedCompanyId, fetchFinancialData]);
+
+    const previousYear = String(Number(selectedYear) - 1);
+
+    const fetchMonthlyMatrix = async () => {
+      setLoadingFinancialData(true);
+      try {
+        const [currentYearData, previousYearData] = await Promise.all([
+          fetchMonthlyDreYear(selectedCompanyId, selectedYear),
+          fetchMonthlyDreYear(selectedCompanyId, previousYear),
+        ]);
+
+        setMonthlyDreData({
+          [selectedYear]: currentYearData,
+          [previousYear]: previousYearData,
+        });
+      } finally {
+        setLoadingFinancialData(false);
+      }
+    };
+
+    fetchMonthlyMatrix();
+  }, [selectedCompanyId, viewMode, selectedYear, selectedMonth, fetchFinancialData, fetchMonthlyDreYear]);
 
   const handleGeneratePdf = async () => {
     if (!selectedCompanyId) {
@@ -328,7 +422,7 @@ export default function DemonstracoesPage() {
     }
     setGeneratingPdf(true);
     try {
-      const response = await fetch('/api/generate-report-pdf', {
+      const response = await fetch(API_ENDPOINTS.GENERATE_REPORT_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId: selectedCompanyId, companyName, year: selectedYear }),
@@ -339,14 +433,22 @@ export default function DemonstracoesPage() {
         throw new Error(error.error || 'Erro ao gerar PDF');
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf')) {
+        const text = await response.text();
+        try {
+          const parsed = JSON.parse(text);
+          throw new Error(parsed.error || 'O serviço não retornou um PDF válido');
+        } catch {
+          throw new Error('O serviço não retornou um PDF válido');
+        }
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Detectar se é HTML ou PDF pelo content-type
-      const contentType = response.headers.get('content-type') || '';
-      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
-      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.${ext}`;
+      link.download = `relatorio_financeiro_${companyName.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -368,7 +470,7 @@ export default function DemonstracoesPage() {
     setShowFederacaoModal(false);
     setGeneratingComparative(true);
     try {
-      const response = await fetch('/api/generate-comparative-pdf', {
+      const response = await fetch(API_ENDPOINTS.GENERATE_COMPARATIVE_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year: selectedYear, companyIds: selectedFederacoes }),
@@ -379,14 +481,22 @@ export default function DemonstracoesPage() {
         throw new Error(error.error || 'Erro ao gerar PDF comparativo');
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf')) {
+        const text = await response.text();
+        try {
+          const parsed = JSON.parse(text);
+          throw new Error(parsed.error || 'O serviço não retornou um PDF comparativo válido');
+        } catch {
+          throw new Error('O serviço não retornou um PDF comparativo válido');
+        }
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Detectar se é HTML ou PDF pelo content-type
-      const contentType = response.headers.get('content-type') || '';
-      const ext = contentType.includes('text/html') ? 'html' : 'pdf';
-      link.download = `comparativo_federacoes_${selectedYear}.${ext}`;
+      link.download = `comparativo_federacoes_${selectedYear}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -570,9 +680,35 @@ export default function DemonstracoesPage() {
 
   const groups = getGroups();
 
+  const getDreChartValue = (year: string, groupTitle: string): number => {
+    const estrutura = financialData[year]?.estruturaDRE;
+    if (!estrutura || estrutura.length === 0) return 0;
+
+    const groupCodes: Record<string, string[]> = {
+      'Receitas Operacionais': ['56', '51'],
+      'Custos': ['57'],
+      'Despesas Operacionais': ['110'],
+      'Resultados': ['229', '227', '225', '210'],
+    };
+
+    const codes = groupCodes[groupTitle];
+    if (!codes) return 0;
+
+    for (const code of codes) {
+      const value = buscarContaPorCodigo(estrutura, code);
+      if (value !== undefined) return value / 1000;
+    }
+
+    return 0;
+  };
+
   const chartData = groups.map(g => ({
     name: g.title.substring(0, 15),
-    [selectedYear]: Math.abs(getValue(selectedYear, g.total))
+    [selectedYear]: Math.abs(
+      activeTab === 'dre'
+        ? (getDreChartValue(selectedYear, g.title) || getValue(selectedYear, g.total))
+        : getValue(selectedYear, g.total)
+    )
   }));
 
   const getTabTitle = () => {
@@ -774,6 +910,282 @@ export default function DemonstracoesPage() {
     return [];
   };
 
+  const previousYear = String(Number(selectedYear) - 1);
+  const selectedMonthIndex = MONTHS.findIndex((m) => m.value === selectedMonth);
+  const ytdMonths = selectedMonthIndex >= 0 ? MONTHS.slice(0, selectedMonthIndex + 1) : MONTHS;
+
+  const flattenContas = useCallback((contas: ContaComValor[]): ContaComValor[] => {
+    const result: ContaComValor[] = [];
+    const walk = (items: ContaComValor[]) => {
+      for (const item of items) {
+        result.push(item);
+        if (item.children?.length) {
+          walk(item.children);
+        }
+      }
+    };
+    walk(contas);
+    return result;
+  }, []);
+
+  const getAccountNature = useCallback((conta: { codigo: string; descricao: string }): 'receita' | 'despesa' | 'neutro' => {
+    const descricao = conta.descricao?.toLowerCase?.() || '';
+    const codigo = conta.codigo || '';
+
+    if (descricao.includes('receita') || codigo === '51' || codigo === '56') return 'receita';
+    if (
+      descricao.includes('custo') ||
+      descricao.includes('despesa') ||
+      codigo === '57' ||
+      codigo === '110'
+    ) {
+      return 'despesa';
+    }
+
+    return 'neutro';
+  }, []);
+
+  const dreMonthlyRows = useMemo(() => {
+    if (viewMode !== 'mensal') return [] as Array<{
+      codigo: string;
+      descricao: string;
+      nivel: number;
+      monthlyValues: Record<string, number>;
+      previousYTD: number;
+      currentYTD: number;
+      variationPct: number;
+    }>;
+
+    const currentYearMonths = monthlyDreData[selectedYear] || {};
+    const previousYearMonths = monthlyDreData[previousYear] || {};
+
+    const globalParentMap = new Map<string, string | null>();
+    const registerParents = (contas: ContaComValor[]) => {
+      flattenContas(contas).forEach((conta) => {
+        if (!globalParentMap.has(conta.codigo)) {
+          globalParentMap.set(conta.codigo, conta.codigoSuperior ?? null);
+        }
+      });
+    };
+
+    MONTHS.forEach((month) => {
+      registerParents(currentYearMonths[month.value] || []);
+      registerParents(previousYearMonths[month.value] || []);
+    });
+
+    const monthPriority = [
+      selectedMonth,
+      ...MONTHS.map((m) => m.value).filter((month) => month !== selectedMonth),
+    ];
+
+    const templateContas =
+      monthPriority
+        .map((month) => currentYearMonths[month])
+        .find((contas) => Array.isArray(contas) && contas.length > 0) ||
+      monthPriority
+        .map((month) => previousYearMonths[month])
+        .find((contas) => Array.isArray(contas) && contas.length > 0) ||
+      [];
+
+    const canonicalRows = flattenContas(templateContas)
+      .filter((conta) => (conta.nivelVisualizacao || 1) <= 2)
+      .reduce((acc, conta) => {
+        if (!acc.some((item) => item.codigo === conta.codigo)) {
+          acc.push(conta);
+        }
+        return acc;
+      }, [] as ContaComValor[]);
+
+    if (canonicalRows.length === 0) {
+      return [];
+    }
+
+    const structureOrderMap = new Map<string, number>();
+    canonicalRows.forEach((conta, index) => {
+      structureOrderMap.set(conta.codigo, index);
+    });
+
+    const canonicalParentMap = new Map<string, string | null>();
+    canonicalRows.forEach((conta) => {
+      canonicalParentMap.set(conta.codigo, conta.codigoSuperior);
+    });
+
+    const canonicalLastDescendantOrder = new Map<string, number>();
+    canonicalRows.forEach((conta, index) => {
+      let ancestor = conta.codigoSuperior;
+      const visited = new Set<string>();
+      while (ancestor && !visited.has(ancestor)) {
+        visited.add(ancestor);
+        const previousMax = canonicalLastDescendantOrder.get(ancestor) ?? structureOrderMap.get(ancestor) ?? -1;
+        if (index > previousMax) {
+          canonicalLastDescendantOrder.set(ancestor, index);
+        }
+        ancestor = canonicalParentMap.get(ancestor) ?? null;
+      }
+    });
+
+    const rowMap = new Map<string, {
+      codigo: string;
+      descricao: string;
+      nivel: number;
+      codigoSuperior: string | null;
+      monthlyValues: Record<string, number>;
+    }>();
+    canonicalRows.forEach((conta) => {
+      rowMap.set(conta.codigo, {
+        codigo: conta.codigo,
+        descricao: conta.descricao,
+        nivel: conta.nivelVisualizacao || 1,
+        codigoSuperior: conta.codigoSuperior,
+        monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
+      });
+    });
+
+    const ensureRow = (conta: ContaComValor) => {
+      const existing = rowMap.get(conta.codigo);
+      if (existing) {
+        if (!existing.codigoSuperior && conta.codigoSuperior) {
+          existing.codigoSuperior = conta.codigoSuperior;
+        }
+        return existing;
+      }
+
+      const created = {
+        codigo: conta.codigo,
+        descricao: conta.descricao,
+        nivel: conta.nivelVisualizacao || 1,
+        codigoSuperior: conta.codigoSuperior,
+        monthlyValues: Object.fromEntries(MONTHS.map((m) => [m.value, 0])),
+      };
+      rowMap.set(conta.codigo, created);
+      return created;
+    };
+
+    MONTHS.forEach((month) => {
+      const contasMes = currentYearMonths[month.value] || [];
+      const flat = flattenContas(contasMes).filter((c) => (c.nivelVisualizacao || 1) <= 2);
+      flat.forEach((conta) => {
+        const row = ensureRow(conta);
+        row.monthlyValues[month.value] = conta.valor || 0;
+      });
+    });
+
+    MONTHS.forEach((month) => {
+      const contasMesAnterior = previousYearMonths[month.value] || [];
+      const flatPrev = flattenContas(contasMesAnterior).filter((c) => (c.nivelVisualizacao || 1) <= 2);
+      flatPrev.forEach((conta) => ensureRow(conta));
+    });
+
+    const allParentMap = new Map<string, string | null>();
+    rowMap.forEach((row) => {
+      allParentMap.set(row.codigo, row.codigoSuperior ?? null);
+    });
+    globalParentMap.forEach((parent, codigo) => {
+      if (!allParentMap.has(codigo)) {
+        allParentMap.set(codigo, parent ?? null);
+      }
+    });
+
+    const getAnchorOrder = (codigo: string): number | undefined => {
+      if (structureOrderMap.has(codigo)) {
+        return structureOrderMap.get(codigo);
+      }
+
+      let parent = allParentMap.get(codigo) ?? globalParentMap.get(codigo) ?? null;
+      const visited = new Set<string>();
+
+      while (parent && !visited.has(parent)) {
+        visited.add(parent);
+        if (structureOrderMap.has(parent)) {
+          return structureOrderMap.get(parent);
+        }
+        parent = allParentMap.get(parent) ?? globalParentMap.get(parent) ?? null;
+      }
+
+      return undefined;
+    };
+
+    const getYearMonthValue = (yearMonths: Record<string, ContaComValor[]>, month: string, codigo: string) => {
+      const contas = yearMonths[month] || [];
+      const flat = flattenContas(contas);
+      return flat.find((c) => c.codigo === codigo)?.valor || 0;
+    };
+
+    return Array.from(rowMap.values())
+      .map((row) => {
+        const previousYTD = ytdMonths.reduce(
+          (sum, month) => sum + getYearMonthValue(previousYearMonths, month.value, row.codigo),
+          0
+        );
+
+        const currentYTD = ytdMonths.reduce(
+          (sum, month) => sum + getYearMonthValue(currentYearMonths, month.value, row.codigo),
+          0
+        );
+
+        const natureza = getAccountNature(row);
+        const rawDiff = currentYTD - previousYTD;
+        const adjustedDiff = natureza === 'despesa' ? -rawDiff : rawDiff;
+        const variationPct = previousYTD === 0
+          ? (adjustedDiff === 0 ? 0 : 100)
+          : (adjustedDiff / Math.abs(previousYTD)) * 100;
+
+        return {
+          ...row,
+          previousYTD,
+          currentYTD,
+          variationPct,
+        };
+      })
+      .filter((row) => {
+        const hasMonthlyValue = ytdMonths.some((month) => Math.abs(row.monthlyValues[month.value] || 0) > 0);
+        const hasYtdValue = Math.abs(row.previousYTD) > 0 || Math.abs(row.currentYTD) > 0;
+        return hasMonthlyValue || hasYtdValue;
+      })
+      .sort((a, b) => {
+        const isKnownA = structureOrderMap.has(a.codigo);
+        const isKnownB = structureOrderMap.has(b.codigo);
+
+        if (isKnownA && isKnownB) {
+          return (structureOrderMap.get(a.codigo) || 0) - (structureOrderMap.get(b.codigo) || 0);
+        }
+
+        if (isKnownA && !isKnownB) {
+          const anchorB = getAnchorOrder(b.codigo);
+          const baseB = anchorB !== undefined
+            ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+            : Number.MAX_SAFE_INTEGER;
+          return (structureOrderMap.get(a.codigo) || 0) - baseB;
+        }
+
+        if (!isKnownA && isKnownB) {
+          const anchorA = getAnchorOrder(a.codigo);
+          const baseA = anchorA !== undefined
+            ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+            : Number.MAX_SAFE_INTEGER;
+          return baseA - (structureOrderMap.get(b.codigo) || 0);
+        }
+
+        const anchorA = getAnchorOrder(a.codigo);
+        const anchorB = getAnchorOrder(b.codigo);
+
+        const anchorBaseA = anchorA !== undefined
+          ? (canonicalLastDescendantOrder.get(canonicalRows[anchorA]?.codigo || '') ?? anchorA)
+          : Number.MAX_SAFE_INTEGER;
+        const anchorBaseB = anchorB !== undefined
+          ? (canonicalLastDescendantOrder.get(canonicalRows[anchorB]?.codigo || '') ?? anchorB)
+          : Number.MAX_SAFE_INTEGER;
+
+        if (anchorBaseA !== anchorBaseB) return anchorBaseA - anchorBaseB;
+
+        const codeA = parseFloat(a.codigo.replace(',', '.'));
+        const codeB = parseFloat(b.codigo.replace(',', '.'));
+        if (!Number.isNaN(codeA) && !Number.isNaN(codeB) && codeA !== codeB) return codeA - codeB;
+
+        return a.descricao.localeCompare(b.descricao);
+      });
+  }, [viewMode, monthlyDreData, selectedYear, previousYear, selectedMonth, ytdMonths, flattenContas, getAccountNature]);
+
   return (
     <div className="space-y-8">
       <motion.div
@@ -788,22 +1200,62 @@ export default function DemonstracoesPage() {
         <p className="text-blue-100">BP, DRE, DFC, DMPL e DVA</p>
       </motion.div>
 
-      {/* Seletor de Ano */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 bg-white rounded-lg px-4 py-2 shadow">
-          <span className="text-sm font-medium text-slate-600">Exercício:</span>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="px-3 py-1 bg-slate-100 border-0 rounded-lg font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
-          >
-            {anosDisponiveis.map(ano => (
-              <option key={ano} value={ano}>{ano}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
+      {viewMode === 'mensal' ? (
+        <motion.div
+          key={`dre-mensal-${selectedYear}-${selectedMonth}`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg overflow-hidden"
+        >
+          <div className="bg-indigo-600 px-4 py-3">
+            <h2 className="font-semibold text-white">
+              DRE - Visão Mensal ({selectedYear})
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[1600px]">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-10">Conta</th>
+                  {ytdMonths.map((month) => (
+                    <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
+                  ))}
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{selectedYear}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
+                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dreMonthlyRows.map((row) => (
+                  <tr key={row.codigo} className={`border-b border-slate-100 ${row.nivel === 1 ? 'bg-slate-50' : 'bg-white'}`}>
+                    <td
+                      className={`px-4 py-2 sticky left-0 z-10 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
+                      style={{ paddingLeft: `${16 + row.nivel * 12}px` }}
+                    >
+                      {row.descricao}
+                    </td>
+                    {ytdMonths.map((month) => (
+                      <td key={`${row.codigo}-${month.value}`} className="text-right px-3 py-2 text-slate-700">
+                        {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
+                      </td>
+                    ))}
+                    <td className="text-right px-3 py-2 font-medium text-slate-900">
+                      {formatCurrency(row.currentYTD / 1000)}
+                    </td>
+                    <td className="text-right px-3 py-2 font-medium text-slate-700">
+                      {formatCurrency(row.previousYTD / 1000)}
+                    </td>
+                    <td className={`text-right px-3 py-2 font-semibold ${row.variationPct > 0 ? 'text-emerald-600' : row.variationPct < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                      {row.variationPct > 0 ? '+' : ''}{row.variationPct.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      ) : (
+      <>
       {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
@@ -903,17 +1355,6 @@ export default function DemonstracoesPage() {
               // PRIORIDADE: Renderiza dados da estrutura base (de-para)
               <>
                 {renderEstruturaRows(getEstruturaData())}
-                {/* Totalizador para Balanço Patrimonial: Total Passivo + PL */}
-                {activeTab === 'bp' && (
-                  <tr className="bg-blue-100 border-t-2 border-blue-300">
-                    <td className="px-4 py-3 font-bold text-blue-900 text-sm">
-                      TOTAL PASSIVO + PATRIMÔNIO LÍQUIDO
-                    </td>
-                    <td className="text-right px-4 py-3 font-bold text-blue-900 text-sm">
-                      {formatCurrency(getTotalPassivoPL() / 1000)}
-                    </td>
-                  </tr>
-                )}
               </>
             ) : hasHierarchicalData(activeTab) ? (
               // FALLBACK 1: Renderiza dados hierárquicos brutos do banco
@@ -963,6 +1404,8 @@ export default function DemonstracoesPage() {
           ]}
         />
       </motion.div>
+      </>
+      )}
 
       {/* Modal de Seleção de Federações */}
       {showFederacaoModal && (

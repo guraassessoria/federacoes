@@ -31,7 +31,7 @@ model Company {
   active         Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  balancetes     BalanceteData[]
+  balancetes     Balancete[]
   files          CompanyFile[]
   users          UserCompany[]
   deParaMappings DeParaMapping[]
@@ -67,41 +67,27 @@ model CompanyFile {
 
 // ─── Balancete ──────────────────────────────────────────────
 
-model BalanceteData {
+model Balancete {
   id                 String   @id @default(cuid())
   companyId          String
   period             String
-  accountNumber      String
+  accountCode        String
   accountDescription String
-  previousBalance    Decimal  @db.Decimal(18, 2)
+  openingBalance     Decimal  @db.Decimal(18, 2)
   debit              Decimal  @db.Decimal(18, 2)
   credit             Decimal  @db.Decimal(18, 2)
-  finalBalance       Decimal  @db.Decimal(18, 2)
+  closingBalance     Decimal  @db.Decimal(18, 2)
   accountNature      String
   createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
   company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, period, accountNumber])
+  @@unique([companyId, period, accountCode])
   @@index([companyId, period])
-  @@index([accountNumber])
+  @@index([accountCode])
 }
 
-model BalanceteRow {
-  id           String   @id @default(cuid())
-  companyId    String
-  periodo      String
-  conta        String
-  descricao    String?
-  saldoInicial Decimal? @db.Decimal(18,2)
-  debito       Decimal? @db.Decimal(18,2)
-  credito      Decimal? @db.Decimal(18,2)
-  saldoFinal   Decimal? @db.Decimal(18,2)
-  natureza     String?
-
-  createdAt    DateTime @default(now())
-
-  @@index([companyId, periodo])
-}
+// BalanceteRow and BalanceteData were unified into Balancete above.
 
 // ─── De x Para ──────────────────────────────────────────────
 

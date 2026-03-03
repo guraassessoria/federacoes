@@ -212,23 +212,23 @@ function isLeafAccount(codigo: string, allCodigos: string[]): boolean {
  * Processa os dados do balancete e agrupa por categoria
  */
 export function processBalanceteData(
-  balanceteData: Array<{
-    accountNumber: string;
+  balancetes: Array<{
+    accountCode: string;
     accountDescription: string;
-    previousBalance: Decimal | number;
+    openingBalance: Decimal | number;
     debit: Decimal | number;
     credit: Decimal | number;
-    finalBalance: Decimal | number;
+    closingBalance: Decimal | number;
     accountNature: string;
   }>
 ): ProcessedAccount[] {
-  return balanceteData.map((item) => ({
-    codigo: item.accountNumber,
+  return balancetes.map((item) => ({
+    codigo: item.accountCode,
     descricao: item.accountDescription,
-    saldoAnterior: decimalToNumber(item.previousBalance),
+    saldoAnterior: decimalToNumber(item.openingBalance),
     debito: decimalToNumber(item.debit),
     credito: decimalToNumber(item.credit),
-    saldoFinal: decimalToNumber(item.finalBalance),
+    saldoFinal: decimalToNumber(item.closingBalance),
     natureza: item.accountNature,
   }));
 }

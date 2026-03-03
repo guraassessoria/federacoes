@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { API_ENDPOINTS } from '@/lib/constants';
 import {
   Upload,
   FileSpreadsheet,
@@ -84,7 +85,7 @@ export default function UploadBalancetePage() {
 
   const fetchCompanyInfo = async (cid: string) => {
     try {
-      const res = await fetch("/api/user/companies");
+      const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
       const data = await res.json();
       const company = data.companies?.find((c: { id: string }) => c.id === cid);
       if (company) setCompanyName(company.name);
@@ -143,7 +144,7 @@ export default function UploadBalancetePage() {
       form.append("period", period);
       form.append("file", selectedFile);
 
-      const res = await fetch("/api/files/balancete/upload", {
+      const res = await fetch(API_ENDPOINTS.FILES_BALANCETE_UPLOAD, {
         method: "POST",
         body: form,
       });

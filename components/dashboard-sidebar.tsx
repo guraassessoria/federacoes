@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/contexts/DashboardContext";
+import { API_ENDPOINTS } from "@/lib/constants";
 
 interface Company {
   id: string;
@@ -39,7 +40,7 @@ interface DashboardSidebarProps {
   companyName: string;
 }
 
-export default function DashboardSidebar({ userRole, companyName }: DashboardSidebarProps) {
+export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   
@@ -53,6 +54,8 @@ export default function DashboardSidebar({ userRole, companyName }: DashboardSid
     setSelectedMonth,
     selectedCompanyId,
     setSelectedCompanyId,
+    selectedCompanyName,
+    setSelectedCompanyName,
     availableYears,
     availableMonths,
     refreshData,
@@ -75,7 +78,7 @@ export default function DashboardSidebar({ userRole, companyName }: DashboardSid
     const fetchCompanies = async () => {
       setLoadingCompanies(true);
       try {
-        const res = await fetch("/api/user/companies");
+        const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (res.ok) {
           const data = await res.json();
           setCompanies(data.companies || []);
@@ -108,8 +111,7 @@ export default function DashboardSidebar({ userRole, companyName }: DashboardSid
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompanyId(company.id);
-    localStorage.setItem("selectedCompany", company.id);
-    localStorage.setItem("selectedCompanyName", company.name);
+    setSelectedCompanyName(company.name);
     setIsDropdownOpen(false);
     refreshData();
   };
@@ -191,7 +193,7 @@ export default function DashboardSidebar({ userRole, companyName }: DashboardSid
           >
             <div className="flex-1 min-w-0">
               <p className="text-xs text-blue-200">Empresa Selecionada</p>
-              <p className="text-sm font-medium truncate">{companyName || "Selecione uma empresa"}</p>
+              <p className="text-sm font-medium truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
             </div>
             <ChevronDown className={cn(
               "w-4 h-4 text-blue-200 transition-transform flex-shrink-0",

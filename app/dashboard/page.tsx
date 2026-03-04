@@ -244,30 +244,30 @@ export default function DashboardPage() {
       {/* Key Indices Summary */}
       {indices && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-gradient-to-r from-[#F7FDFC] to-white rounded-xl p-6 border border-[#E5E7EB]">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Principais Índices - {periodLabel}</h2>
+          className="card-surface bg-white rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-[#13161C] mb-4">Principais Índices - {periodLabel}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Liquidez Corrente</p>
-              <p className="text-2xl font-bold text-[#08C97D]">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Liquidez Corrente</p>
+              <p className="text-3xl font-semibold tracking-tight text-[#08C97D] mt-1">
                 {renderIndicePrincipal(indices.liquidez.corrente, '', indexAvailability?.liquidez?.corrente, 2)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Margem Líquida</p>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Margem Líquida</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.rentabilidade.margemLiquida >= 0 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.rentabilidade.margemLiquida, '%', indexAvailability?.rentabilidade?.margemLiquida)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">ROE</p>
-              <p className="text-2xl font-bold text-purple-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">ROE</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.rentabilidade.roe >= 0 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.rentabilidade.roe, '%', indexAvailability?.rentabilidade?.roe)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Endividamento</p>
-              <p className="text-2xl font-bold text-orange-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Endividamento</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.endividamento.endividamentoGeral <= 70 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.endividamento.endividamentoGeral, '%', indexAvailability?.endividamento?.endividamentoGeral)}
               </p>
             </div>

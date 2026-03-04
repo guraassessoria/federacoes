@@ -51,9 +51,8 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
             <div className="px-8 py-6 text-center border-b border-[#E5E7EB]">
               <div className="flex justify-center mb-4">
-                <Image src="/favicon.svg" alt="Planning" width={44} height={44} className="rounded-md" />
+                <Image src="/planning-logo.png" alt="Planning" width={190} height={52} className="h-10 w-auto" priority />
               </div>
-              <h1 className="text-2xl font-semibold text-[#13161C]">Planning</h1>
               <p className="text-[#8E8E8E] mt-1 text-sm">Acesse sua conta</p>
             </div>
 

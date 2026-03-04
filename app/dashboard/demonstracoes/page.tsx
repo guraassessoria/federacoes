@@ -399,6 +399,7 @@ export default function DemonstracoesPage() {
   const handleGeneratePdf = async () => {
     const companyIdToUse = selectedCompanyId || localStorage.getItem('selectedCompany');
     const companyNameToUse = companyName || localStorage.getItem('selectedCompanyName') || 'empresa';
+    const filePeriod = viewMode === 'mensal' ? `${selectedYear}_${selectedMonth}` : selectedYear;
 
     if (!companyIdToUse) {
       alert('Selecione uma empresa no menu lateral');
@@ -409,7 +410,13 @@ export default function DemonstracoesPage() {
       const response = await fetch(API_ENDPOINTS.GENERATE_REPORT_PDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: companyIdToUse, companyName: companyNameToUse, year: selectedYear }),
+        body: JSON.stringify({
+          companyId: companyIdToUse,
+          companyName: companyNameToUse,
+          year: selectedYear,
+          viewMode,
+          month: viewMode === 'mensal' ? selectedMonth : undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -432,7 +439,7 @@ export default function DemonstracoesPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `relatorio_financeiro_${companyNameToUse.replace(/\s+/g, '_')}_${selectedYear}.pdf`;
+      link.download = `relatorio_financeiro_${companyNameToUse.replace(/\s+/g, '_')}_${filePeriod}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -519,7 +526,8 @@ export default function DemonstracoesPage() {
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(dreSheet), 'DRE');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(indicesSheet), 'Indices');
 
-      XLSX.writeFile(workbook, `demonstracoes_${selectedYear}.xlsx`);
+      const excelPeriod = viewMode === 'mensal' ? `${selectedYear}_${selectedMonth}` : selectedYear;
+      XLSX.writeFile(workbook, `demonstracoes_${excelPeriod}.xlsx`);
     } catch (error) {
       console.error('Erro ao exportar Excel:', error);
       alert(error instanceof Error ? error.message : 'Erro ao exportar Excel');
@@ -1208,59 +1216,98 @@ export default function DemonstracoesPage() {
       </motion.div>
 
       {viewMode === 'mensal' ? (
-        <motion.div
-          key={`dre-mensal-${selectedYear}-${selectedMonth}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg overflow-hidden"
-        >
-          <div className="bg-[#07B670] px-4 py-3">
-            <h2 className="font-semibold text-white">
-              DRE - Visão Mensal ({selectedYear})
-            </h2>
+        <>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={handleGeneratePdf}
+              disabled={generatingPdf}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {generatingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Exportar PDF
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleExportExcel}
+              disabled={exportingExcel}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg font-semibold shadow-lg hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {exportingExcel ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Exportar Excel
+                </>
+              )}
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1600px]">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-0">Conta</th>
-                  {ytdMonths.map((month) => (
-                    <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
-                  ))}
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{selectedYear}</th>
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
-                  <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dreMonthlyRows.map((row) => (
-                  <tr key={row.codigo} className={`border-b border-slate-100 ${row.nivel === 1 ? 'bg-slate-50' : 'bg-white'}`}>
-                    <td
-                      className={`px-4 py-2 sticky left-0 z-0 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
-                      style={{ paddingLeft: `${16 + row.nivel * 12}px` }}
-                    >
-                      {row.descricao}
-                    </td>
+
+          <motion.div
+            key={`dre-mensal-${selectedYear}-${selectedMonth}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-surface bg-white rounded-xl overflow-hidden"
+          >
+            <div className="bg-[#07B670] px-4 py-3">
+              <h2 className="font-semibold text-white">
+                DRE - Visão Mensal ({selectedYear})
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[1600px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-100 z-0">Conta</th>
                     {ytdMonths.map((month) => (
-                      <td key={`${row.codigo}-${month.value}`} className="text-right px-3 py-2 text-slate-700">
-                        {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
-                      </td>
+                      <th key={month.value} className="text-right px-3 py-3 font-semibold text-slate-700">{month.label}</th>
                     ))}
-                    <td className="text-right px-3 py-2 font-medium text-slate-900">
-                      {formatCurrency(row.currentYTD / 1000)}
-                    </td>
-                    <td className="text-right px-3 py-2 font-medium text-slate-700">
-                      {formatCurrency(row.previousYTD / 1000)}
-                    </td>
-                    <td className={`text-right px-3 py-2 font-semibold ${row.variationPct > 0 ? 'text-emerald-600' : row.variationPct < 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                      {row.variationPct > 0 ? '+' : ''}{row.variationPct.toFixed(2)}%
-                    </td>
+                    <th className="text-right px-3 py-3 font-semibold text-slate-700">{selectedYear}</th>
+                    <th className="text-right px-3 py-3 font-semibold text-slate-700">{previousYear}</th>
+                    <th className="text-right px-3 py-3 font-semibold text-slate-700">Variação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
+                </thead>
+                <tbody>
+                  {dreMonthlyRows.map((row) => (
+                    <tr key={row.codigo} className={`border-b border-slate-100 ${row.nivel === 1 ? 'bg-slate-50' : 'bg-white'}`}>
+                      <td
+                        className={`px-4 py-2 sticky left-0 z-0 ${row.nivel === 1 ? 'font-semibold text-slate-900 bg-slate-50' : 'text-slate-700 bg-white'}`}
+                        style={{ paddingLeft: `${16 + row.nivel * 12}px` }}
+                      >
+                        {row.descricao}
+                      </td>
+                      {ytdMonths.map((month) => (
+                        <td key={`${row.codigo}-${month.value}`} className="text-right px-3 py-2 text-slate-700">
+                          {formatCurrency((row.monthlyValues[month.value] || 0) / 1000)}
+                        </td>
+                      ))}
+                      <td className="text-right px-3 py-2 font-medium text-slate-900">
+                        {formatCurrency(row.currentYTD / 1000)}
+                      </td>
+                      <td className="text-right px-3 py-2 font-medium text-slate-700">
+                        {formatCurrency(row.previousYTD / 1000)}
+                      </td>
+                      <td className={`text-right px-3 py-2 font-semibold ${row.variationPct > 0 ? 'text-emerald-600' : row.variationPct < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                        {row.variationPct > 0 ? '+' : ''}{row.variationPct.toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </>
       ) : (
       <>
       {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
@@ -1340,7 +1387,7 @@ export default function DemonstracoesPage() {
         key={activeTab + selectedYear}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-lg overflow-hidden"
+        className="card-surface bg-white rounded-xl overflow-hidden"
       >
         <div className={`${getTabColor()} px-4 py-3`}>
           <h2 className="font-semibold text-white">{getTabTitle()} - Exercício {selectedYear}</h2>
@@ -1396,7 +1443,7 @@ export default function DemonstracoesPage() {
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        className="card-surface bg-white rounded-xl p-6"
         transition={{ delay: 0.2 }}
         className="bg-white rounded-xl shadow-lg p-6"
       >

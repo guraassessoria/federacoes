@@ -172,12 +172,9 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
     <aside className="fixed left-0 top-0 h-screen w-64 bg-[#13161C] text-white flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-white/10">
-        <div className="flex items-center gap-3 mb-4">
-          <Image src="/favicon.svg" alt="Planning" width={34} height={34} className="rounded-md bg-white p-1" />
-          <div>
-            <h1 className="font-semibold text-lg leading-tight">Planning</h1>
-            <p className="text-xs text-[#8E8E8E]">Dashboard Financeiro</p>
-          </div>
+        <div className="mb-4">
+          <Image src="/planning-logo.png" alt="Planning" width={150} height={42} className="h-8 w-auto" priority />
+          <p className="text-xs text-[#8E8E8E] mt-2">Dashboard Financeiro</p>
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>

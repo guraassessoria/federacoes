@@ -44,15 +44,19 @@ body {
   color: #13161c;
 }
 
-.bg-white.rounded-xl.shadow-lg,
-.bg-white.rounded-2xl.shadow-lg {
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-}
+@layer components {
+  .card-surface {
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
 
-.bg-white.rounded-xl.shadow-lg:hover,
-.bg-white.rounded-2xl.shadow-lg:hover {
-  box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+  .card-surface-hover {
+    transition: box-shadow 0.2s ease;
+  }
+
+  .card-surface-hover:hover {
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+  }
 }
 
 /* Custom scrollbar */

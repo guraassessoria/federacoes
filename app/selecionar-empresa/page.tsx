@@ -85,7 +85,7 @@ export default function SelecionarEmpresaPage() {
         <div className="flex justify-between items-center mb-8 pt-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <Image src="/favicon.svg" alt="Planning" width={32} height={32} className="rounded-md" />
+              <Image src="/planning-logo.png" alt="Planning" width={170} height={46} className="h-8 w-auto" priority />
               <h1 className="text-2xl font-semibold text-[#13161C]">Bem-vindo, {session?.user?.name || session?.user?.email}</h1>
             </div>
             <p className="text-[#8E8E8E] text-sm">

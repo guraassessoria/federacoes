@@ -28,10 +28,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       <nav className="h-16 bg-[#13161C]">
         <div className="mx-auto h-full max-w-6xl px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image src="/favicon.svg" alt="Planning" width={30} height={30} className="rounded-md bg-white p-1" />
-            <span className="text-white text-xl font-semibold tracking-tight">Planning</span>
-          </div>
+          <Image src="/planning-logo.png" alt="Planning" width={170} height={46} className="h-8 w-auto" priority />
           <Link
             href="/login"
             className="inline-flex items-center rounded-md bg-[#08C97D] px-4 py-2 text-sm font-semibold text-[#13161C] transition-colors hover:bg-[#0AE18C]"

@@ -147,6 +147,7 @@ model StandardStructure {
 
 enum UserRole {
   ADMIN
+  GESTOR
   EDITOR
   CONSULTA
 }

@@ -12,6 +12,7 @@ import {
   Percent,
   ArrowLeftRight,
   PieChart,
+  Columns3,
   Users,
   Building2,
   Settings,
@@ -69,6 +70,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
   const monthDropdownRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userRole === "ADMIN";
+  const isGestor = userRole === "GESTOR";
   const isEditor = userRole === "EDITOR" || isAdmin;
 
   // Buscar empresas do usuário
@@ -117,6 +119,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
   // Menu items for all users (Consulta, Editor, Admin)
   const analysisItems = [
     { href: "/dashboard", label: "Resumo Executivo", icon: Home },
+    ...(isAdmin || isGestor ? [{ href: "/dashboard/comparativo", label: "Comparativo", icon: Columns3 }] : []),
     { href: "/dashboard/demonstracoes", label: "Demonstrações", icon: FileText },
     { href: "/dashboard/liquidez", label: "Índices de Liquidez", icon: TrendingUp },
     { href: "/dashboard/rentabilidade", label: "Rentabilidade", icon: DollarSign },

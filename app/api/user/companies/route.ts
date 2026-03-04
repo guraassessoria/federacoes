@@ -13,6 +13,22 @@ export async function GET() {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    if (session.user.role === "ADMIN") {
+      const companies = await prisma.company.findMany({
+        where: { active: true },
+        orderBy: { name: "asc" },
+      });
+
+      return NextResponse.json({
+        companies: companies.map((company) => ({
+          id: company.id,
+          name: company.name,
+          cnpj: company.cnpj,
+          role: "ADMIN",
+        })),
+      });
+    }
+
     const userCompanies = await prisma.userCompany.findMany({
       where: { userId: session.user.id },
       include: {

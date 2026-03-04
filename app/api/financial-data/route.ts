@@ -28,6 +28,7 @@ import {
   ContaComValor,
   DeParaRecord 
 } from "@/lib/services/estruturaMapping";
+import { ordenarArvoreDreReceitaBrutaPrimeiro } from "@/lib/services/drePresentation";
 import { FinancialDataQuerySchema } from "@/lib/validators";
 import { handleApiError } from "@/lib/errorHandler";
 
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
     });
 
     const uniquePeriods: string[] = [...new Set(periods.map((p: { period: string }) => p.period))];
-    
+
     // Se não há dados no banco, retorna dados de demonstração
     if (uniquePeriods.length === 0) {
       return NextResponse.json({
@@ -237,7 +238,7 @@ export async function GET(request: NextRequest) {
 
           if (balanceteMes.length > 0) {
             const processado = await processarDadosFinanceiros(balanceteMes, deParaRecords);
-            estruturaDREMensal = processado.dre;
+            estruturaDREMensal = ordenarArvoreDreReceitaBrutaPrimeiro(processado.dre);
             estruturaBPMensal = processado.bp;
           }
         } catch (error) {
@@ -306,7 +307,7 @@ export async function GET(request: NextRequest) {
     console.log(`[financial-data] De-para: ${deParaRecords.length} registros`);
     
     const processado = await processarDadosFinanceiros(allBalancetes, deParaRecords);
-            estruturaDRE = processado.dre;
+          estruturaDRE = ordenarArvoreDreReceitaBrutaPrimeiro(processado.dre);
             estruturaBP = processado.bp;
             resultadoDRE = processado.resultadoDRE;
             totalPassivoPL = processado.totalPassivoPL;
@@ -654,7 +655,7 @@ function generateDemoData(
     ];
   };
 
-  const estruturaDRE = gerarEstruturaDRE(mFactor);
+  const estruturaDRE = ordenarArvoreDreReceitaBrutaPrimeiro(gerarEstruturaDRE(mFactor));
 
   if (viewMode === "mensal") {
     const months = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -706,7 +707,7 @@ function generateDemoData(
     dre,
     indices,
     months: monthlyIndices,
-    estruturaDRE: gerarEstruturaDRE(1), // Anual: fator 1
+    estruturaDRE: ordenarArvoreDreReceitaBrutaPrimeiro(gerarEstruturaDRE(1)), // Anual: fator 1
     resultadoDRE: resultadoLiquido,
     totalPassivoPL: totalPassivos + totalPL,
   };

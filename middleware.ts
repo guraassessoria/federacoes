@@ -6,6 +6,13 @@ export default withAuth(
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
 
+    // Comparativo - apenas ADMIN e GESTOR
+    if (path.startsWith("/dashboard/comparativo")) {
+      if (token?.role !== "ADMIN" && token?.role !== "GESTOR") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+    }
+
     // Rotas de admin - apenas ADMIN
     if (path.startsWith("/admin")) {
       if (token?.role !== "ADMIN") {
@@ -42,5 +49,6 @@ export const config = {
     "/endividamento/:path*",
     "/analise-horizontal/:path*",
     "/analise-vertical/:path*",
+    "/comparativo/:path*",
   ],
 };

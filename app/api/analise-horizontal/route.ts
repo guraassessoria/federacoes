@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import { ordenarDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,37 @@ function compareCodigoContabil(a: string, b: string): number {
   return 0;
 }
 
+function compareCodigoContabilDre(codigoA: string, codigoB: string): number {
+  if (codigoA === '51' && codigoB !== '51') return -1;
+  if (codigoB === '51' && codigoA !== '51') return 1;
+  return compareCodigoContabil(codigoA, codigoB);
+}
+
+function normalizarCodigo(value: string | null | undefined): string {
+  return (value || '').toString().trim().replace(',', '.');
+}
+
+function normalizarDescricao(value: string | null | undefined): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function flattenContas(contas: ContaComValor[]): ContaComValor[] {
+  const result: ContaComValor[] = [];
+  const walk = (items: ContaComValor[]) => {
+    for (const item of items) {
+      result.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(contas || []);
+  return result;
+}
+
 async function buscarBalancetesAno(companyId: string, yearShort: string) {
   const model = (prisma as any).balancete ?? (prisma as any).balanceteRow;
   if (!model) return [];
@@ -169,6 +201,7 @@ export async function GET(request: NextRequest) {
       {
         dre: Record<string, { codigo: string; descricao: string; nivel: number; valor: number }>;
         bp: Record<string, { codigo: string; descricao: string; nivel: number; valor: number }>;
+        dreEstrutura: ContaComValor[];
       }
     > = {};
 
@@ -181,6 +214,7 @@ export async function GET(request: NextRequest) {
         dadosPorAno[ano] = {
           dre: extrairContasModelo(dre, maxNivel, incluirZeros),
           bp: extrairContasModelo(bp, maxNivel, incluirZeros),
+          dreEstrutura: dre,
         };
       }
     }
@@ -201,11 +235,9 @@ export async function GET(request: NextRequest) {
       BP: {}
     };
 
-    const dreCodigos = new Set<string>();
     const bpCodigos = new Set<string>();
 
     for (const ano of anosDisponiveis) {
-      Object.keys(dadosPorAno[ano].dre).forEach(codigo => dreCodigos.add(codigo));
       Object.keys(dadosPorAno[ano].bp).forEach(codigo => bpCodigos.add(codigo));
     }
 
@@ -249,12 +281,146 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    const dreOrdenados = Array.from(dreCodigos).sort(compareCodigoContabil);
+    const dreTemplateAno = anosDisponiveis.find((ano) => (dadosPorAno[ano]?.dreEstrutura || []).length > 0);
+    const dreTemplate = dreTemplateAno ? dadosPorAno[dreTemplateAno].dreEstrutura : [];
     const bpOrdenados = Array.from(bpCodigos).sort(compareCodigoContabil);
 
-    for (const codigo of dreOrdenados) {
-      analiseHorizontal.DRE[codigo] = construirSerie(codigo, 'dre');
+    const dreLookupsPorAno = new Map<
+      string,
+      {
+        byCode: Map<string, ContaComValor>;
+        byNormalizedCode: Map<string, ContaComValor>;
+        byDescricao: Map<string, ContaComValor[]>;
+      }
+    >();
+
+    for (const ano of anosDisponiveis) {
+      const byCode = new Map<string, ContaComValor>();
+      const byNormalizedCode = new Map<string, ContaComValor>();
+      const byDescricao = new Map<string, ContaComValor[]>();
+
+      flattenContas(dadosPorAno[ano].dreEstrutura || []).forEach((conta) => {
+        byCode.set(conta.codigo, conta);
+
+        const normalizedCode = normalizarCodigo(conta.codigo);
+        if (!byNormalizedCode.has(normalizedCode)) {
+          byNormalizedCode.set(normalizedCode, conta);
+        }
+
+        const descricaoKey = normalizarDescricao(conta.descricao);
+        if (!byDescricao.has(descricaoKey)) {
+          byDescricao.set(descricaoKey, []);
+        }
+        byDescricao.get(descricaoKey)!.push(conta);
+      });
+
+      dreLookupsPorAno.set(ano, { byCode, byNormalizedCode, byDescricao });
     }
+
+    const resolverContaDre = (
+      ano: string,
+      contaTemplate: ContaComValor,
+      parentResolved?: ContaComValor
+    ): ContaComValor | undefined => {
+      const lookup = dreLookupsPorAno.get(ano);
+      if (!lookup) return undefined;
+
+      const exact = lookup.byCode.get(contaTemplate.codigo);
+      if (exact) return exact;
+
+      const normalized = lookup.byNormalizedCode.get(normalizarCodigo(contaTemplate.codigo));
+      if (normalized) return normalized;
+
+      const candidates = lookup.byDescricao.get(normalizarDescricao(contaTemplate.descricao)) || [];
+      if (candidates.length === 0) return undefined;
+      if (candidates.length === 1) return candidates[0];
+
+      if (parentResolved) {
+        const parentCode = normalizarCodigo(parentResolved.codigo);
+        const withSameParent = candidates.find(
+          (candidate) => normalizarCodigo(candidate.codigoSuperior) === parentCode
+        );
+        if (withSameParent) return withSameParent;
+      }
+
+      const templateNivel = contaTemplate.nivelVisualizacao || contaTemplate.nivel || 1;
+      const withSameLevel = candidates.find(
+        (candidate) => (candidate.nivelVisualizacao || candidate.nivel || 1) === templateNivel
+      );
+      if (withSameLevel) return withSameLevel;
+
+      return candidates[0];
+    };
+
+    const dreRowsTemplate: Array<{ codigo: string; descricao: string; nivel: number; valores: Record<string, number> }> = [];
+
+    const processarTemplate = (
+      contas: ContaComValor[],
+      fallbackNivel: number = 1,
+      parentsResolved: Record<string, ContaComValor | undefined> = {}
+    ) => {
+      for (const contaTemplate of contas) {
+        const nivel = contaTemplate.nivelVisualizacao ?? contaTemplate.nivel ?? fallbackNivel;
+        if (nivel > maxNivel) continue;
+
+        const resolvedByAno: Record<string, ContaComValor | undefined> = {};
+        const valores: Record<string, number> = {};
+
+        for (const ano of anosDisponiveis) {
+          const resolved = resolverContaDre(ano, contaTemplate, parentsResolved[ano]);
+          resolvedByAno[ano] = resolved;
+          valores[ano] = resolved?.valor ?? 0;
+        }
+
+        const deveIncluir = incluirZeros || Object.values(valores).some((valor) => valor !== 0) || nivel === 1;
+        if (deveIncluir) {
+          dreRowsTemplate.push({
+            codigo: contaTemplate.codigo,
+            descricao: contaTemplate.descricao,
+            nivel,
+            valores,
+          });
+        }
+
+        if (contaTemplate.children?.length) {
+          processarTemplate(contaTemplate.children, nivel + 1, resolvedByAno);
+        }
+      }
+    };
+
+    processarTemplate(dreTemplate);
+
+    const dreSeries = dreRowsTemplate.map((row) => {
+      const variacoes: Record<string, number> = {};
+
+      for (let i = 1; i < anosDisponiveis.length; i++) {
+        const anoAnterior = anosDisponiveis[i - 1];
+        const anoAtual = anosDisponiveis[i];
+        const key = `Variacao ${anoAnterior}-${anoAtual} (%)`;
+        variacoes[key] = calcularVariacao(row.valores[anoAnterior], row.valores[anoAtual]);
+      }
+
+      if (anosDisponiveis.length >= 2) {
+        const primeiroAno = anosDisponiveis[0];
+        const ultimoAno = anosDisponiveis[anosDisponiveis.length - 1];
+        variacoes[`Variacao ${primeiroAno}-${ultimoAno} (%)`] = calcularVariacao(
+          row.valores[primeiroAno],
+          row.valores[ultimoAno]
+        );
+      }
+
+      return {
+        codigo: row.codigo,
+        descricao: row.descricao,
+        nivel: row.nivel,
+        valores: row.valores,
+        variacoes,
+      };
+    });
+
+    ordenarDreReceitaBrutaPrimeiro(dreSeries).forEach((serie) => {
+      analiseHorizontal.DRE[serie.codigo] = serie;
+    });
 
     for (const codigo of bpOrdenados) {
       analiseHorizontal.BP[codigo] = construirSerie(codigo, 'bp');

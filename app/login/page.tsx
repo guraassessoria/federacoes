@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Mail, Lock, LogIn } from "lucide-react";
+import { resolveCompanyRedirect } from "@/lib/company-selection";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +14,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const redirectAfterLogin = async () => {
+    const { target } = await resolveCompanyRedirect();
+    router.replace(target);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +35,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.replace("/selecionar-empresa");
+        await redirectAfterLogin();
       }
     } catch {
       setError("Erro ao processar solicitação");

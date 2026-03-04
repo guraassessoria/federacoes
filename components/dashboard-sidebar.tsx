@@ -72,6 +72,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
   const isAdmin = userRole === "ADMIN";
   const isGestor = userRole === "GESTOR";
+  const showCompanySwitcher = !loadingCompanies && companies.length !== 1;
 
   // Buscar empresas do usuário
   useEffect(() => {
@@ -81,7 +82,14 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
         if (res.ok) {
           const data = await res.json();
-          setCompanies(data.companies || []);
+          const userCompanies: Company[] = data.companies || [];
+          setCompanies(userCompanies);
+
+          if (userCompanies.length === 1) {
+            const onlyCompany = userCompanies[0];
+            setSelectedCompanyId(onlyCompany.id);
+            setSelectedCompanyName(onlyCompany.name);
+          }
         }
       } catch (error) {
         console.error("Erro ao buscar empresas:", error);
@@ -174,58 +182,62 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         <div className="mb-4 flex justify-center">
           <Image src="/planning-mark.png" alt="Planning" width={210} height={59} className="h-[90px] w-auto" priority />
         </div>
-        {/* Dropdown de Empresas */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left !text-white"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-xs !text-white">Empresa Selecionada</p>
-              <p className="text-sm font-medium !text-white truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
-            </div>
-            <ChevronDown className={cn(
-              "w-4 h-4 text-white transition-transform flex-shrink-0",
-              isDropdownOpen && "rotate-180"
-            )} />
-          </button>
+        {showCompanySwitcher && (
+          <>
+            {/* Dropdown de Empresas */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left !text-white"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs !text-white">Empresa Selecionada</p>
+                  <p className="text-sm font-medium !text-white truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
+                </div>
+                <ChevronDown className={cn(
+                  "w-4 h-4 text-white transition-transform flex-shrink-0",
+                  isDropdownOpen && "rotate-180"
+                )} />
+              </button>
 
-          {/* Dropdown Lista */}
-          {isDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
-              {loadingCompanies ? (
-                <div className="px-3 py-2 text-sm text-white">Carregando...</div>
-              ) : companies.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-white">Nenhuma empresa disponível</div>
-              ) : (
-                companies.map((company) => (
-                  <button
-                    key={company.id}
-                    onClick={() => handleSelectCompany(company)}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors text-white",
-                      company.id === selectedCompanyId && "bg-[#08C97D]/25 text-white"
-                    )}
-                  >
-                    <span className="truncate">{company.name}</span>
-                    {company.id === selectedCompanyId && (
-                      <Check className="w-4 h-4 text-[#08C97D] flex-shrink-0" />
-                    )}
-                  </button>
-                ))
+              {/* Dropdown Lista */}
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+                  {loadingCompanies ? (
+                    <div className="px-3 py-2 text-sm text-white">Carregando...</div>
+                  ) : companies.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-white">Nenhuma empresa disponível</div>
+                  ) : (
+                    companies.map((company) => (
+                      <button
+                        key={company.id}
+                        onClick={() => handleSelectCompany(company)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors text-white",
+                          company.id === selectedCompanyId && "bg-[#08C97D]/25 text-white"
+                        )}
+                      >
+                        <span className="truncate">{company.name}</span>
+                        {company.id === selectedCompanyId && (
+                          <Check className="w-4 h-4 text-[#08C97D] flex-shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Botão Voltar à Seleção */}
-        <button
-          onClick={handleChangeCompany}
-          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-white hover:text-white hover:bg-white/10 rounded-lg transition-all"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Voltar à Seleção</span>
-        </button>
+            {/* Botão Voltar à Seleção */}
+            <button
+              onClick={handleChangeCompany}
+              className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-white hover:text-white hover:bg-white/10 rounded-lg transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Voltar à Seleção</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* View Mode Toggle */}

@@ -15,7 +15,7 @@ import {
   BarChart3,
   Plus,
 } from "lucide-react";
-import { API_ENDPOINTS } from "@/lib/constants";
+import { resolveCompanyRedirect } from "@/lib/company-selection";
 
 interface Company {
   id: string;
@@ -40,9 +40,23 @@ export default function SelecionarEmpresaPage() {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch(API_ENDPOINTS.USER_COMPANIES);
-      const data = await res.json();
-      setCompanies(data.companies || []);
+      const { target, companies: userCompanies } = await resolveCompanyRedirect();
+      const normalizedCompanies: Company[] = userCompanies.map((company) => ({
+        id: company.id,
+        name: company.name,
+        cnpj: company.cnpj ?? null,
+        role: company.role ?? "CONSULTA",
+      }));
+
+      setCompanies(normalizedCompanies);
+
+      if (target === "/dashboard") {
+        if (normalizedCompanies.length === 1) {
+          setSelectedCompany(normalizedCompanies[0].id);
+        }
+        router.replace("/dashboard");
+        return;
+      }
     } catch (error) {
       console.error("Error fetching companies:", error);
     } finally {
@@ -68,7 +82,6 @@ export default function SelecionarEmpresaPage() {
 
   const selectedCompanyData = companies.find((c) => c.id === selectedCompany);
   const isAdmin = session?.user?.role === "ADMIN";
-  const isEditor = session?.user?.role === "EDITOR" || isAdmin;
 
   if (status === "loading" || loading) {
     return (
@@ -184,11 +197,11 @@ export default function SelecionarEmpresaPage() {
           </div>
 
           {/* Quick Actions */}
-          {(isAdmin || isEditor) && (
+          {isAdmin && (
             <div className="border-t border-[#E5E7EB] bg-[#FAFAFA] p-6">
               <h3 className="text-sm font-medium text-[#8E8E8E] mb-4">Ações Rápidas</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {isEditor && (
+                {isAdmin && (
                   <>
                     <button
                       onClick={() => router.push("/admin/dados")}
@@ -204,10 +217,6 @@ export default function SelecionarEmpresaPage() {
                       <FileSpreadsheet className="w-6 h-6 text-[#08C97D]" />
                       <span className="text-sm text-[#6B6E71]">Upload De x Para</span>
                     </button>
-                  </>
-                )}
-                {isAdmin && (
-                  <>
                     <button
                       onClick={() => router.push("/admin/empresas")}
                       className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"

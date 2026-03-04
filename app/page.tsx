@@ -5,15 +5,21 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { resolveCompanyRedirect } from "@/lib/company-selection";
 
 export default function HomePage() {
   const { status } = useSession() || {};
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.replace("/selecionar-empresa");
-    }
+    const redirectAuthenticatedUser = async () => {
+      if (status !== "authenticated") return;
+
+      const { target } = await resolveCompanyRedirect();
+      router.replace(target);
+    };
+
+    redirectAuthenticatedUser();
   }, [status, router]);
 
   if (status === "loading") {

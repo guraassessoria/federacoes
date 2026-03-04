@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   Building2,
   ChevronDown,
@@ -71,26 +72,29 @@ export default function SelecionarEmpresaPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Carregando...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-[#8E8E8E] text-base">Carregando...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-4">
+    <div className="min-h-screen bg-white p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8 pt-4">
-          <div className="text-white">
-            <h1 className="text-2xl font-bold">Bem-vindo, {session?.user?.name || session?.user?.email}</h1>
-            <p className="text-blue-200 text-sm">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Image src="/favicon.svg" alt="Planning" width={32} height={32} className="rounded-md" />
+              <h1 className="text-2xl font-semibold text-[#13161C]">Bem-vindo, {session?.user?.name || session?.user?.email}</h1>
+            </div>
+            <p className="text-[#8E8E8E] text-sm">
               Nível de acesso: {session?.user?.role}
             </p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all"
+            className="flex items-center gap-2 border border-[#E5E7EB] hover:bg-[#F9FAFB] text-[#13161C] px-4 py-2 rounded-lg transition-all"
           >
             <LogOut className="w-4 h-4" />
             Sair
@@ -101,11 +105,11 @@ export default function SelecionarEmpresaPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-2xl overflow-visible"
+          className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-visible"
         >
           <div className="p-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
-              <Building2 className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-[#13161C] mb-6 flex items-center gap-2">
+              <Building2 className="w-6 h-6 text-[#08C97D]" />
               Selecione a Empresa
             </h2>
 
@@ -124,13 +128,13 @@ export default function SelecionarEmpresaPage() {
                   <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full flex items-center justify-between px-4 py-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-all bg-white"
+                    className="w-full flex items-center justify-between px-4 py-3 border-2 border-[#E5E7EB] rounded-lg hover:border-[#08C97D] transition-all bg-white"
                   >
-                    <span className={selectedCompany ? "text-gray-800" : "text-gray-400"}>
+                    <span className={selectedCompany ? "text-[#13161C]" : "text-[#8E8E8E]"}>
                       {selectedCompanyData?.name || "Selecione uma empresa..."}
                     </span>
                     <ChevronDown
-                      className={`w-5 h-5 text-gray-400 transition-transform ${
+                      className={`w-5 h-5 text-[#8E8E8E] transition-transform ${
                         isOpen ? "rotate-180" : ""
                       }`}
                     />
@@ -140,15 +144,15 @@ export default function SelecionarEmpresaPage() {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                      className="absolute z-50 w-full mt-2 bg-white border border-[#E5E7EB] rounded-lg shadow-lg max-h-60 overflow-auto"
                     >
                       {companies.map((company) => (
                         <button
                           key={company.id}
                           type="button"
                           onClick={() => handleSelectCompany(company.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-all flex items-center justify-between ${
-                            selectedCompany === company.id ? "bg-blue-50" : ""
+                          className={`w-full text-left px-4 py-3 hover:bg-[#F7FDFC] transition-all flex items-center justify-between ${
+                            selectedCompany === company.id ? "bg-[#F7FDFC]" : ""
                           }`}
                         >
                           <div>
@@ -170,7 +174,7 @@ export default function SelecionarEmpresaPage() {
                 <button
                   onClick={handleContinue}
                   disabled={!selectedCompany}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-[#08C97D] text-[#13161C] py-3 rounded-lg font-semibold hover:bg-[#0AE18C] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <BarChart3 className="w-5 h-5" />
                   Acessar Dashboard
@@ -181,24 +185,24 @@ export default function SelecionarEmpresaPage() {
 
           {/* Quick Actions */}
           {(isAdmin || isEditor) && (
-            <div className="border-t border-gray-100 bg-gray-50 p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-4">Ações Rápidas</h3>
+            <div className="border-t border-[#E5E7EB] bg-[#FAFAFA] p-6">
+              <h3 className="text-sm font-medium text-[#8E8E8E] mb-4">Ações Rápidas</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {isEditor && (
                   <>
                     <button
                       onClick={() => router.push("/admin/dados")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
+                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
                     >
-                      <FileSpreadsheet className="w-6 h-6 text-green-600" />
-                      <span className="text-sm text-gray-600">Upload Balancete</span>
+                      <FileSpreadsheet className="w-6 h-6 text-[#08C97D]" />
+                      <span className="text-sm text-[#6B6E71]">Upload Balancete</span>
                     </button>
                     <button
                       onClick={() => router.push("/admin/dados")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
+                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
                     >
-                      <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-                      <span className="text-sm text-gray-600">Upload De x Para</span>
+                      <FileSpreadsheet className="w-6 h-6 text-[#08C97D]" />
+                      <span className="text-sm text-[#6B6E71]">Upload De x Para</span>
                     </button>
                   </>
                 )}
@@ -206,24 +210,24 @@ export default function SelecionarEmpresaPage() {
                   <>
                     <button
                       onClick={() => router.push("/admin/empresas")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
+                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
                     >
-                      <Plus className="w-6 h-6 text-emerald-600" />
-                      <span className="text-sm text-gray-600">Cadastrar Empresa</span>
+                      <Plus className="w-6 h-6 text-[#08C97D]" />
+                      <span className="text-sm text-[#6B6E71]">Cadastrar Empresa</span>
                     </button>
                     <button
                       onClick={() => router.push("/admin/usuarios")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
+                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
                     >
-                      <Users className="w-6 h-6 text-purple-600" />
-                      <span className="text-sm text-gray-600">Usuários</span>
+                      <Users className="w-6 h-6 text-[#08C97D]" />
+                      <span className="text-sm text-[#6B6E71]">Usuários</span>
                     </button>
                     <button
                       onClick={() => router.push("/admin/configuracoes")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow transition-all"
+                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
                     >
-                      <Settings className="w-6 h-6 text-gray-600" />
-                      <span className="text-sm text-gray-600">Configurações</span>
+                      <Settings className="w-6 h-6 text-[#08C97D]" />
+                      <span className="text-sm text-[#6B6E71]">Configurações</span>
                     </button>
                   </>
                 )}

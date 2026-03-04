@@ -190,7 +190,7 @@ export default function AdminUsuariosPage() {
       case "GESTOR":
         return "bg-violet-100 text-violet-700";
       case "EDITOR":
-        return "bg-blue-100 text-blue-700";
+        return "bg-[#DDF7EB] text-[#2C5D47]";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -223,7 +223,7 @@ export default function AdminUsuariosPage() {
           </div>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all"
+            className="flex items-center gap-2 bg-[#08C97D] text-[#13161C] px-4 py-2 rounded-lg hover:bg-[#0AE18C] transition-all"
           >
             <UserPlus className="w-5 h-5" />
             Novo Usuário
@@ -251,8 +251,8 @@ export default function AdminUsuariosPage() {
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-[#DDF7EB] rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-[#08C97D]" />
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">{user.name || "Sem nome"}</p>
@@ -296,7 +296,7 @@ export default function AdminUsuariosPage() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => openEditModal(user)}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600"
+                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-[#08C97D]"
                         title="Editar"
                       >
                         <Edit className="w-4 h-4" />
@@ -347,7 +347,7 @@ export default function AdminUsuariosPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                     placeholder="Nome do usuário"
                   />
                 </div>
@@ -358,7 +358,7 @@ export default function AdminUsuariosPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                     placeholder="email@exemplo.com"
                     required
                   />
@@ -372,7 +372,7 @@ export default function AdminUsuariosPage() {
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                     placeholder="Senha"
                     required={!editingUser}
                   />
@@ -383,7 +383,7 @@ export default function AdminUsuariosPage() {
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                   >
                     <option value="CONSULTA">Consulta</option>
                     <option value="GESTOR">Gestor</option>
@@ -431,7 +431,7 @@ export default function AdminUsuariosPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 bg-[#08C97D] text-[#13161C] rounded-lg hover:bg-[#0AE18C] flex items-center justify-center gap-2"
                   >
                     <Check className="w-4 h-4" />
                     {editingUser ? "Salvar" : "Criar"}

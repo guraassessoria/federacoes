@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   const { status } = useSession() || {};
@@ -27,7 +28,10 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       <nav className="h-16 bg-[#13161C]">
         <div className="mx-auto h-full max-w-6xl px-6 flex items-center justify-between">
-          <span className="text-white text-xl font-semibold tracking-tight">Planning</span>
+          <div className="flex items-center gap-3">
+            <Image src="/favicon.svg" alt="Planning" width={30} height={30} className="rounded-md bg-white p-1" />
+            <span className="text-white text-xl font-semibold tracking-tight">Planning</span>
+          </div>
           <Link
             href="/login"
             className="inline-flex items-center rounded-md bg-[#08C97D] px-4 py-2 text-sm font-semibold text-[#13161C] transition-colors hover:bg-[#0AE18C]"

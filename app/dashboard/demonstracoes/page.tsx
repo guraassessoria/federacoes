@@ -729,12 +729,12 @@ export default function DemonstracoesPage() {
 
   const getTabColor = () => {
     switch (activeTab) {
-      case 'bp': return 'bg-blue-600';
-      case 'dre': return 'bg-indigo-600';
+      case 'bp': return 'bg-[#08C97D]';
+      case 'dre': return 'bg-[#07B670]';
       case 'dfc': return 'bg-emerald-600';
       case 'dmpl': return 'bg-purple-600';
       case 'dva': return 'bg-amber-600';
-      default: return 'bg-blue-600';
+      default: return 'bg-[#08C97D]';
     }
   };
 
@@ -1198,13 +1198,13 @@ export default function DemonstracoesPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <FileSpreadsheet className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Demonstrações Financeiras</h1>
         </div>
-        <p className="text-blue-100">BP, DRE, DFC, DMPL e DVA</p>
+        <p className="text-emerald-100">BP, DRE, DFC, DMPL e DVA</p>
       </motion.div>
 
       {viewMode === 'mensal' ? (
@@ -1214,7 +1214,7 @@ export default function DemonstracoesPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl shadow-lg overflow-hidden"
         >
-          <div className="bg-indigo-600 px-4 py-3">
+          <div className="bg-[#07B670] px-4 py-3">
             <h2 className="font-semibold text-white">
               DRE - Visão Mensal ({selectedYear})
             </h2>
@@ -1268,13 +1268,13 @@ export default function DemonstracoesPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('bp')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-[#08C97D] text-[#13161C] shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             BP
           </button>
           <button
             onClick={() => setActiveTab('dre')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DRE
           </button>

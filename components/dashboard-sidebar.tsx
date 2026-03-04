@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -168,41 +169,39 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-blue-900 to-indigo-900 text-white flex flex-col">
+    <aside className="fixed left-0 top-0 h-screen w-64 bg-[#13161C] text-white flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-            <BarChart3 className="w-6 h-6" />
-          </div>
+          <Image src="/favicon.svg" alt="Planning" width={34} height={34} className="rounded-md bg-white p-1" />
           <div>
-            <h1 className="font-bold text-lg">Dashboard</h1>
-            <p className="text-xs text-blue-200">Financeiro</p>
+            <h1 className="font-semibold text-lg leading-tight">Planning</h1>
+            <p className="text-xs text-[#8E8E8E]">Dashboard Financeiro</p>
           </div>
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-left"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-blue-200">Empresa Selecionada</p>
+              <p className="text-xs text-[#8E8E8E]">Empresa Selecionada</p>
               <p className="text-sm font-medium truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
             </div>
             <ChevronDown className={cn(
-              "w-4 h-4 text-blue-200 transition-transform flex-shrink-0",
+              "w-4 h-4 text-[#8E8E8E] transition-transform flex-shrink-0",
               isDropdownOpen && "rotate-180"
             )} />
           </button>
 
           {/* Dropdown Lista */}
           {isDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
               {loadingCompanies ? (
-                <div className="px-3 py-2 text-sm text-blue-200">Carregando...</div>
+                <div className="px-3 py-2 text-sm text-[#8E8E8E]">Carregando...</div>
               ) : companies.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-blue-200">Nenhuma empresa disponível</div>
+                <div className="px-3 py-2 text-sm text-[#8E8E8E]">Nenhuma empresa disponível</div>
               ) : (
                 companies.map((company) => (
                   <button
@@ -210,12 +209,12 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                     onClick={() => handleSelectCompany(company)}
                     className={cn(
                       "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
-                      company.id === selectedCompanyId && "bg-blue-600/30 text-white"
+                      company.id === selectedCompanyId && "bg-[#08C97D]/25 text-white"
                     )}
                   >
                     <span className="truncate">{company.name}</span>
                     {company.id === selectedCompanyId && (
-                      <Check className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                      <Check className="w-4 h-4 text-[#08C97D] flex-shrink-0" />
                     )}
                   </button>
                 ))
@@ -227,7 +226,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Botão Voltar à Seleção */}
         <button
           onClick={handleChangeCompany}
-          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-[#8E8E8E] hover:text-white hover:bg-white/10 rounded-lg transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar à Seleção</span>
@@ -236,15 +235,15 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
       {/* View Mode Toggle */}
       <div className="px-4 py-3 border-b border-white/10">
-        <p className="text-xs text-blue-300 uppercase font-medium mb-2 px-2">Visão</p>
+        <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Visão</p>
         <div className="flex gap-2 mb-3">
           <button
             onClick={() => handleViewModeChange("anual")}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
               viewMode === "anual"
-                ? "bg-white/20 text-white"
-                : "text-blue-100 hover:bg-white/10"
+                ? "bg-[#08C97D] text-[#13161C]"
+                : "text-[#C7CAD0] hover:bg-white/10"
             )}
           >
             <Calendar className="w-4 h-4" />
@@ -255,8 +254,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
               viewMode === "mensal"
-                ? "bg-white/20 text-white"
-                : "text-blue-100 hover:bg-white/10"
+                ? "bg-[#08C97D] text-[#13161C]"
+                : "text-[#C7CAD0] hover:bg-white/10"
             )}
           >
             <CalendarDays className="w-4 h-4" />
@@ -270,26 +269,26 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
             onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
             className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-sm"
           >
-            <span className="text-blue-200">Ano:</span>
+            <span className="text-[#8E8E8E]">Ano:</span>
             <span className="font-medium">{selectedYear}</span>
             <ChevronDown className={cn(
-              "w-4 h-4 text-blue-200 transition-transform",
+              "w-4 h-4 text-[#8E8E8E] transition-transform",
               isYearDropdownOpen && "rotate-180"
             )} />
           </button>
           {isYearDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-32 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-32 overflow-y-auto">
               {availableYears.map((year) => (
                 <button
                   key={year}
                   onClick={() => handleYearChange(year)}
                   className={cn(
                     "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
-                    year === selectedYear && "bg-blue-600/30 text-white"
+                    year === selectedYear && "bg-[#08C97D]/25 text-white"
                   )}
                 >
                   <span>{year}</span>
-                  {year === selectedYear && <Check className="w-4 h-4 text-blue-300" />}
+                  {year === selectedYear && <Check className="w-4 h-4 text-[#08C97D]" />}
                 </button>
               ))}
             </div>
@@ -303,26 +302,26 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
               onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-sm"
             >
-              <span className="text-blue-200">Mês:</span>
+                <span className="text-[#8E8E8E]">Mês:</span>
               <span className="font-medium">{getMonthName(selectedMonth)}</span>
               <ChevronDown className={cn(
-                "w-4 h-4 text-blue-200 transition-transform",
+                  "w-4 h-4 text-[#8E8E8E] transition-transform",
                 isMonthDropdownOpen && "rotate-180"
               )} />
             </button>
             {isMonthDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
                 {availableMonths.map((month) => (
                   <button
                     key={month.value}
                     onClick={() => handleMonthChange(month.value)}
                     className={cn(
                       "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
-                      month.value === selectedMonth && "bg-blue-600/30 text-white"
+                        month.value === selectedMonth && "bg-[#08C97D]/25 text-white"
                     )}
                   >
                     <span>{month.label}</span>
-                    {month.value === selectedMonth && <Check className="w-4 h-4 text-blue-300" />}
+                      {month.value === selectedMonth && <Check className="w-4 h-4 text-[#08C97D]" />}
                   </button>
                 ))}
               </div>
@@ -335,7 +334,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       <nav className="flex-1 overflow-y-auto py-4">
         {/* Analysis Section */}
         <div className="px-4 mb-4">
-          <p className="text-xs text-blue-300 uppercase font-medium mb-2 px-2">Análises</p>
+          <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Análises</p>
           <ul className="space-y-1">
             {analysisItems.map((item) => {
               const Icon = item.icon;
@@ -347,8 +346,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg transition-all",
                       isActive
-                        ? "bg-white/20 text-white"
-                        : "text-blue-100 hover:bg-white/10 hover:text-white"
+                        ? "bg-[#08C97D] text-[#13161C]"
+                        : "text-[#C7CAD0] hover:bg-white/10 hover:text-white"
                     )}
                   >
                     <Icon className="w-5 h-5" />
@@ -363,7 +362,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Data Management Section (Editor & Admin) */}
         {isEditor && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-blue-300 uppercase font-medium mb-2 px-2">Dados</p>
+            <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Dados</p>
             <ul className="space-y-1">
               {dataManagementItems.map((item) => {
                 const Icon = item.icon;
@@ -375,8 +374,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg transition-all",
                         isActive
-                          ? "bg-white/20 text-white"
-                          : "text-blue-100 hover:bg-white/10 hover:text-white"
+                          ? "bg-[#08C97D] text-[#13161C]"
+                          : "text-[#C7CAD0] hover:bg-white/10 hover:text-white"
                       )}
                     >
                       <Icon className="w-5 h-5" />
@@ -392,7 +391,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Admin Section */}
         {isAdmin && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-blue-300 uppercase font-medium mb-2 px-2">Administração</p>
+            <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Administração</p>
             <ul className="space-y-1">
               {adminItems.map((item) => {
                 const Icon = item.icon;
@@ -404,8 +403,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg transition-all",
                         isActive
-                          ? "bg-white/20 text-white"
-                          : "text-blue-100 hover:bg-white/10 hover:text-white"
+                          ? "bg-[#08C97D] text-[#13161C]"
+                          : "text-[#C7CAD0] hover:bg-white/10 hover:text-white"
                       )}
                     >
                       <Icon className="w-5 h-5" />
@@ -422,12 +421,12 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <div className="bg-white/10 rounded-lg px-3 py-2 mb-3">
-          <p className="text-xs text-blue-200">Nível de Acesso</p>
+          <p className="text-xs text-[#8E8E8E]">Nível de Acesso</p>
           <p className="text-sm font-medium">{userRole}</p>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-100 px-3 py-2 rounded-lg transition-all"
+          className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg transition-all"
         >
           <LogOut className="w-4 h-4" />
           <span className="text-sm">Sair</span>

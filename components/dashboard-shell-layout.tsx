@@ -43,8 +43,8 @@ export function DashboardShellLayout({
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p>Carregando...</p>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-sm text-[#8E8E8E]">Carregando...</p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export function DashboardShellLayout({
 
   return (
     <DashboardProvider>
-      <div className="flex min-h-screen bg-slate-50">
+      <div className="flex min-h-screen bg-white">
         <DashboardSidebar
           userRole={session?.user?.role || "CONSULTA"}
           companyName={companyName}

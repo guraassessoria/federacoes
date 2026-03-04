@@ -9,11 +9,7 @@ import {
   Building2,
   ChevronDown,
   LogOut,
-  Settings,
-  Users,
-  FileSpreadsheet,
   BarChart3,
-  Plus,
 } from "lucide-react";
 import { resolveCompanyRedirect } from "@/lib/company-selection";
 
@@ -81,8 +77,6 @@ export default function SelecionarEmpresaPage() {
   };
 
   const selectedCompanyData = companies.find((c) => c.id === selectedCompany);
-  const isAdmin = session?.user?.role === "ADMIN";
-
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -118,9 +112,9 @@ export default function SelecionarEmpresaPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-visible"
+          className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden"
         >
-          <div className="p-8">
+          <div className="px-8 pt-8 pb-5">
             <h2 className="text-xl font-semibold text-[#13161C] mb-6 flex items-center gap-2">
               <Building2 className="w-6 h-6 text-[#08C97D]" />
               Selecione a Empresa
@@ -195,54 +189,6 @@ export default function SelecionarEmpresaPage() {
               </>
             )}
           </div>
-
-          {/* Quick Actions */}
-          {isAdmin && (
-            <div className="border-t border-[#E5E7EB] bg-[#FAFAFA] p-6">
-              <h3 className="text-sm font-medium text-[#8E8E8E] mb-4">Ações Rápidas</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {isAdmin && (
-                  <>
-                    <button
-                      onClick={() => router.push("/admin/dados")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
-                    >
-                      <FileSpreadsheet className="w-6 h-6 text-[#08C97D]" />
-                      <span className="text-sm text-[#6B6E71]">Upload Balancete</span>
-                    </button>
-                    <button
-                      onClick={() => router.push("/admin/dados")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
-                    >
-                      <FileSpreadsheet className="w-6 h-6 text-[#08C97D]" />
-                      <span className="text-sm text-[#6B6E71]">Upload De x Para</span>
-                    </button>
-                    <button
-                      onClick={() => router.push("/admin/empresas")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
-                    >
-                      <Plus className="w-6 h-6 text-[#08C97D]" />
-                      <span className="text-sm text-[#6B6E71]">Cadastrar Empresa</span>
-                    </button>
-                    <button
-                      onClick={() => router.push("/admin/usuarios")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
-                    >
-                      <Users className="w-6 h-6 text-[#08C97D]" />
-                      <span className="text-sm text-[#6B6E71]">Usuários</span>
-                    </button>
-                    <button
-                      onClick={() => router.push("/admin/configuracoes")}
-                      className="flex flex-col items-center gap-2 p-4 bg-white rounded-lg border border-[#E5E7EB] hover:border-[#08C97D] hover:shadow transition-all"
-                    >
-                      <Settings className="w-6 h-6 text-[#08C97D]" />
-                      <span className="text-sm text-[#6B6E71]">Configurações</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
         </motion.div>
       </div>
     </div>

@@ -173,7 +173,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="mb-4 flex justify-center">
-          <Image src="/planning-mark.png" alt="Planning" width={150} height={42} className="h-16 w-auto" priority />
+          <Image src="/planning-mark.png" alt="Planning" width={300} height={84} className="h-32 w-auto" priority />
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>

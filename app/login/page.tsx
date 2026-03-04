@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
             <div className="px-8 py-6 text-center border-b border-[#E5E7EB]">
               <div className="flex justify-center mb-4">
-                <Image src="/planning-mark1.png" alt="Planning" width={190} height={52} className="h-10 w-auto" priority />
+                <Image src="/planning-mark1.png" alt="Planning" width={380} height={104} className="h-20 w-auto" priority />
               </div>
               <p className="text-[#8E8E8E] mt-1 text-sm">Acesse sua conta</p>
             </div>

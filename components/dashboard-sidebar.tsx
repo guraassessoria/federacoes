@@ -172,9 +172,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
     <aside className="fixed left-0 top-0 h-screen w-64 bg-[#13161C] text-white flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-white/10">
-        <div className="mb-4">
-          <Image src="/planning-logo.png" alt="Planning" width={150} height={42} className="h-8 w-auto" priority />
-          <p className="text-xs text-[#8E8E8E] mt-2">Dashboard Financeiro</p>
+        <div className="mb-4 flex justify-center">
+          <Image src="/planning-logo.png" alt="Planning" width={150} height={42} className="h-12 w-auto" priority />
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>
@@ -183,11 +182,11 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
             className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-[#8E8E8E]">Empresa Selecionada</p>
+              <p className="text-xs text-[#C7CAD0]">Empresa Selecionada</p>
               <p className="text-sm font-medium truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
             </div>
             <ChevronDown className={cn(
-              "w-4 h-4 text-[#8E8E8E] transition-transform flex-shrink-0",
+              "w-4 h-4 text-[#C7CAD0] transition-transform flex-shrink-0",
               isDropdownOpen && "rotate-180"
             )} />
           </button>
@@ -196,9 +195,9 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
           {isDropdownOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C212A] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
               {loadingCompanies ? (
-                <div className="px-3 py-2 text-sm text-[#8E8E8E]">Carregando...</div>
+                <div className="px-3 py-2 text-sm text-[#C7CAD0]">Carregando...</div>
               ) : companies.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-[#8E8E8E]">Nenhuma empresa disponível</div>
+                <div className="px-3 py-2 text-sm text-[#C7CAD0]">Nenhuma empresa disponível</div>
               ) : (
                 companies.map((company) => (
                   <button
@@ -223,7 +222,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Botão Voltar à Seleção */}
         <button
           onClick={handleChangeCompany}
-          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-[#8E8E8E] hover:text-white hover:bg-white/10 rounded-lg transition-all"
+          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-sm text-[#C7CAD0] hover:text-white hover:bg-white/10 rounded-lg transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar à Seleção</span>
@@ -232,7 +231,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
       {/* View Mode Toggle */}
       <div className="px-4 py-3 border-b border-white/10">
-        <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Visão</p>
+        <p className="text-xs text-[#C7CAD0] uppercase font-medium mb-2 px-2">Visão</p>
         <div className="flex gap-2 mb-3">
           <button
             onClick={() => handleViewModeChange("anual")}
@@ -266,10 +265,10 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
             onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
             className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-sm"
           >
-            <span className="text-[#8E8E8E]">Ano:</span>
+            <span className="text-[#C7CAD0]">Ano:</span>
             <span className="font-medium">{selectedYear}</span>
             <ChevronDown className={cn(
-              "w-4 h-4 text-[#8E8E8E] transition-transform",
+              "w-4 h-4 text-[#C7CAD0] transition-transform",
               isYearDropdownOpen && "rotate-180"
             )} />
           </button>
@@ -299,10 +298,10 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
               onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-sm"
             >
-                <span className="text-[#8E8E8E]">Mês:</span>
+                <span className="text-[#C7CAD0]">Mês:</span>
               <span className="font-medium">{getMonthName(selectedMonth)}</span>
               <ChevronDown className={cn(
-                  "w-4 h-4 text-[#8E8E8E] transition-transform",
+                  "w-4 h-4 text-[#C7CAD0] transition-transform",
                 isMonthDropdownOpen && "rotate-180"
               )} />
             </button>
@@ -331,7 +330,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       <nav className="flex-1 overflow-y-auto py-4">
         {/* Analysis Section */}
         <div className="px-4 mb-4">
-          <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Análises</p>
+          <p className="text-xs text-[#C7CAD0] uppercase font-medium mb-2 px-2">Análises</p>
           <ul className="space-y-1">
             {analysisItems.map((item) => {
               const Icon = item.icon;
@@ -359,7 +358,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Data Management Section (Editor & Admin) */}
         {isEditor && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Dados</p>
+            <p className="text-xs text-[#C7CAD0] uppercase font-medium mb-2 px-2">Dados</p>
             <ul className="space-y-1">
               {dataManagementItems.map((item) => {
                 const Icon = item.icon;
@@ -388,7 +387,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Admin Section */}
         {isAdmin && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-[#8E8E8E] uppercase font-medium mb-2 px-2">Administração</p>
+            <p className="text-xs text-[#C7CAD0] uppercase font-medium mb-2 px-2">Administração</p>
             <ul className="space-y-1">
               {adminItems.map((item) => {
                 const Icon = item.icon;

@@ -1445,7 +1445,6 @@ export default function DemonstracoesPage() {
         initial={{ opacity: 0, y: 20 }}
         className="card-surface bg-white rounded-xl p-6"
         transition={{ delay: 0.2 }}
-        className="bg-white rounded-xl shadow-lg p-6"
       >
         <h2 className="text-lg font-bold text-slate-800 mb-4">Composição por Grupo - {getTabTitle()} ({selectedYear})</h2>
         <CustomBarChart

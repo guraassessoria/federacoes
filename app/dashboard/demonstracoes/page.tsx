@@ -475,8 +475,8 @@ export default function DemonstracoesPage() {
       const XLSX = await import('xlsx');
       const workbook = XLSX.utils.book_new();
 
-      const bpRows = flattenContas(data.estruturaBP || []);
-      const dreRows = flattenContas(data.estruturaDRE || []);
+      const bpRows = flattenContas(data.estruturaBP || []).filter((row) => Math.abs(row.valor || 0) > 0);
+      const dreRows = flattenContas(data.estruturaDRE || []).filter((row) => Math.abs(row.valor || 0) > 0);
       const formatDescricao = (descricao: string, nivel: number) => `${'  '.repeat(Math.max(0, nivel - 1))}${descricao}`;
 
       const bpSheet = [

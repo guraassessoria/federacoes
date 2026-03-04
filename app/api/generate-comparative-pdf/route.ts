@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { processarDadosFinanceiros, ContaComValor, DeParaRecord } from '@/lib/services/estruturaMapping';
+import {
+  processarDadosFinanceiros,
+  ContaComValor,
+  DeParaRecord,
+  ContaEstrutura,
+  loadEstruturaDRE,
+  loadEstruturaBP,
+} from '@/lib/services/estruturaMapping';
 import { ordenarArvoreDreReceitaBrutaPrimeiro } from '@/lib/services/drePresentation';
 import { handleApiError } from '@/lib/errorHandler';
 import { calcularIndices, indicesParaPDF, extrairValores } from '@/lib/services/indicesFinanceiros';
@@ -626,45 +633,15 @@ function generateComparativeHTML(
 }
 
 // Gerar dados fictícios no formato ContaComValor[] para empresas sem balancete
-function gerarDadosFicticiosComparativo(year: string): {
+async function gerarDadosFicticiosComparativo(year: string): Promise<{
   dre: ContaComValor[];
   bp: ContaComValor[];
   resultadoDRE: number;
   totalPassivoPL: number;
-} {
+}> {
   const yearFactors: Record<string, number> = { "2023": 0.85, "2024": 0.95, "2025": 1.0, "2026": 1.05 };
   const f = yearFactors[year] || 1.0;
 
-  const conta = (codigo: string, descricao: string, valor: number, nivel: number = 1, children?: ContaComValor[]): ContaComValor => ({
-    codigo, descricao, valor, nivel, nivelVisualizacao: nivel, codigoSuperior: null, children: children || [],
-  });
-
-  // BP
-  const bp: ContaComValor[] = [
-    conta('1', 'ATIVO', 50000000 * f, 1, [
-      conta('2', 'Ativo Circulante', 15000000 * f, 2, [
-        conta('3', 'Disponibilidades', 3000000 * f, 3),
-        conta('7', 'Contas a Receber', 4500000 * f, 3),
-        conta('20', 'Estoques', 1500000 * f, 3),
-      ]),
-      conta('33', 'Ativo Não Circulante', 35000000 * f, 2, [
-        conta('34', 'Realizável a Longo Prazo', 5000000 * f, 3),
-        conta('43', 'Imobilizado', 20000000 * f, 3),
-      ]),
-    ]),
-    conta('76', 'PASSIVO + PL', 50000000 * f, 1, [
-      conta('77', 'Passivo Circulante', 10000000 * f, 2, [
-        conta('78', 'Fornecedores', 3000000 * f, 3),
-      ]),
-      conta('113', 'Passivo Não Circulante', 15000000 * f, 2),
-      conta('125', 'Patrimônio Líquido', 25000000 * f, 2, [
-        conta('126', 'Capital Social', 15000000 * f, 3),
-        conta('141', 'Superávits Acumulados', 10000000 * f, 3),
-      ]),
-    ]),
-  ];
-
-  // DRE
   const receitaLiquida = 45000000 * f;
   const custos = 25000000 * f;
   const despesas = 10000000 * f;
@@ -672,16 +649,146 @@ function gerarDadosFicticiosComparativo(year: string): {
   const resultadoFin = -2000000 * f;
   const resultadoLiq = resultadoOp + resultadoFin;
 
-  const dre: ContaComValor[] = [
-    conta('1', 'Receita Bruta', receitaLiquida, 1),
-    conta('51', 'Receita Líquida', receitaLiquida, 1),
-    conta('52', '(-) Custos', custos, 1),
-    conta('104', '(-) Despesas', despesas, 1),
-    conta('190', 'Resultado Financeiro', resultadoFin, 1),
-    conta('211', 'Resultado Operacional', resultadoOp, 1),
-    conta('225', 'Resultado Líquido', resultadoLiq, 1),
-    conta('229', 'Superávit/Déficit', resultadoLiq, 1),
-  ];
+  const normalizarTexto = (value: string) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+  const buscarCodigoPorDescricao = (
+    estrutura: ContaEstrutura[],
+    termosPreferenciais: string[][],
+    fallbackCodigos: string[] = []
+  ): string | null => {
+    for (const termos of termosPreferenciais) {
+      const matches = estrutura
+        .filter((conta) => {
+          const desc = normalizarTexto(conta.descricao || '');
+          return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+        })
+        .sort((a, b) => {
+          const na = Number(a.nivel ?? Number.MAX_SAFE_INTEGER);
+          const nb = Number(b.nivel ?? Number.MAX_SAFE_INTEGER);
+          if (na !== nb) return na - nb;
+          return String(a.codigo).localeCompare(String(b.codigo));
+        });
+      if (matches.length > 0) return matches[0].codigo;
+    }
+
+    for (const codigo of fallbackCodigos) {
+      if (estrutura.some((conta) => conta.codigo === codigo)) return codigo;
+    }
+
+    return null;
+  };
+
+  const construirArvoreComValores = (
+    estrutura: ContaEstrutura[],
+    valoresPorCodigo: Record<string, number>
+  ): ContaComValor[] => {
+    const ordemPorCodigo = new Map<string, number>();
+    estrutura.forEach((item, idx) => {
+      ordemPorCodigo.set(item.codigo, Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : idx + 1);
+    });
+
+    const mapa = new Map<string, ContaComValor>();
+    estrutura.forEach((item) => {
+      mapa.set(item.codigo, {
+        codigo: item.codigo,
+        descricao: item.descricao,
+        codigoSuperior: item.codigoSuperior,
+        nivel: item.nivel,
+        nivelVisualizacao: item.nivelVisualizacao,
+        valor: valoresPorCodigo[item.codigo] || 0,
+        children: [],
+      });
+    });
+
+    const roots: ContaComValor[] = [];
+    estrutura.forEach((item) => {
+      const atual = mapa.get(item.codigo)!;
+      if (item.codigoSuperior) {
+        const pai = mapa.get(item.codigoSuperior);
+        if (pai) {
+          pai.children!.push(atual);
+          return;
+        }
+      }
+      roots.push(atual);
+    });
+
+    const sortRec = (nodes: ContaComValor[]) => {
+      nodes.sort((a, b) => {
+        const oa = ordemPorCodigo.get(a.codigo) ?? Number.MAX_SAFE_INTEGER;
+        const ob = ordemPorCodigo.get(b.codigo) ?? Number.MAX_SAFE_INTEGER;
+        if (oa !== ob) return oa - ob;
+        return a.codigo.localeCompare(b.codigo);
+      });
+      nodes.forEach((node) => {
+        if (node.children?.length) sortRec(node.children);
+      });
+    };
+
+    const preencherPais = (node: ContaComValor): number => {
+      if (!node.children?.length) return node.valor;
+      const somaFilhos = node.children.reduce((s, child) => s + preencherPais(child), 0);
+      if (Math.abs(node.valor || 0) < 0.000001) node.valor = somaFilhos;
+      return node.valor;
+    };
+
+    sortRec(roots);
+    roots.forEach((root) => preencherPais(root));
+    return roots;
+  };
+
+  const [estruturaDREPadrao, estruturaBPPadrao] = await Promise.all([
+    loadEstruturaDRE(),
+    loadEstruturaBP(),
+  ]);
+
+  const dreValores: Record<string, number> = {};
+  const setDre = (termos: string[][], valor: number, fallback: string[] = []) => {
+    const codigo = buscarCodigoPorDescricao(estruturaDREPadrao, termos, fallback);
+    if (codigo) dreValores[codigo] = Math.round(valor);
+  };
+
+  setDre([['receita', 'bruta']], receitaLiquida, ['51']);
+  setDre([['receita', 'liquida']], receitaLiquida, ['56']);
+  setDre([['custos']], custos, ['57']);
+  setDre([['despesas']], despesas, ['110', '104']);
+  setDre([['resultado', 'financeiro']], resultadoFin, ['198', '190']);
+  setDre([['resultado', 'operacional']], resultadoOp, ['196', '211']);
+  setDre([['superavit', 'deficit', 'exercicio']], resultadoLiq, ['229', '225']);
+
+  const bpValores: Record<string, number> = {};
+  const setBp = (termos: string[][], valor: number, fallback: string[] = []) => {
+    const codigo = buscarCodigoPorDescricao(estruturaBPPadrao, termos, fallback);
+    if (codigo) bpValores[codigo] = Math.round(valor);
+  };
+
+  setBp([['ativo']], 50000000 * f, ['1']);
+  setBp([['ativo', 'circulante']], 15000000 * f, ['2']);
+  setBp([['disponibilidades']], 3000000 * f, ['3']);
+  setBp([['contas', 'a', 'receber']], 4500000 * f, ['7']);
+  setBp([['estoques']], 1500000 * f, ['17']);
+  setBp([['ativo', 'nao', 'circulante']], 35000000 * f, ['33']);
+  setBp([['realizavel', 'longo', 'prazo']], 5000000 * f, ['34']);
+  setBp([['imobilizado']], 20000000 * f, ['43']);
+  setBp([['passivo', 'pl'], ['passivo', 'patrimonio']], 50000000 * f, ['76']);
+  setBp([['passivo', 'circulante']], 10000000 * f, ['77']);
+  setBp([['fornecedores']], 3000000 * f, ['78']);
+  setBp([['passivo', 'nao', 'circulante']], 15000000 * f, ['113']);
+  setBp([['patrimonio', 'liquido']], 25000000 * f, ['125']);
+  setBp([['capital', 'social']], 15000000 * f, ['126']);
+  setBp([['superavit', 'acumulados'], ['lucros', 'acumulados']], 10000000 * f, ['141']);
+
+  const bp = estruturaBPPadrao.length
+    ? construirArvoreComValores(estruturaBPPadrao, bpValores)
+    : [];
+
+  const dre = estruturaDREPadrao.length
+    ? ordenarArvoreDreReceitaBrutaPrimeiro(construirArvoreComValores(estruturaDREPadrao, dreValores))
+    : [];
 
   return {
     dre,
@@ -755,7 +862,7 @@ export async function POST(request: NextRequest) {
       if (balancetes.length === 0) {
         // Gerar dados fictícios para empresa sem balancete
         console.log(`Sem dados reais para ${company.name} — usando dados fictícios`);
-        const demo = gerarDadosFicticiosComparativo(year);
+        const demo = await gerarDadosFicticiosComparativo(year);
         dre = ordenarArvoreDreReceitaBrutaPrimeiro(demo.dre);
         bp = demo.bp;
         resultadoDRE = demo.resultadoDRE;

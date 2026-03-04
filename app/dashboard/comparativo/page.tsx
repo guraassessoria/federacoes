@@ -418,8 +418,12 @@ export default function ComparativoPage() {
       const workbook = XLSX.utils.book_new();
 
       const companyHeaders = selectedCompanies.map((company) => company.name);
-      const bpRowsForExcel = buildComparativeRows('bp', Number.MAX_SAFE_INTEGER, false);
-      const dreRowsForExcel = buildComparativeRows('dre', Number.MAX_SAFE_INTEGER, false);
+      const bpRowsForExcel = buildComparativeRows('bp', Number.MAX_SAFE_INTEGER, false).filter((row) =>
+        selectedCompanies.some((company) => Math.abs(row.valores[company.id] || 0) > 0)
+      );
+      const dreRowsForExcel = buildComparativeRows('dre', Number.MAX_SAFE_INTEGER, false).filter((row) =>
+        selectedCompanies.some((company) => Math.abs(row.valores[company.id] || 0) > 0)
+      );
       const formatDescricao = (descricao: string, nivel: number) => `${'  '.repeat(Math.max(0, nivel - 1))}${descricao}`;
       const normalizeCode = (codigo: string) => (codigo || '').toString().trim().replace(',', '.');
 

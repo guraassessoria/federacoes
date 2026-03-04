@@ -26,7 +26,10 @@ import {
   mapBalanceteToEstrutura,
   processarDadosFinanceiros,
   ContaComValor,
-  DeParaRecord 
+  DeParaRecord,
+  ContaEstrutura,
+  loadEstruturaDRE,
+  loadEstruturaBP,
 } from "@/lib/services/estruturaMapping";
 import { ordenarArvoreDreReceitaBrutaPrimeiro } from "@/lib/services/drePresentation";
 import { FinancialDataQuerySchema } from "@/lib/validators";
@@ -133,7 +136,7 @@ export async function GET(request: NextRequest) {
         success: true,
         source: "demonstration",
         message: "Dados de demonstração - faça upload de balancetes para ver dados reais",
-        data: generateDemoData(viewMode, year, monthValue),
+        data: await generateDemoData(viewMode, year, monthValue),
       });
     }
 
@@ -149,7 +152,7 @@ export async function GET(request: NextRequest) {
         success: true,
         source: "demonstration",
         message: `Sem dados para o ano ${year} - exibindo dados de demonstração`,
-        data: generateDemoData(viewMode, year, monthValue),
+        data: await generateDemoData(viewMode, year, monthValue),
       });
     }
 
@@ -362,7 +365,7 @@ export async function GET(request: NextRequest) {
           success: true,
           source: "demonstration",
           message: "Dados insuficientes para consolidação anual",
-          data: generateDemoData("anual", year, monthValue),
+          data: await generateDemoData("anual", year, monthValue),
         });
       }
     }
@@ -376,11 +379,11 @@ export async function GET(request: NextRequest) {
  * Gera dados de demonstração quando não há dados reais no banco
  * Inclui estruturaDRE para visão mensal funcionar corretamente
  */
-function generateDemoData(
+async function generateDemoData(
   viewMode: string,
   year: string,
   month: string
-): {
+): Promise<{
   bp: ProcessedBP;
   dre: ProcessedDRE;
   indices: FinancialIndices;
@@ -390,7 +393,7 @@ function generateDemoData(
   estruturaBP?: ContaComValor[];
   resultadoDRE?: number;
   totalPassivoPL?: number;
-} {
+}> {
   // Fatores de variação por ano para simular crescimento
   const yearFactors: Record<string, number> = {
     "2023": 0.85,
@@ -599,63 +602,175 @@ function generateDemoData(
     },
   };
 
-  // ═══ ESTRUTURA DRE FICTÍCIA (formato sequencial) ═══
-  // Segue a mesma estrutura que o mapBalanceteToDRE gera
-  const gerarEstruturaDRE = (fatorMes: number): ContaComValor[] => {
-    const v = (val: number) => Math.round(val * fatorMes);
-    
-    const conta = (codigo: string, descricao: string, valor: number, nivelVis: number, children?: ContaComValor[]): ContaComValor => ({
-      codigo,
-      descricao,
-      codigoSuperior: null,
-      nivel: 1,
-      nivelVisualizacao: nivelVis,
-      valor: v(valor),
-      children: children || [],
-    });
+  const normalizarTexto = (value: string) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
 
-    return [
-      // Receita Bruta (expandível)
-      conta('51', 'Receita Bruta', receitaBruta, 1, [
-        conta('51.1', 'Receitas de Competições', 18000000 * factor, 2),
-        conta('51.2', 'Patrocínios e Publicidade', 12000000 * factor, 2),
-        conta('51.3', 'Direitos de Transmissão', 10000000 * factor, 2),
-        conta('51.4', 'Outras Receitas Operacionais', 5000000 * factor, 2),
-      ]),
-      // Receita Líquida (calculada, sem children)
-      conta('56', 'Receita Líquida', receitaLiquida, 1),
-      // Custos (expandível)
-      conta('57', '(-) Custos dos Serviços', custos, 1, [
-        conta('57.1', 'Custos com Arbitragem', 8000000 * factor, 2),
-        conta('57.2', 'Premiações', 7000000 * factor, 2),
-        conta('57.3', 'Infraestrutura Esportiva', 5000000 * factor, 2),
-        conta('57.4', 'Outros Custos', 5000000 * factor, 2),
-      ]),
-      // Margem Bruta (calculada)
-      conta('109', 'Margem Bruta', margemBruta, 1),
-      // Despesas (expandível)
-      conta('110', '(-) Despesas Gerais', despesasGerais, 1, [
-        conta('110.1', 'Despesas Administrativas', 5000000 * factor, 2),
-        conta('110.2', 'Despesas com Pessoal', 3000000 * factor, 2),
-        conta('110.3', 'Despesas Comerciais e Marketing', 2000000 * factor, 2),
-      ]),
-      // Resultado Operacional (calculado)
-      conta('196', 'Resultado Operacional', resultadoOperacional, 1),
-      // Lucro Antes do Resultado Financeiro (calculado)
-      conta('197', 'Lucro Antes do Resultado Financeiro', resultadoOperacional, 1),
-      // Resultado Financeiro (expandível, indentado)
-      { ...conta('198', '(+/-) Resultado Financeiro', resultadoFinanceiro, 2, [
-        conta('198.1', 'Receitas Financeiras', 500000 * factor, 3),
-        conta('198.2', '(-) Despesas Financeiras', -2500000 * factor, 3),
-      ]) },
-      // Lucro Líquido Antes dos Impostos
-      conta('227', 'Lucro Líquido Antes dos Impostos', lucroAntesIR, 1),
-      // Superávit/Déficit
-      conta('229', 'Superávit/Déficit do Exercício', resultadoLiquido, 1),
-    ];
+  const buscarCodigoPorDescricao = (
+    estrutura: ContaEstrutura[],
+    termosPreferenciais: string[][],
+    fallbackCodigos: string[] = []
+  ): string | null => {
+    for (const termos of termosPreferenciais) {
+      const matches = estrutura
+        .filter((conta) => {
+          const desc = normalizarTexto(conta.descricao || '');
+          return termos.every((termo) => desc.includes(normalizarTexto(termo)));
+        })
+        .sort((a, b) => {
+          const na = Number(a.nivel ?? Number.MAX_SAFE_INTEGER);
+          const nb = Number(b.nivel ?? Number.MAX_SAFE_INTEGER);
+          if (na !== nb) return na - nb;
+          return String(a.codigo).localeCompare(String(b.codigo));
+        });
+      if (matches.length > 0) return matches[0].codigo;
+    }
+
+    for (const codigo of fallbackCodigos) {
+      if (estrutura.some((conta) => conta.codigo === codigo)) return codigo;
+    }
+
+    return null;
   };
 
-  const estruturaDRE = ordenarArvoreDreReceitaBrutaPrimeiro(gerarEstruturaDRE(mFactor));
+  const construirArvoreComValores = (
+    estrutura: ContaEstrutura[],
+    valoresPorCodigo: Record<string, number>
+  ): ContaComValor[] => {
+    const ordemPorCodigo = new Map<string, number>();
+    estrutura.forEach((item, idx) => {
+      ordemPorCodigo.set(item.codigo, Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : idx + 1);
+    });
+
+    const mapa = new Map<string, ContaComValor>();
+    estrutura.forEach((item) => {
+      mapa.set(item.codigo, {
+        codigo: item.codigo,
+        descricao: item.descricao,
+        codigoSuperior: item.codigoSuperior,
+        nivel: item.nivel,
+        nivelVisualizacao: item.nivelVisualizacao,
+        valor: valoresPorCodigo[item.codigo] || 0,
+        children: [],
+      });
+    });
+
+    const roots: ContaComValor[] = [];
+    estrutura.forEach((item) => {
+      const atual = mapa.get(item.codigo)!;
+      if (item.codigoSuperior) {
+        const pai = mapa.get(item.codigoSuperior);
+        if (pai) {
+          pai.children!.push(atual);
+          return;
+        }
+      }
+      roots.push(atual);
+    });
+
+    const sortRec = (nodes: ContaComValor[]) => {
+      nodes.sort((a, b) => {
+        const oa = ordemPorCodigo.get(a.codigo) ?? Number.MAX_SAFE_INTEGER;
+        const ob = ordemPorCodigo.get(b.codigo) ?? Number.MAX_SAFE_INTEGER;
+        if (oa !== ob) return oa - ob;
+        return a.codigo.localeCompare(b.codigo);
+      });
+      nodes.forEach((node) => {
+        if (node.children?.length) sortRec(node.children);
+      });
+    };
+
+    const preencherPais = (node: ContaComValor): number => {
+      if (!node.children?.length) return node.valor;
+      const somaFilhos = node.children.reduce((s, child) => s + preencherPais(child), 0);
+      if (Math.abs(node.valor || 0) < 0.000001) node.valor = somaFilhos;
+      return node.valor;
+    };
+
+    sortRec(roots);
+    roots.forEach((root) => preencherPais(root));
+    return roots;
+  };
+
+  const [estruturaDREPadrao, estruturaBPPadrao] = await Promise.all([
+    loadEstruturaDRE(),
+    loadEstruturaBP(),
+  ]);
+
+  const gerarEstruturaDREPadrao = (fatorDre: number): ContaComValor[] => {
+    if (!estruturaDREPadrao.length) return [];
+
+    const v = (val: number) => Math.round(val * fatorDre);
+    const valores: Record<string, number> = {};
+
+    const set = (termos: string[][], valor: number, fallback: string[] = []) => {
+      const codigo = buscarCodigoPorDescricao(estruturaDREPadrao, termos, fallback);
+      if (codigo) valores[codigo] = valor;
+    };
+
+    set([['receita', 'bruta']], v(receitaBruta), ['51']);
+    set([['receitas', 'competicoes']], v(18000000 * factor), ['1']);
+    set([['receitas', 'repasses']], v(13500000 * factor), ['19']);
+    set([['outras', 'receitas', 'operacionais']], v(5000000 * factor), ['40']);
+    set([['receita', 'liquida']], v(receitaLiquida), ['56']);
+
+    set([['custos']], v(custos), ['57']);
+    set([['arbitragem']], v(8000000 * factor), ['60']);
+    set([['premiacoes']], v(7000000 * factor), ['65']);
+    set([['infraestrutura', 'esportiva']], v(5000000 * factor), ['68']);
+    set([['outros', 'custos']], v(5000000 * factor), ['72']);
+
+    set([['margem', 'bruta']], v(margemBruta), ['109']);
+    set([['despesas']], v(despesasGerais), ['110']);
+    set([['despesas', 'administrativas']], v(5000000 * factor), ['125']);
+    set([['despesas', 'pessoal']], v(3000000 * factor), ['105']);
+    set([['despesas', 'comerciais'], ['marketing']], v(2000000 * factor), ['164']);
+
+    set([['resultado', 'operacional']], v(resultadoOperacional), ['196', '211']);
+    set([['lucro', 'antes', 'resultado', 'financeiro']], v(resultadoOperacional), ['197']);
+    set([['resultado', 'financeiro']], v(resultadoFinanceiro), ['198', '190']);
+    set([['receitas', 'financeiras']], v(500000 * factor), ['198.1', '191']);
+    set([['despesas', 'financeiras']], v(-2500000 * factor), ['198.2', '199']);
+    set([['lucro', 'antes', 'impostos']], v(lucroAntesIR), ['227']);
+    set([['superavit', 'deficit', 'exercicio']], v(resultadoLiquido), ['229']);
+
+    return ordenarArvoreDreReceitaBrutaPrimeiro(construirArvoreComValores(estruturaDREPadrao, valores));
+  };
+
+  const gerarEstruturaBPPadrao = (): ContaComValor[] => {
+    if (!estruturaBPPadrao.length) return [];
+
+    const valores: Record<string, number> = {};
+    const set = (termos: string[][], valor: number, fallback: string[] = []) => {
+      const codigo = buscarCodigoPorDescricao(estruturaBPPadrao, termos, fallback);
+      if (codigo) valores[codigo] = Math.round(valor);
+    };
+
+    set([['ativo']], ativoTotal, ['1']);
+    set([['ativo', 'circulante']], totalAtivoCirculante, ['2']);
+    set([['disponibilidades']], disponibilidades + aplicacoesFinanceiras, ['3']);
+    set([['contas', 'a', 'receber']], contasReceber, ['7']);
+    set([['estoques']], estoques, ['17']);
+    set([['ativo', 'nao', 'circulante']], totalAtivoNaoCirculante, ['33']);
+    set([['realizavel', 'longo', 'prazo']], realizavelLP, ['34']);
+    set([['imobilizado']], imobilizado, ['43']);
+
+    set([['passivo', 'pl'], ['passivo', 'patrimonio']], totalPassivos + totalPL, ['76']);
+    set([['passivo', 'circulante']], totalPassivoCirculante, ['77']);
+    set([['fornecedores']], fornecedores, ['78']);
+    set([['passivo', 'nao', 'circulante']], totalPassivoNaoCirculante, ['113']);
+    set([['patrimonio', 'liquido']], totalPL, ['125']);
+    set([['capital', 'social']], capitalSocial, ['126']);
+    set([['superavit', 'acumulados'], ['lucros', 'acumulados']], lucrosAcumulados, ['141']);
+
+    return construirArvoreComValores(estruturaBPPadrao, valores);
+  };
+
+  const estruturaDREMensal = gerarEstruturaDREPadrao(mFactor);
+  const estruturaDREAnual = gerarEstruturaDREPadrao(1);
+  const estruturaBPDemo = gerarEstruturaBPPadrao();
 
   if (viewMode === "mensal") {
     const months = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -667,7 +782,8 @@ function generateDemoData(
       dre,
       indices,
       period: `${monthName}/${yearShort}`,
-      estruturaDRE,
+      estruturaDRE: estruturaDREMensal,
+      estruturaBP: estruturaBPDemo,
       resultadoDRE: resultadoLiquido * mFactor,
       totalPassivoPL: totalPassivos + totalPL,
     };
@@ -707,7 +823,8 @@ function generateDemoData(
     dre,
     indices,
     months: monthlyIndices,
-    estruturaDRE: ordenarArvoreDreReceitaBrutaPrimeiro(gerarEstruturaDRE(1)), // Anual: fator 1
+    estruturaDRE: estruturaDREAnual,
+    estruturaBP: estruturaBPDemo,
     resultadoDRE: resultadoLiquido,
     totalPassivoPL: totalPassivos + totalPL,
   };

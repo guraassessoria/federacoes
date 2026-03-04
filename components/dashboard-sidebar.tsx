@@ -173,17 +173,17 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="mb-4 flex justify-center">
-          <Image src="/planning-mark.png" alt="Planning" width={300} height={84} className="h-32 w-auto" priority />
+          <Image src="/planning-mark.png" alt="Planning" width={210} height={59} className="h-[90px] w-auto" priority />
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left text-white"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white/10 hover:bg-white/15 rounded-lg transition-all text-left !text-white"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-white">Empresa Selecionada</p>
-              <p className="text-sm font-medium text-white truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
+              <p className="text-xs !text-white">Empresa Selecionada</p>
+              <p className="text-sm font-medium !text-white truncate">{selectedCompanyName || companyName || "Selecione uma empresa"}</p>
             </div>
             <ChevronDown className={cn(
               "w-4 h-4 text-white transition-transform flex-shrink-0",
@@ -231,7 +231,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
       {/* View Mode Toggle */}
       <div className="px-4 py-3 border-b border-white/10">
-        <p className="text-xs text-white uppercase font-medium mb-2 px-2">Visão</p>
+        <p className="text-xs !text-white uppercase font-medium mb-2 px-2">Visão</p>
         <div className="flex gap-2 mb-3">
           <button
             onClick={() => handleViewModeChange("anual")}
@@ -330,7 +330,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       <nav className="flex-1 overflow-y-auto py-4">
         {/* Analysis Section */}
         <div className="px-4 mb-4">
-          <p className="text-xs text-white uppercase font-medium mb-2 px-2">Análises</p>
+          <p className="text-xs !text-white uppercase font-medium mb-2 px-2">Análises</p>
           <ul className="space-y-1">
             {analysisItems.map((item) => {
               const Icon = item.icon;
@@ -358,7 +358,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Data Management Section (Editor & Admin) */}
         {isEditor && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-white uppercase font-medium mb-2 px-2">Dados</p>
+            <p className="text-xs !text-white uppercase font-medium mb-2 px-2">Dados</p>
             <ul className="space-y-1">
               {dataManagementItems.map((item) => {
                 const Icon = item.icon;
@@ -387,7 +387,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
         {/* Admin Section */}
         {isAdmin && (
           <div className="px-4 mb-4">
-            <p className="text-xs text-white uppercase font-medium mb-2 px-2">Administração</p>
+            <p className="text-xs !text-white uppercase font-medium mb-2 px-2">Administração</p>
             <ul className="space-y-1">
               {adminItems.map((item) => {
                 const Icon = item.icon;
@@ -417,8 +417,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <div className="bg-white/10 rounded-lg px-3 py-2 mb-3">
-          <p className="text-xs text-white">Nível de Acesso</p>
-          <p className="text-sm font-medium text-white">{userRole}</p>
+          <p className="text-xs !text-white">Nível de Acesso</p>
+          <p className="text-sm font-medium !text-white">{userRole}</p>
         </div>
         <button
           onClick={handleLogout}

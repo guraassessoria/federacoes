@@ -173,7 +173,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="mb-4 flex justify-center">
-          <Image src="/planning-logo.png" alt="Planning" width={150} height={42} className="h-12 w-auto" priority />
+          <Image src="/planning-logo.png" alt="Planning" width={150} height={42} className="h-16 w-auto" priority />
         </div>
         {/* Dropdown de Empresas */}
         <div className="relative" ref={dropdownRef}>
@@ -204,7 +204,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                     key={company.id}
                     onClick={() => handleSelectCompany(company)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
+                      "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors text-[#C7CAD0]",
                       company.id === selectedCompanyId && "bg-[#08C97D]/25 text-white"
                     )}
                   >
@@ -279,7 +279,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                   key={year}
                   onClick={() => handleYearChange(year)}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
+                    "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors text-[#C7CAD0]",
                     year === selectedYear && "bg-[#08C97D]/25 text-white"
                   )}
                 >
@@ -312,7 +312,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
                     key={month.value}
                     onClick={() => handleMonthChange(month.value)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors",
+                      "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-white/10 transition-colors text-[#C7CAD0]",
                         month.value === selectedMonth && "bg-[#08C97D]/25 text-white"
                     )}
                   >
@@ -417,7 +417,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <div className="bg-white/10 rounded-lg px-3 py-2 mb-3">
-          <p className="text-xs text-[#8E8E8E]">Nível de Acesso</p>
+          <p className="text-xs text-[#C7CAD0]">Nível de Acesso</p>
           <p className="text-sm font-medium">{userRole}</p>
         </div>
         <button

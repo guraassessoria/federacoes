@@ -15,9 +15,12 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    // Se quiser travar só ADMIN, mantém assim:
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Lê FormData (arquivo real)

@@ -241,6 +241,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const type = (searchParams.get("type") || "").toUpperCase();
 

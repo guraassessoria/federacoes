@@ -801,7 +801,7 @@ async function gerarDadosFicticiosComparativo(year: string): Promise<{
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -826,7 +826,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Fallback: todas as empresas do usuário
       const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { id: session.user.id },
         include: { companies: { include: { company: { select: { id: true, name: true } } } } }
       });
       if (user?.companies) {

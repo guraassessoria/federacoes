@@ -1,5 +1,12 @@
-// AWS S3 helper is deprecated. Application now uses Vercel Blob storage.
-// Keep this file present to avoid breaking imports but throw errors if used.
+import { del, head } from "@vercel/blob";
+
+function getBlobToken(): string {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    throw new Error("Missing env var: BLOB_READ_WRITE_TOKEN");
+  }
+  return token;
+}
 
 export async function generatePresignedUploadUrl(
   fileName: string,
@@ -13,9 +20,10 @@ export async function getFileUrl(
   cloudStoragePath: string,
   isPublic: boolean = false
 ): Promise<string> {
-  throw new Error("getFileUrl is deprecated. Use storage providers instead.");
+  const meta = await head(cloudStoragePath, { token: getBlobToken() });
+  return isPublic ? meta.url : meta.downloadUrl;
 }
 
 export async function deleteFile(cloudStoragePath: string): Promise<void> {
-  throw new Error("deleteFile is deprecated. Use storage providers instead.");
+  await del(cloudStoragePath, { token: getBlobToken() });
 }

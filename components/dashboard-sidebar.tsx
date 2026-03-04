@@ -72,7 +72,6 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
 
   const isAdmin = userRole === "ADMIN";
   const isGestor = userRole === "GESTOR";
-  const isEditor = userRole === "EDITOR" || isAdmin;
 
   // Buscar empresas do usuário
   useEffect(() => {
@@ -129,7 +128,7 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
     { href: "/dashboard/analise-vertical", label: "Análise Vertical", icon: PieChart },
   ];
 
-  // Menu items for Editor and Admin - Dados
+  // Menu items for Admin - Dados
   const dataManagementItems = [
     { href: "/admin/dados", label: "Gerenciar Dados", icon: Database },
   ];
@@ -355,8 +354,8 @@ export function DashboardSidebar({ userRole, companyName }: DashboardSidebarProp
           </ul>
         </div>
 
-        {/* Data Management Section (Editor & Admin) */}
-        {isEditor && (
+        {/* Data Management Section (Admin) */}
+        {isAdmin && (
           <div className="px-4 mb-4">
             <p className="text-xs !text-white uppercase font-medium mb-2 px-2">Dados</p>
             <ul className="space-y-1">

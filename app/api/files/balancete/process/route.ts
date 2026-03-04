@@ -168,6 +168,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { companyId, fileId } = body;
 
@@ -176,23 +180,6 @@ export async function POST(request: NextRequest) {
         { error: "companyId e fileId são obrigatórios" },
         { status: 400 }
       );
-    }
-
-    // Verificar permissão do usuário na empresa
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        companyId,
-        role: { in: ["ADMIN", "EDITOR"] },
-      },
-    });
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
-
-    if (!userCompany && user?.role !== "ADMIN") {
-      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }
 
     // Buscar o arquivo

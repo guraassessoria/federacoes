@@ -20,9 +20,9 @@ export default withAuth(
       }
     }
 
-    // Rotas de upload - ADMIN e EDITOR
+    // Rotas de upload - apenas ADMIN
     if (path.startsWith("/upload")) {
-      if (token?.role !== "ADMIN" && token?.role !== "EDITOR") {
+      if (token?.role !== "ADMIN") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }

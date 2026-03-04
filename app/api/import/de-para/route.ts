@@ -40,6 +40,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    }
+
     const form = await req.formData();
     const companyId = toStr(form.get("companyId"));
     const file = form.get("file");

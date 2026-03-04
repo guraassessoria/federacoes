@@ -6,8 +6,17 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Iniciando seed do banco de dados...");
 
+  const testPasswordPlain = process.env.SEED_TEST_PASSWORD;
+  const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD;
+
+  if (!testPasswordPlain || !adminPasswordPlain) {
+    throw new Error(
+      "Defina SEED_TEST_PASSWORD e SEED_ADMIN_PASSWORD no ambiente para executar o seed com segurança."
+    );
+  }
+
   // Create test user (required for testing)
-  const testPassword = await bcrypt.hash("johndoe123", 10);
+  const testPassword = await bcrypt.hash(testPasswordPlain, 10);
   const testUser = await prisma.user.upsert({
     where: { email: "john@doe.com" },
     update: {},
@@ -21,7 +30,7 @@ async function main() {
   console.log("Usuário de teste criado:", testUser.email);
 
   // Create admin user
-  const adminPassword = await bcrypt.hash("Admin@123", 10);
+  const adminPassword = await bcrypt.hash(adminPasswordPlain, 10);
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@federacao.com.br" },
     update: { password: adminPassword },

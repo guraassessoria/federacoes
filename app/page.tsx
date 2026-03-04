@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Building2 } from "lucide-react";
+import Link from "next/link";
 
 export default function HomePage() {
   const { status } = useSession() || {};
@@ -12,22 +12,62 @@ export default function HomePage() {
   useEffect(() => {
     if (status === "authenticated") {
       router.replace("/selecionar-empresa");
-    } else if (status === "unauthenticated") {
-      router.replace("/login");
     }
   }, [status, router]);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center">
-      <div className="text-center text-white">
-        <div className="flex justify-center mb-6">
-          <div className="bg-white/20 p-4 rounded-full">
-            <Building2 className="w-12 h-12" />
-          </div>
-        </div>
-        <h1 className="text-2xl font-bold mb-2">Dashboard Financeiro</h1>
-        <p className="text-blue-200">Carregando...</p>
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-sm text-[#8E8E8E]">Carregando...</p>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <nav className="h-16 bg-[#13161C]">
+        <div className="mx-auto h-full max-w-6xl px-6 flex items-center justify-between">
+          <span className="text-white text-xl font-semibold tracking-tight">Planning</span>
+          <Link
+            href="/login"
+            className="inline-flex items-center rounded-md bg-[#08C97D] px-4 py-2 text-sm font-semibold text-[#13161C] transition-colors hover:bg-[#0AE18C]"
+          >
+            Entrar
+          </Link>
+        </div>
+      </nav>
+
+      <main className="mx-auto max-w-6xl px-6 py-16">
+        <header className="mb-10">
+          <h1 className="text-5xl font-light tracking-tight text-[#6B6E71]">Áreas</h1>
+          <h2 className="text-5xl font-extrabold tracking-tight text-[#08C97D]">de atuação</h2>
+        </header>
+
+        <div className="mb-8 h-px w-full bg-[#E5E7EB]" />
+
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <article className="rounded-2xl border border-[#E5E7EB] p-6">
+            <h3 className="text-2xl font-medium text-[#13161C]">Planejamento estratégico</h3>
+            <p className="mt-4 text-base font-normal text-[#8E8E8E]">
+              Estruturamos metas e indicadores para apoiar decisões com foco em crescimento sustentável.
+            </p>
+          </article>
+
+          <article className="rounded-2xl border border-[#E5E7EB] p-6">
+            <h3 className="text-2xl font-medium text-[#13161C]">Gestão financeira</h3>
+            <p className="mt-4 text-base font-normal text-[#8E8E8E]">
+              Consolidamos informações financeiras em análises claras para acompanhamento de desempenho.
+            </p>
+          </article>
+
+          <article className="rounded-2xl border border-[#E5E7EB] p-6">
+            <h3 className="text-2xl font-medium text-[#13161C]">Inteligência de dados</h3>
+            <p className="mt-4 text-base font-normal text-[#8E8E8E]">
+              Transformamos dados operacionais em insights acionáveis para reduzir riscos e melhorar resultados.
+            </p>
+          </article>
+        </section>
+      </main>
     </div>
   );
 }

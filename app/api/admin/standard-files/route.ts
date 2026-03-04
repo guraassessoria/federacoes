@@ -162,6 +162,33 @@ function parseCsv(content: string): Record<string, any>[] {
   });
 }
 
+function csvEscape(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  if (/[;"\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function rowsToCsv(rows: StructureRow[]): string {
+  const header = ["ordem", "codigo", "descricao", "codigoSuperior", "nivel", "isTotal", "grupo"];
+  const lines = rows.map((row) =>
+    [
+      row.ordem,
+      row.codigo,
+      row.descricao,
+      row.codigoSuperior ?? "",
+      row.nivel ?? "",
+      row.isTotal,
+      row.grupo ?? "",
+    ]
+      .map(csvEscape)
+      .join(";")
+  );
+
+  return [header.join(";"), ...lines].join("\n");
+}
+
 function mapRows(rows: Record<string, any>[]): StructureRow[] {
   if (!rows.length) return [];
   const keys = Object.keys(rows[0]);
@@ -217,6 +244,11 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const type = (searchParams.get("type") || "").toUpperCase();
 
+    const shouldDownload = ["1", "true", "yes"].includes(
+      (searchParams.get("download") || "").toLowerCase()
+    );
+    const format = (searchParams.get("format") || "csv").toLowerCase();
+
     if (!type) {
       const all = await prisma.standardStructure.findMany({
         orderBy: { type: "asc" },
@@ -234,14 +266,54 @@ export async function GET(req: NextRequest) {
     });
 
     if (!record) {
+      if (shouldDownload) {
+        return NextResponse.json({ error: "Estrutura não encontrada" }, { status: 404 });
+      }
       return NextResponse.json({ type, version: 0, rows: [], meta: null });
     }
 
     const data = record.data as any;
+    const rows: StructureRow[] = Array.isArray(data?.rows) ? data.rows : [];
+
+    if (shouldDownload) {
+      if (format !== "csv" && format !== "json") {
+        return NextResponse.json({ error: "Formato inválido. Use csv ou json." }, { status: 400 });
+      }
+
+      if (format === "json") {
+        const payload = {
+          type: record.type,
+          version: record.version,
+          rows,
+          meta: data?.meta ?? null,
+          updatedAt: record.updatedAt,
+        };
+
+        return new NextResponse(JSON.stringify(payload, null, 2), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Content-Disposition": `attachment; filename=\"estrutura_${record.type.toLowerCase()}_v${record.version}.json\"`,
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+
+      const csv = rowsToCsv(rows);
+      return new NextResponse(`\uFEFF${csv}`, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename=\"estrutura_${record.type.toLowerCase()}_v${record.version}.csv\"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     return NextResponse.json({
       type: record.type,
       version: record.version,
-      rows: data?.rows ?? [],
+      rows,
       meta: data?.meta ?? null,
       updatedAt: record.updatedAt,
     });

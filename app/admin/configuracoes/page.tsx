@@ -142,6 +142,7 @@ export default function EstruturasPage() {
   const [activeType, setActiveType] = useState<StructureType>("BP");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewRows, setPreviewRows] = useState<StructureRow[]>([]);
@@ -279,6 +280,52 @@ export default function EstruturasPage() {
       setMessage(e?.message || "Erro no upload");
     } finally {
       setUploading(false);
+    }
+  };
+
+  // ── Download active saved version ──
+  const downloadActiveStructure = async () => {
+    if (!data.version) return;
+
+    setDownloading(true);
+    setStatus("idle");
+    setMessage("");
+
+    try {
+      const res = await fetch(
+        `${API_ENDPOINTS.ADMIN_STANDARD_FILES}?type=${activeType}&download=1&format=csv`,
+        { cache: "no-store" }
+      );
+
+      if (!res.ok) {
+        let errorMessage = "Erro ao baixar estrutura";
+        try {
+          const json = await res.json();
+          errorMessage = json?.error || errorMessage;
+        } catch {
+          // noop
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition") || "";
+      const fileNameMatch = contentDisposition.match(/filename=\"?([^\"]+)\"?/i);
+      const fileName = fileNameMatch?.[1] || `estrutura_${activeType.toLowerCase()}_v${data.version}.csv`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setStatus("error");
+      setMessage(e?.message || "Erro ao baixar estrutura ativa");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -424,6 +471,20 @@ export default function EstruturasPage() {
             >
               <Download className="w-4 h-4" />
               Baixar template CSV de exemplo
+            </button>
+
+            <button
+              onClick={downloadActiveStructure}
+              disabled={!data.version || loading || downloading || isPreviewMode}
+              className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                isPreviewMode
+                  ? "Finalize ou limpe o preview para baixar a versão ativa salva"
+                  : undefined
+              }
+            >
+              <Download className={`w-4 h-4 ${downloading ? "animate-pulse" : ""}`} />
+              {downloading ? "Baixando versão ativa..." : `Baixar versão ativa (${activeType})`}
             </button>
 
             {/* File input area */}

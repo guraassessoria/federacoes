@@ -133,13 +133,13 @@ export default function AnaliseHorizontalPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <ArrowLeftRight className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Análise Horizontal</h1>
         </div>
-        <p className="text-orange-100">Variação percentual por código contábil (modelo DRE/BP)</p>
+        <p className="text-emerald-100">Variação percentual por código contábil (modelo DRE/BP)</p>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -736,14 +736,7 @@ export default function DemonstracoesPage() {
   };
 
   const getTabColor = () => {
-    switch (activeTab) {
-      case 'bp': return 'bg-[#08C97D]';
-      case 'dre': return 'bg-[#07B670]';
-      case 'dfc': return 'bg-emerald-600';
-      case 'dmpl': return 'bg-purple-600';
-      case 'dra': return 'bg-amber-600';
-      default: return 'bg-[#08C97D]';
-    }
+    return 'bg-gradient-to-r from-[#08C97D] to-[#07B670]';
   };
 
   // Função para renderizar contas da estrutura base recursivamente
@@ -1315,31 +1308,31 @@ export default function DemonstracoesPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('bp')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-[#08C97D] text-[#13161C] shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-gradient-to-r from-[#08C97D] to-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             BP
           </button>
           <button
             onClick={() => setActiveTab('dre')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-gradient-to-r from-[#08C97D] to-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DRE
           </button>
           <button
             onClick={() => setActiveTab('dfc')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dfc' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dfc' ? 'bg-gradient-to-r from-[#08C97D] to-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DFC
           </button>
           <button
             onClick={() => setActiveTab('dmpl')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dmpl' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dmpl' ? 'bg-gradient-to-r from-[#08C97D] to-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DMPL
           </button>
           <button
             onClick={() => setActiveTab('dra')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dra' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dra' ? 'bg-gradient-to-r from-[#08C97D] to-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DRA
           </button>

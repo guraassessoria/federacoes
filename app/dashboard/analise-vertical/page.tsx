@@ -122,7 +122,7 @@ export default function AnaliseVerticalPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#08C97D]" />
       </div>
     );
   }
@@ -143,26 +143,26 @@ export default function AnaliseVerticalPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <BarChart3 className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Análise Vertical</h1>
         </div>
-        <p className="text-indigo-100">Composição percentual por modelo contábil (DRE e BP)</p>
+        <p className="text-emerald-100">Composição percentual por modelo contábil (DRE e BP)</p>
       </motion.div>
 
       <div className="flex flex-wrap gap-4">
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('dre')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'dre' ? 'bg-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             DRE
           </button>
           <button
             onClick={() => setActiveTab('bp')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'bp' ? 'bg-[#07B670] text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             Balanço Patrimonial
           </button>
@@ -226,7 +226,7 @@ export default function AnaliseVerticalPage() {
                       {conta.analitica ? (
                         <div className="w-full bg-slate-200 rounded-full h-4">
                           <div 
-                            className="bg-indigo-500 h-4 rounded-full transition-all duration-500"
+                            className="bg-[#08C97D] h-4 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(Math.abs(value), 100)}%` }}
                           />
                         </div>

@@ -86,26 +86,26 @@ export default function LiquidezPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-cyan-600 to-cyan-700 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <Droplets className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Índices de Liquidez</h1>
         </div>
-        <p className="text-cyan-100">Capacidade de pagamento das obrigações de curto prazo - {periodLabel}</p>
+        <p className="text-emerald-100">Capacidade de pagamento das obrigações de curto prazo - {periodLabel}</p>
         {source === 'demonstration' && (
-          <p className="text-cyan-200 text-sm mt-2">
+          <p className="text-emerald-200 text-sm mt-2">
             <Info className="w-4 h-4 inline mr-1" />
             {message || "Dados de demonstração"}
           </p>
         )}
       </motion.div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800">
+      <div className="bg-[#F7FDFC] border border-[#B8EED8] rounded-xl p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-[#08C97D] flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-[#2C5D47]">
           <p className="font-semibold mb-1">Como interpretar:</p>
-          <ul className="list-disc list-inside space-y-1 text-blue-700">
+          <ul className="list-disc list-inside space-y-1 text-[#3B6F56]">
             <li><span className="text-green-600 font-medium">Verde</span>: Índice dentro ou acima da faixa ideal</li>
             <li><span className="text-yellow-600 font-medium">Amarelo</span>: Índice abaixo do ideal, requer atenção</li>
             <li><span className="text-red-600 font-medium">Vermelho</span>: Índice crítico, ação imediata necessária</li>
@@ -144,9 +144,9 @@ export default function LiquidezPage() {
           <CustomLineChart
             data={chartData}
             lines={[
-              { dataKey: 'Liquidez Corrente', color: '#0891B2', name: 'Corrente' },
-              { dataKey: 'Liquidez Seca', color: '#0D9488', name: 'Seca' },
-              { dataKey: 'Liquidez Imediata', color: '#0EA5E9', name: 'Imediata' },
+              { dataKey: 'Liquidez Corrente', color: '#08C97D', name: 'Corrente' },
+              { dataKey: 'Liquidez Seca', color: '#10B981', name: 'Seca' },
+              { dataKey: 'Liquidez Imediata', color: '#34D399', name: 'Imediata' },
             ]}
           />
         </motion.div>

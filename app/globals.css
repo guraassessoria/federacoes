@@ -8,7 +8,25 @@
 
 :root {
   --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  --foreground: 220 19% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 19% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 19% 9%;
+  --primary: 156 92% 41%;
+  --primary-foreground: 220 19% 9%;
+  --secondary: 210 18% 97%;
+  --secondary-foreground: 220 19% 9%;
+  --muted: 210 18% 97%;
+  --muted-foreground: 0 0% 56%;
+  --accent: 210 18% 97%;
+  --accent-foreground: 220 19% 9%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 14% 91%;
+  --input: 220 14% 91%;
+  --ring: 156 92% 41%;
+  --radius: 0.75rem;
 }
 
 * {
@@ -19,6 +37,26 @@ html, body {
   margin: 0;
   padding: 0;
   scroll-behavior: smooth;
+}
+
+body {
+  background-color: #ffffff;
+  color: #13161c;
+}
+
+@layer components {
+  .card-surface {
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .card-surface-hover {
+    transition: box-shadow 0.2s ease;
+  }
+
+  .card-surface-hover:hover {
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+  }
 }
 
 /* Custom scrollbar */

@@ -327,7 +327,7 @@ export default function EstruturasPage() {
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="flex items-center gap-3">
-                <FileSpreadsheet className="w-7 h-7 text-blue-600" />
+                <FileSpreadsheet className="w-7 h-7 text-[#08C97D]" />
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">
                     Estruturas Padrão das Demonstrações
@@ -360,7 +360,7 @@ export default function EstruturasPage() {
                 onClick={() => setActiveType(t.type)}
                 className={`flex-1 min-w-[140px] px-4 py-3 rounded-xl font-medium transition-all text-sm ${
                   activeType === t.type
-                    ? "bg-blue-600 text-white shadow-md"
+                    ? "bg-[#08C97D] text-[#13161C] shadow-md"
                     : "bg-slate-50 text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -368,7 +368,7 @@ export default function EstruturasPage() {
                 {info && info.version > 0 ? (
                   <div
                     className={`text-xs mt-0.5 ${
-                      activeType === t.type ? "text-blue-200" : "text-slate-400"
+                      activeType === t.type ? "text-[#145A3D]" : "text-slate-400"
                     }`}
                   >
                     v{info.version}
@@ -376,7 +376,7 @@ export default function EstruturasPage() {
                 ) : (
                   <div
                     className={`text-xs mt-0.5 ${
-                      activeType === t.type ? "text-blue-200" : "text-amber-500"
+                      activeType === t.type ? "text-[#145A3D]" : "text-amber-500"
                     }`}
                   >
                     Não configurado
@@ -392,25 +392,25 @@ export default function EstruturasPage() {
           {/* Upload Panel */}
           <div className="bg-white rounded-2xl shadow p-6 space-y-4">
             <h2 className="font-bold text-slate-900 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-blue-600" />
+              <Upload className="w-5 h-5 text-[#08C97D]" />
               Upload da Estrutura
             </h2>
 
             {/* Info */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm text-blue-800">
+            <div className="bg-[#F7FDFC] border border-[#B8EED8] rounded-xl p-3 text-sm text-[#2C5D47]">
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-medium mb-1">Formatos aceitos: XLSX ou CSV</p>
-                  <p className="text-blue-700 text-xs">
-                    Colunas: <code className="bg-blue-100 px-1 rounded">codigo</code>,{" "}
-                    <code className="bg-blue-100 px-1 rounded">descricao</code>,{" "}
-                    <code className="bg-blue-100 px-1 rounded">codigoSuperior</code>,{" "}
-                    <code className="bg-blue-100 px-1 rounded">nivel</code>,{" "}
-                    <code className="bg-blue-100 px-1 rounded">ordem</code>,{" "}
-                    <code className="bg-blue-100 px-1 rounded">isTotal</code>
+                  <p className="text-[#3B6F56] text-xs">
+                    Colunas: <code className="bg-[#DDF7EB] px-1 rounded">codigo</code>,{" "}
+                    <code className="bg-[#DDF7EB] px-1 rounded">descricao</code>,{" "}
+                    <code className="bg-[#DDF7EB] px-1 rounded">codigoSuperior</code>,{" "}
+                    <code className="bg-[#DDF7EB] px-1 rounded">nivel</code>,{" "}
+                    <code className="bg-[#DDF7EB] px-1 rounded">ordem</code>,{" "}
+                    <code className="bg-[#DDF7EB] px-1 rounded">isTotal</code>
                   </p>
-                  <p className="text-blue-600 text-xs mt-1">
+                  <p className="text-[#2C5D47] text-xs mt-1">
                     Também aceita nomes em inglês: code, description, parentCode, etc.
                   </p>
                 </div>
@@ -420,7 +420,7 @@ export default function EstruturasPage() {
             {/* Download template */}
             <button
               onClick={downloadTemplate}
-              className="inline-flex items-center gap-2 text-blue-700 hover:text-blue-900 text-sm font-medium"
+              className="inline-flex items-center gap-2 text-[#08C97D] hover:text-[#07B670] text-sm font-medium"
             >
               <Download className="w-4 h-4" />
               Baixar template CSV de exemplo
@@ -431,8 +431,8 @@ export default function EstruturasPage() {
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
                 selectedFile
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-slate-300 hover:border-blue-400 hover:bg-slate-50"
+                  ? "border-[#08C97D] bg-[#F7FDFC]"
+                  : "border-slate-300 hover:border-[#08C97D] hover:bg-slate-50"
               }`}
             >
               <input
@@ -448,7 +448,7 @@ export default function EstruturasPage() {
 
               {selectedFile ? (
                 <div>
-                  <FileSpreadsheet className="w-10 h-10 text-blue-600 mx-auto mb-2" />
+                  <FileSpreadsheet className="w-10 h-10 text-[#08C97D] mx-auto mb-2" />
                   <p className="font-semibold text-slate-800 text-sm">{selectedFile.name}</p>
                   <p className="text-xs text-slate-500 mt-1">
                     {previewRows.length > 0
@@ -493,7 +493,7 @@ export default function EstruturasPage() {
             <button
               onClick={handleUpload}
               disabled={!selectedFile || uploading || previewRows.length === 0}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-indigo-700 transition-all"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#08C97D] text-[#13161C] font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#0AE18C] transition-all"
             >
               <Upload className="w-5 h-5" />
               {uploading ? "Enviando..." : "Publicar nova versão"}
@@ -622,7 +622,7 @@ export default function EstruturasPage() {
                         key={`${row.codigo}-${idx}`}
                         className={`border-t transition-colors ${
                           row.isTotal
-                            ? "bg-blue-50 font-semibold"
+                            ? "bg-[#F7FDFC] font-semibold"
                             : "hover:bg-slate-50"
                         }`}
                       >
@@ -644,7 +644,7 @@ export default function EstruturasPage() {
                         <td className="px-3 py-2 text-center text-xs">{row.nivel ?? "—"}</td>
                         <td className="px-3 py-2 text-center">
                           {row.isTotal ? (
-                            <span className="inline-block w-5 h-5 bg-blue-100 text-blue-700 rounded text-xs leading-5 font-bold">
+                            <span className="inline-block w-5 h-5 bg-[#DDF7EB] text-[#2C5D47] rounded text-xs leading-5 font-bold">
                               T
                             </span>
                           ) : (

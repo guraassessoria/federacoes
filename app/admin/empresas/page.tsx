@@ -171,7 +171,7 @@ export default function AdminEmpresasPage() {
           </div>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all"
+            className="flex items-center gap-2 bg-[#08C97D] text-[#13161C] px-4 py-2 rounded-lg hover:bg-[#0AE18C] transition-all"
           >
             <Plus className="w-5 h-5" />
             Nova Empresa
@@ -189,13 +189,13 @@ export default function AdminEmpresasPage() {
               className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 bg-[#DDF7EB] rounded-xl flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-[#08C97D]" />
                 </div>
                 <div className="flex gap-1">
                   <button
                     onClick={() => openEditModal(company)}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600"
+                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-[#08C97D]"
                     title="Editar"
                   >
                     <Edit className="w-4 h-4" />
@@ -268,7 +268,7 @@ export default function AdminEmpresasPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                     placeholder="Federação Paulista de Futebol"
                     required
                   />
@@ -280,7 +280,7 @@ export default function AdminEmpresasPage() {
                     type="text"
                     value={formData.cnpj}
                     onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#08C97D]"
                     placeholder="00.000.000/0000-00"
                   />
                 </div>
@@ -315,7 +315,7 @@ export default function AdminEmpresasPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 bg-[#08C97D] text-[#13161C] rounded-lg hover:bg-[#0AE18C] flex items-center justify-center gap-2"
                   >
                     <Check className="w-4 h-4" />
                     {editingCompany ? "Salvar" : "Criar"}

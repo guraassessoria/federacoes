@@ -63,7 +63,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#08C97D] mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando dados financeiros...</p>
         </div>
       </div>
@@ -175,7 +175,7 @@ export default function DashboardPage() {
   const custosData = custosEstruturaData.length > 0 ? custosEstruturaData : custosFlatData;
   const despesasData = despesasEstruturaData.length > 0 ? despesasEstruturaData : despesasFlatData;
 
-  const receitasColors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+  const receitasColors = ["#08C97D", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
   const custosColors = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#6366F1"];
   const despesasColors = ["#F43F5E", "#FB7185", "#E11D48", "#BE123C", "#9F1239"];
 
@@ -234,7 +234,7 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <KPICard title="Receita Total" value={formatCurrency(receitaTotal)} change={0} icon={DollarSign} color="blue" />
+        <KPICard title="Receita Total" value={formatCurrency(receitaTotal)} change={0} icon={DollarSign} color="green" />
         <KPICard title="Resultado Líquido" value={formatCurrency(resultadoLiquido)} change={0} icon={TrendingUp} color={resultadoLiquido >= 0 ? "green" : "red"} />
         <KPICard title="Ativo Total" value={formatCurrency(ativoTotal)} change={0} icon={PiggyBank} color="purple" />
         <KPICard title="Passivo Total" value={formatCurrency(passivoTotal)} change={0} icon={Building2} color="red" />
@@ -244,30 +244,30 @@ export default function DashboardPage() {
       {/* Key Indices Summary */}
       {indices && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Principais Índices - {periodLabel}</h2>
+          className="card-surface bg-white rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-[#13161C] mb-4">Principais Índices - {periodLabel}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Liquidez Corrente</p>
-              <p className="text-2xl font-bold text-blue-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Liquidez Corrente</p>
+              <p className="text-3xl font-semibold tracking-tight text-[#08C97D] mt-1">
                 {renderIndicePrincipal(indices.liquidez.corrente, '', indexAvailability?.liquidez?.corrente, 2)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Margem Líquida</p>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Margem Líquida</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.rentabilidade.margemLiquida >= 0 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.rentabilidade.margemLiquida, '%', indexAvailability?.rentabilidade?.margemLiquida)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">ROE</p>
-              <p className="text-2xl font-bold text-purple-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">ROE</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.rentabilidade.roe >= 0 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.rentabilidade.roe, '%', indexAvailability?.rentabilidade?.roe)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Endividamento</p>
-              <p className="text-2xl font-bold text-orange-600">
+            <div className="rounded-lg border border-[#E5E7EB] bg-[#FCFCFC] p-4">
+              <p className="text-sm text-[#6B6E71]">Endividamento</p>
+              <p className={`text-3xl font-semibold tracking-tight mt-1 ${indices.endividamento.endividamentoGeral <= 70 ? 'text-[#08C97D]' : 'text-red-600'}`}>
                 {renderIndicePrincipal(indices.endividamento.endividamentoGeral, '%', indexAvailability?.endividamento?.endividamentoGeral)}
               </p>
             </div>
@@ -284,7 +284,7 @@ export default function DashboardPage() {
             <CustomLineChart
               data={lineChartData}
               lines={[
-                { dataKey: "liquidez", color: "#3B82F6", name: "Liquidez Corrente" },
+                { dataKey: "liquidez", color: "#08C97D", name: "Liquidez Corrente" },
                 { dataKey: "rentabilidade", color: "#10B981", name: "Margem Líquida (%)" },
               ]}
             />

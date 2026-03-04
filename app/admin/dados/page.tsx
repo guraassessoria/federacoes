@@ -294,7 +294,7 @@ export default function GerenciamentoDadosPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-[#08C97D] to-[#07B670] rounded-lg flex items-center justify-center">
               <Database className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -330,7 +330,7 @@ export default function GerenciamentoDadosPage() {
           className="bg-white rounded-xl shadow-lg p-6 mb-6"
         >
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+            <Info className="w-5 h-5 text-[#08C97D] mt-0.5" />
             <div className="w-full">
               <h3 className="font-semibold text-gray-800 mb-2">Upload de Balancete</h3>
               <p className="text-sm text-gray-600 mb-4">
@@ -392,7 +392,7 @@ export default function GerenciamentoDadosPage() {
             className={`mt-6 border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
               selectedBalanceteFile
                 ? "border-green-500 bg-green-50"
-                : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                : "border-gray-300 hover:border-[#08C97D] hover:bg-[#F7FDFC]"
             }`}
           >
             <input
@@ -445,7 +445,7 @@ export default function GerenciamentoDadosPage() {
           <button
             onClick={handleUploadBalancete}
             disabled={!selectedBalanceteFile || uploadingBalancete || !canUpload}
-            className="mt-6 w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="mt-6 w-full bg-[#08C97D] text-[#13161C] py-3 rounded-lg font-semibold hover:bg-[#0AE18C] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {uploadingBalancete ? (
               <>Enviando...</>
@@ -481,22 +481,22 @@ export default function GerenciamentoDadosPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl shadow-lg p-6"
         >
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+          <div className="bg-[#F7FDFC] border border-[#B8EED8] rounded-xl p-6 mb-6">
             <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <Info className="w-5 h-5 text-[#08C97D] mt-0.5" />
               <div>
-                <h3 className="font-medium text-blue-800 mb-2">Upload de De x Para</h3>
-                <p className="text-sm text-blue-700 mb-3">Colunas obrigatórias (com variações aceitas):</p>
+                <h3 className="font-medium text-[#2C5D47] mb-2">Upload de De x Para</h3>
+                <p className="text-sm text-[#3B6F56] mb-3">Colunas obrigatórias (com variações aceitas):</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  <span className="bg-blue-100 px-2 py-1 rounded">Conta Federação</span>
-                  <span className="bg-blue-100 px-2 py-1 rounded">Descrição Conta</span>
-                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_BP</span>
-                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DRE</span>
-                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DFC</span>
-                  <span className="bg-blue-100 px-2 py-1 rounded">Padrão_DMPL</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Conta Federação</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Descrição Conta</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Padrão_BP</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Padrão_DRE</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Padrão_DFC</span>
+                  <span className="bg-[#DDF7EB] px-2 py-1 rounded">Padrão_DMPL</span>
                 </div>
 
-                <button onClick={downloadTemplate} className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium">
+                <button onClick={downloadTemplate} className="mt-4 flex items-center gap-2 text-[#08C97D] hover:text-[#07B670] text-sm font-medium">
                   <Download className="w-4 h-4" />
                   Baixar modelo de exemplo
                 </button>
@@ -507,7 +507,7 @@ export default function GerenciamentoDadosPage() {
           <div
             onClick={() => deParaInputRef.current?.click()}
             className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
-              selectedDeParaFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+              selectedDeParaFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-[#08C97D] hover:bg-[#F7FDFC]"
             }`}
           >
             <input
@@ -571,7 +571,7 @@ export default function GerenciamentoDadosPage() {
           <button
             onClick={handleUploadDePara}
             disabled={!selectedDeParaFile || uploadingDePara || !canUpload}
-            className="mt-6 w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="mt-6 w-full bg-[#08C97D] text-[#13161C] py-3 rounded-lg font-semibold hover:bg-[#0AE18C] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {uploadingDePara ? (
               <>Enviando...</>

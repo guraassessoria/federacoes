@@ -87,7 +87,7 @@ export default function AdminConfiguracoesPage() {
 
             <button
               onClick={() => router.push("/admin/configuracoes/estruturas")}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm"
+              className="flex items-center gap-2 bg-[#08C97D] text-[#13161C] px-4 py-2 rounded-lg hover:bg-[#0AE18C] transition-all text-sm"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Gerenciar Estruturas
@@ -103,7 +103,7 @@ export default function AdminConfiguracoesPage() {
                 <div
                   key={sf.type}
                   onClick={() => router.push("/admin/configuracoes/estruturas")}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all cursor-pointer group"
+                  className="flex items-center justify-between p-4 border rounded-lg hover:border-[#08C97D] hover:bg-[#F7FDFC] transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-4">
                     <div
@@ -143,7 +143,7 @@ export default function AdminConfiguracoesPage() {
                       </span>
                     )}
 
-                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#08C97D] transition-colors" />
                   </div>
                 </div>
               );

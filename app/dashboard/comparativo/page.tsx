@@ -549,7 +549,7 @@ export default function ComparativoPage() {
       ) : (
         <>
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-blue-600 px-4 py-3">
+            <div className="bg-[#08C97D] px-4 py-3">
               <h2 className="font-semibold text-white">Balanço Patrimonial - Comparativo ({selectedYear})</h2>
             </div>
             <div className="overflow-x-auto">
@@ -585,7 +585,7 @@ export default function ComparativoPage() {
           </div>
 
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-indigo-600 px-4 py-3">
+            <div className="bg-[#07B670] px-4 py-3">
               <h2 className="font-semibold text-white">DRE - Comparativo ({selectedYear})</h2>
             </div>
             <div className="overflow-x-auto">

@@ -103,7 +103,7 @@ interface FinancialApiData {
   hierarchicalBP?: HierarchicalBP;
 }
 
-type TabType = 'bp' | 'dre' | 'dfc' | 'dmpl' | 'dva';
+type TabType = 'bp' | 'dre' | 'dfc' | 'dmpl' | 'dra';
 
 // Anos disponíveis
 const anosDisponiveis = ['2023', '2024', '2025'];
@@ -155,7 +155,7 @@ const dmplGroups = [
   { title: 'Total Patrimonio Liquido', keys: ['Saldo Inicial PL', 'Mutacoes do Periodo', 'Saldo Final PL'], total: 'Saldo Final PL' }
 ];
 
-const dvaGroups = [
+const draGroups = [
   { title: 'Receitas', keys: ['Receitas de Competicoes e Eventos', 'Receitas Comerciais e de Patrocinio', 'Receitas de Subvencoes e Convenios', 'Outras Receitas Operacionais', 'Total Receitas'], total: 'Total Receitas' },
   { title: '(-) Insumos Adquiridos de Terceiros', keys: ['Custos de Competicoes e Eventos', 'Materiais e Servicos de Terceiros', 'Servicos Tecnicos Especializados', 'Outros Insumos', 'Total Insumos'], total: 'Total Insumos' },
   { title: 'Valor Adicionado Bruto', keys: ['Valor Adicionado Bruto'], total: 'Valor Adicionado Bruto' },
@@ -219,8 +219,8 @@ const dmplData: Record<string, Record<string, number>> = {
   }
 };
 
-// Dados fictícios para DVA
-const dvaData: Record<string, Record<string, number>> = {
+// Dados fictícios para DRA
+const draData: Record<string, Record<string, number>> = {
   '2025': {
     'Receitas de Competicoes e Eventos': 42000,
     'Receitas Comerciais e de Patrocinio': 28000,
@@ -665,8 +665,8 @@ export default function DemonstracoesPage() {
     return dmplData[year]?.[key] ?? 0;
   };
 
-  const getDvaValue = (year: string, key: string) => {
-    return dvaData[year]?.[key] ?? 0;
+  const getDraValue = (year: string, key: string) => {
+    return draData[year]?.[key] ?? 0;
   };
 
   const getGroups = () => {
@@ -675,7 +675,7 @@ export default function DemonstracoesPage() {
       case 'dre': return dreGroups;
       case 'dfc': return dfcGroups;
       case 'dmpl': return dmplGroups;
-      case 'dva': return dvaGroups;
+      case 'dra': return draGroups;
       default: return bpGroups;
     }
   };
@@ -686,7 +686,7 @@ export default function DemonstracoesPage() {
       case 'dre': return getDreValue(year, key);
       case 'dfc': return getDfcValue(year, key);
       case 'dmpl': return getDmplValue(year, key);
-      case 'dva': return getDvaValue(year, key);
+      case 'dra': return getDraValue(year, key);
       default: return 0;
     }
   };
@@ -730,7 +730,7 @@ export default function DemonstracoesPage() {
       case 'dre': return 'DRE - Demonstração do Resultado';
       case 'dfc': return 'DFC - Demonstração do Fluxo de Caixa';
       case 'dmpl': return 'DMPL - Demonstração das Mutações do PL';
-      case 'dva': return 'DVA - Demonstração do Valor Adicionado';
+      case 'dra': return 'DRA - Demonstração do Resultado Abrangente';
       default: return '';
     }
   };
@@ -741,7 +741,7 @@ export default function DemonstracoesPage() {
       case 'dre': return 'bg-[#07B670]';
       case 'dfc': return 'bg-emerald-600';
       case 'dmpl': return 'bg-purple-600';
-      case 'dva': return 'bg-amber-600';
+      case 'dra': return 'bg-amber-600';
       default: return 'bg-[#08C97D]';
     }
   };
@@ -1212,7 +1212,7 @@ export default function DemonstracoesPage() {
           <FileSpreadsheet className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Demonstrações Financeiras</h1>
         </div>
-        <p className="text-emerald-100">BP, DRE, DFC, DMPL e DVA</p>
+        <p className="text-emerald-100">BP, DRE, DFC, DMPL e DRA</p>
       </motion.div>
 
       {viewMode === 'mensal' ? (
@@ -1310,7 +1310,7 @@ export default function DemonstracoesPage() {
         </>
       ) : (
       <>
-      {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DVA */}
+      {/* Tabs das Demonstrações - Ordem: BP, DRE, DFC, DMPL, DRA */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           <button
@@ -1338,10 +1338,10 @@ export default function DemonstracoesPage() {
             DMPL
           </button>
           <button
-            onClick={() => setActiveTab('dva')}
-            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dva' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            onClick={() => setActiveTab('dra')}
+            className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${activeTab === 'dra' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
           >
-            DVA
+            DRA
           </button>
         </div>
         

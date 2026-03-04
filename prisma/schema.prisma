@@ -129,7 +129,7 @@ model DeParaMapping {
 // ─── Estruturas Padrão (GLOBAL — JSON no banco) ────────────
 //
 // Uma única tabela com campo Json para armazenar a estrutura.
-// Cada tipo (BP, DRE, DFC, DMPL) tem exatamente 1 registro.
+// Cada tipo (BP, DRE, DFC, DMPL, DRA) tem exatamente 1 registro.
 // O campo `data` contém: { rows: [...], meta: {...} }
 // Versionamento via campo `version` (incrementa a cada upload).
 //
@@ -166,6 +166,5 @@ enum StructureType {
   DRE
   DFC
   DMPL
-  DVA
   DRA
 }

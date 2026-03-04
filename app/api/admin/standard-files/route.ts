@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TYPES = ["BP", "DRE", "DFC", "DMPL"] as const;
+const ALLOWED_TYPES = ["BP", "DRE", "DFC", "DMPL", "DRA"] as const;
 type AllowedType = (typeof ALLOWED_TYPES)[number];
 
 // ─── Helpers ────────────────────────────────────────────────

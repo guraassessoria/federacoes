@@ -110,15 +110,15 @@ export default function RentabilidadePage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <TrendingUp className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Índices de Rentabilidade</h1>
         </div>
-        <p className="text-green-100">Capacidade de gerar lucros e retornos - {periodLabel}</p>
+        <p className="text-emerald-100">Capacidade de gerar lucros e retornos - {periodLabel}</p>
         {source === 'demonstration' && (
-          <p className="text-green-200 text-sm mt-2">
+          <p className="text-emerald-200 text-sm mt-2">
             <Info className="w-4 h-4 inline mr-1" />
             {message || "Dados de demonstração"}
           </p>

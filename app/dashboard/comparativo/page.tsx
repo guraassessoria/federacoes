@@ -484,13 +484,13 @@ export default function ComparativoPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-violet-600 to-violet-700 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <Columns3 className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Comparativo</h1>
         </div>
-        <p className="text-violet-100">Demonstrações e índices comparativos entre empresas com acesso do usuário</p>
+        <p className="text-emerald-100">Demonstrações e índices comparativos entre empresas com acesso do usuário</p>
       </motion.div>
 
       <div className="bg-white rounded-xl shadow-lg p-6">

@@ -20,7 +20,7 @@ import * as XLSX from "xlsx";
 
 // ─── Types ──────────────────────────────────────────────────
 
-type StructureType = "BP" | "DRE" | "DFC" | "DMPL";
+type StructureType = "BP" | "DRE" | "DFC" | "DMPL" | "DRA";
 
 type StructureRow = {
   ordem: number;
@@ -49,6 +49,7 @@ const TYPES: { type: StructureType; label: string; description: string }[] = [
   { type: "DRE", label: "DRE", description: "Demonstração do Resultado" },
   { type: "DFC", label: "DFC", description: "Demonstração dos Fluxos de Caixa" },
   { type: "DMPL", label: "DMPL", description: "Mutações do Patrimônio Líquido" },
+  { type: "DRA", label: "DRA", description: "Demonstração do Resultado Abrangente" },
 ];
 
 // ─── Flexible parser (same logic as backend, for preview) ───

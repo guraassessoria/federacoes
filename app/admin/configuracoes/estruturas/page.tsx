@@ -24,6 +24,7 @@ const STRUCTURE_TYPES = [
   { type: "DRE", name: "DRE", description: "Demonstração do Resultado" },
   { type: "DFC", name: "DFC", description: "Demonstração dos Fluxos de Caixa" },
   { type: "DMPL", name: "DMPL", description: "Mutações do Patrimônio Líquido" },
+  { type: "DRA", name: "DRA", description: "Demonstração do Resultado Abrangente" },
 ];
 
 export default function AdminConfiguracoesPage() {

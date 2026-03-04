@@ -99,15 +99,15 @@ export default function EndividamentoPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl p-8 text-white shadow-xl"
+        className="bg-gradient-to-r from-[#08C97D] to-[#07B670] rounded-2xl p-8 text-white shadow-xl"
       >
         <div className="flex items-center gap-3 mb-2">
           <Percent className="w-8 h-8" />
           <h1 className="text-3xl font-bold">Índices de Endividamento</h1>
         </div>
-        <p className="text-orange-100">Estrutura de capital e nível de endividamento - {periodLabel}</p>
+        <p className="text-emerald-100">Estrutura de capital e nível de endividamento - {periodLabel}</p>
         {source === 'demonstration' && (
-          <p className="text-orange-200 text-sm mt-2">
+          <p className="text-emerald-200 text-sm mt-2">
             <Info className="w-4 h-4 inline mr-1" />
             {message || "Dados de demonstração"}
           </p>

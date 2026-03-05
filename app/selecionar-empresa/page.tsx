@@ -7,11 +7,17 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import {
   Building2,
-  ChevronDown,
   LogOut,
   BarChart3,
 } from "lucide-react";
 import { resolveCompanyRedirect } from "@/lib/company-selection";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Company {
   id: string;
@@ -25,7 +31,6 @@ export default function SelecionarEmpresaPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>("");
-  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,7 +67,6 @@ export default function SelecionarEmpresaPage() {
 
   const handleSelectCompany = (companyId: string) => {
     setSelectedCompany(companyId);
-    setIsOpen(false);
     localStorage.setItem("selectedCompany", companyId);
     const company = companies.find((c) => c.id === companyId);
     if (company?.name) {
@@ -112,7 +116,7 @@ export default function SelecionarEmpresaPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden"
+          className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-visible"
         >
           <div className="px-8 pt-8 pb-5">
             <h2 className="text-xl font-semibold text-[#13161C] mb-6 flex items-center gap-2">
@@ -131,50 +135,29 @@ export default function SelecionarEmpresaPage() {
             ) : (
               <>
                 {/* Company Selector */}
-                <div className="relative mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="w-full flex items-center justify-between px-4 py-3 border-2 border-[#E5E7EB] rounded-lg hover:border-[#08C97D] transition-all bg-white"
-                  >
-                    <span className={selectedCompany ? "text-[#13161C]" : "text-[#8E8E8E]"}>
-                      {selectedCompanyData?.name || "Selecione uma empresa..."}
-                    </span>
-                    <ChevronDown
-                      className={`w-5 h-5 text-[#8E8E8E] transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {isOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute z-50 w-full mt-2 bg-white border border-[#E5E7EB] rounded-lg shadow-lg max-h-60 overflow-auto"
-                    >
+                <div className="mb-6">
+                  <Select value={selectedCompany} onValueChange={handleSelectCompany}>
+                    <SelectTrigger className="h-auto min-h-[52px] px-4 py-3 border-2 border-[#E5E7EB] rounded-lg hover:border-[#08C97D] transition-all bg-white text-left">
+                      <SelectValue placeholder="Selecione uma empresa..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
                       {companies.map((company) => (
-                        <button
+                        <SelectItem
                           key={company.id}
-                          type="button"
-                          onClick={() => handleSelectCompany(company.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-[#F7FDFC] transition-all flex items-center justify-between ${
-                            selectedCompany === company.id ? "bg-[#F7FDFC]" : ""
-                          }`}
+                          value={company.id}
+                          textValue={company.name}
+                          className="py-2"
                         >
-                          <div>
-                            <p className="font-medium text-gray-800">{company.name}</p>
-                            {company.cnpj && (
-                              <p className="text-sm text-gray-500">CNPJ: {company.cnpj}</p>
-                            )}
+                          <div className="flex flex-col">
+                            <span className="font-medium text-[#13161C]">{company.name}</span>
+                            <span className="text-xs text-[#8E8E8E]">
+                              {company.cnpj ? `CNPJ: ${company.cnpj}` : "Sem CNPJ"} • {company.role}
+                            </span>
                           </div>
-                          <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                            {company.role}
-                          </span>
-                        </button>
+                        </SelectItem>
                       ))}
-                    </motion.div>
-                  )}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Continue Button */}

@@ -366,6 +366,30 @@ export default function GerenciamentoDadosPage() {
       structureResults
         .filter((item): item is { type: StructureType; version: number; rows: StandardStructureRow[] } => Boolean(item))
         .forEach((item) => {
+          const normalizedRows = item.rows.filter((row) => (row.codigo || "").trim());
+          const allCodes = normalizedRows.map((row) => (row.codigo || "").trim());
+          const parentCodes = new Set(
+            normalizedRows
+              .map((row) => (row.codigoSuperior || "").trim())
+              .filter(Boolean)
+          );
+
+          const analyticalRows = normalizedRows.filter((row) => {
+            const code = (row.codigo || "").trim();
+            if (!code) return false;
+
+            const hasChildByParent = parentCodes.has(code);
+            const hasChildByPrefix = allCodes.some(
+              (otherCode) => otherCode !== code && otherCode.startsWith(`${code}.`)
+            );
+
+            return !hasChildByParent && !hasChildByPrefix;
+          });
+
+          if (analyticalRows.length === 0) {
+            return;
+          }
+
           const structureHeader = [
             "ordem",
             "codigo",
@@ -377,7 +401,7 @@ export default function GerenciamentoDadosPage() {
             "versao",
           ];
 
-          const structureRows = item.rows.map((row) => [
+          const structureRows = analyticalRows.map((row) => [
             row.ordem ?? "",
             row.codigo ?? "",
             row.descricao ?? "",

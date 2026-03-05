@@ -16,6 +16,7 @@ import {
   Download,
 } from "lucide-react";
 import { API_ENDPOINTS } from "@/lib/constants";
+import { useDashboard } from "@/lib/contexts/DashboardContext";
 
 type UploadStatus = "idle" | "success" | "warning" | "error";
 
@@ -59,9 +60,11 @@ export default function GerenciamentoDadosPage() {
   const { data: session } = useSession() || {};
   const role = (session?.user as any)?.role as string | undefined;
   const router = useRouter();
+  const { selectedCompanyId, selectedCompanyName } = useDashboard();
 
   const balanceteInputRef = useRef<HTMLInputElement>(null);
   const deParaInputRef = useRef<HTMLInputElement>(null);
+  const previousCompanyIdRef = useRef<string>("");
 
   const [companyId, setCompanyId] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
@@ -91,13 +94,41 @@ export default function GerenciamentoDadosPage() {
   }, [session?.user, role]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("selectedCompany");
-    if (stored) {
-      setCompanyId(stored);
-      fetchCompanyInfo(stored);
-      fetchFiles(stored);
+    const currentCompanyId = selectedCompanyId || localStorage.getItem("selectedCompany") || "";
+    const currentCompanyName = selectedCompanyName || localStorage.getItem("selectedCompanyName") || "";
+
+    if (!currentCompanyId) {
+      setCompanyId("");
+      setCompanyName("");
+      setBalancetes([]);
+      setDeParaFiles([]);
+      return;
     }
-  }, []);
+
+    const companyChanged =
+      previousCompanyIdRef.current && previousCompanyIdRef.current !== currentCompanyId;
+
+    setCompanyId(currentCompanyId);
+    setCompanyName(currentCompanyName);
+    fetchFiles(currentCompanyId);
+
+    if (!currentCompanyName) {
+      fetchCompanyInfo(currentCompanyId);
+    }
+
+    if (companyChanged) {
+      setSelectedBalanceteFile(null);
+      setSelectedDeParaFile(null);
+      setBalanceteStatus("idle");
+      setDeParaStatus("idle");
+      setBalanceteMessage("");
+      setDeParaMessage("");
+      if (balanceteInputRef.current) balanceteInputRef.current.value = "";
+      if (deParaInputRef.current) deParaInputRef.current.value = "";
+    }
+
+    previousCompanyIdRef.current = currentCompanyId;
+  }, [selectedCompanyId, selectedCompanyName]);
 
   const fetchCompanyInfo = async (cid: string) => {
     try {

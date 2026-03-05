@@ -28,6 +28,25 @@ interface CompanyFile {
   updatedAt: string;
 }
 
+const STRUCTURE_TYPES = ["BP", "DRE", "DFC", "DMPL", "DRA"] as const;
+type StructureType = (typeof STRUCTURE_TYPES)[number];
+
+interface StandardStructureRow {
+  ordem?: number;
+  codigo?: string;
+  descricao?: string;
+  codigoSuperior?: string | null;
+  nivel?: number | null;
+  isTotal?: boolean;
+  grupo?: string | null;
+}
+
+interface StandardStructureResponse {
+  type: StructureType;
+  version: number;
+  rows: StandardStructureRow[];
+}
+
 function monthOptions() {
   return [
     { label: "JAN", value: "JAN" },
@@ -298,20 +317,87 @@ export default function GerenciamentoDadosPage() {
     }
   };
 
-  const downloadTemplate = () => {
-    const headers = "Conta Federação;Descrição Conta Federação;Padrão_BP;Padrão_DRE;Padrão_DFC;Padrão_DMPL";
-    const example1 = "1.1.01;Caixa e Equivalentes;0001;;;";
-    const example2 = "4.1.01;Receitas de Competições;;0001;;";
-    const example3 = "3.1.01;Custos com Competições;;0050;;";
+  const downloadTemplate = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.utils.book_new();
 
-    const content = `${headers}\n${example1}\n${example2}\n${example3}`;
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "modelo_de_para.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+      const modelHeader = [
+        "Conta Federação",
+        "Descrição Conta Federação",
+        "Padrão_BP",
+        "Padrão_DRE",
+        "Padrão_DFC",
+        "Padrão_DMPL",
+      ];
+
+      const modelRows = [
+        ["1.1.01", "Caixa e Equivalentes", "0001", "", "", ""],
+        ["4.1.01", "Receitas de Competições", "", "0001", "", ""],
+        ["3.1.01", "Custos com Competições", "", "0050", "", ""],
+      ];
+
+      const modelSheet = XLSX.utils.aoa_to_sheet([modelHeader, ...modelRows]);
+      XLSX.utils.book_append_sheet(workbook, modelSheet, "MODELO_DE_PARA");
+
+      const structureResults = await Promise.all(
+        STRUCTURE_TYPES.map(async (type) => {
+          const res = await fetch(`${API_ENDPOINTS.ADMIN_STANDARD_FILES}?type=${type}`, {
+            cache: "no-store",
+          });
+
+          if (!res.ok) {
+            return null;
+          }
+
+          const data = (await res.json()) as StandardStructureResponse;
+          if (!Array.isArray(data.rows) || data.rows.length === 0) {
+            return null;
+          }
+
+          return {
+            type,
+            version: data.version || 0,
+            rows: data.rows,
+          };
+        })
+      );
+
+      structureResults
+        .filter((item): item is { type: StructureType; version: number; rows: StandardStructureRow[] } => Boolean(item))
+        .forEach((item) => {
+          const structureHeader = [
+            "ordem",
+            "codigo",
+            "descricao",
+            "codigoSuperior",
+            "nivel",
+            "isTotal",
+            "grupo",
+            "versao",
+          ];
+
+          const structureRows = item.rows.map((row) => [
+            row.ordem ?? "",
+            row.codigo ?? "",
+            row.descricao ?? "",
+            row.codigoSuperior ?? "",
+            row.nivel ?? "",
+            row.isTotal ? "TRUE" : "FALSE",
+            row.grupo ?? "",
+            item.version,
+          ]);
+
+          const structureSheet = XLSX.utils.aoa_to_sheet([structureHeader, ...structureRows]);
+          XLSX.utils.book_append_sheet(workbook, structureSheet, item.type);
+        });
+
+      XLSX.writeFile(workbook, "modelo_de_para_com_estruturas.xlsx");
+    } catch (error) {
+      console.error("Erro ao gerar modelo de De x Para:", error);
+      setDeParaStatus("error");
+      setDeParaMessage("Não foi possível gerar o modelo de De x Para com estruturas.");
+    }
   };
 
   return (
@@ -529,7 +615,7 @@ export default function GerenciamentoDadosPage() {
 
                 <button onClick={downloadTemplate} className="mt-4 flex items-center gap-2 text-[#08C97D] hover:text-[#07B670] text-sm font-medium">
                   <Download className="w-4 h-4" />
-                  Baixar modelo de exemplo
+                  Baixar modelo com estruturas (Excel)
                 </button>
               </div>
             </div>
